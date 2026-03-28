@@ -15,6 +15,7 @@ import {
   Copy,
   Check,
   Code2,
+  ShieldCheck,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 
@@ -22,8 +23,8 @@ const SETUP_SQL = `-- 1. Create the events table
 create table if not exists public.events (
   id uuid primary key default gen_random_uuid(),
   title text not null,
-  date date not null,
-  location text not null,
+  event_date date,
+  location text,
   created_at timestamptz default now()
 );
 
@@ -95,6 +96,44 @@ create or replace trigger on_auth_user_created
   after insert on auth.users
   for each row execute procedure public.handle_new_user();`;
 
+const FIX_PERMISSIONS_SQL = `-- Fix permissions for existing tables
+-- Run this if you can read events but cannot update, insert, or delete them.
+
+-- Drop old policies (safe — ignores if they don't exist)
+drop policy if exists "Authenticated users can read events"   on public.events;
+drop policy if exists "Authenticated users can insert events" on public.events;
+drop policy if exists "Authenticated users can update events" on public.events;
+drop policy if exists "Authenticated users can delete events" on public.events;
+drop policy if exists "Authenticated users can read tickets"  on public.tickets;
+drop policy if exists "Authenticated users can insert tickets" on public.tickets;
+drop policy if exists "Authenticated users can update tickets" on public.tickets;
+
+-- Re-create all policies
+create policy "Authenticated users can read events"
+  on public.events for select to authenticated using (true);
+
+create policy "Authenticated users can insert events"
+  on public.events for insert to authenticated with check (true);
+
+create policy "Authenticated users can update events"
+  on public.events for update to authenticated using (true) with check (true);
+
+create policy "Authenticated users can delete events"
+  on public.events for delete to authenticated using (true);
+
+create policy "Authenticated users can read tickets"
+  on public.tickets for select to authenticated using (true);
+
+create policy "Authenticated users can insert tickets"
+  on public.tickets for insert to authenticated with check (true);
+
+create policy "Authenticated users can update tickets"
+  on public.tickets for update to authenticated using (true) with check (true);
+
+-- Add event_date column if your table used a different name
+alter table public.events add column if not exists event_date date;
+alter table public.events add column if not exists location text;`;
+
 export default function SettingsPage() {
   const { t, lang, setLang } = useLocale();
   const { profile } = useAuth();
@@ -104,6 +143,13 @@ export default function SettingsPage() {
   const [clearConfirm, setClearConfirm] = useState(false);
   const [clearMsg, setClearMsg] = useState("");
   const [sqlCopied, setSqlCopied] = useState(false);
+  const [fixCopied, setFixCopied] = useState(false);
+
+  const handleCopyFixSQL = async () => {
+    await navigator.clipboard.writeText(FIX_PERMISSIONS_SQL);
+    setFixCopied(true);
+    setTimeout(() => setFixCopied(false), 2000);
+  };
 
   const handleTestConnection = async () => {
     setTestStatus("testing");
@@ -220,6 +266,34 @@ export default function SettingsPage() {
             </div>
             <p className="text-xs text-muted-foreground">
               Go to <strong>Supabase Dashboard → SQL Editor → New query</strong>, paste the script above, and click <strong>Run</strong>.
+            </p>
+          </div>
+        </SectionCard>
+
+        {/* Fix Permissions */}
+        <SectionCard title="Fix Permissions (RLS)" icon={ShieldCheck}>
+          <div className="space-y-3">
+            <div className="flex items-start gap-2.5 p-3 bg-amber-50 dark:bg-amber-900/10 border border-amber-200 dark:border-amber-800/30 rounded-xl text-sm text-amber-800 dark:text-amber-400">
+              <AlertTriangle className="w-4 h-4 shrink-0 mt-0.5" />
+              <p className="text-xs leading-relaxed">
+                <strong>Run this if edits, additions, or deletes don't save to the database.</strong>{" "}
+                This safely drops and recreates all RLS policies on your existing tables — nothing is deleted.
+              </p>
+            </div>
+            <div className="relative">
+              <pre className="bg-muted/60 rounded-xl p-4 text-xs font-mono overflow-auto max-h-48 text-foreground/80 leading-relaxed whitespace-pre-wrap">
+                {FIX_PERMISSIONS_SQL}
+              </pre>
+              <button
+                onClick={handleCopyFixSQL}
+                className="absolute top-2 end-2 flex items-center gap-1.5 px-2.5 py-1.5 bg-card border border-border rounded-lg text-xs font-medium hover:bg-muted transition-colors"
+              >
+                {fixCopied ? <Check className="w-3.5 h-3.5 text-emerald-500" /> : <Copy className="w-3.5 h-3.5" />}
+                {fixCopied ? "Copied!" : "Copy"}
+              </button>
+            </div>
+            <p className="text-xs text-muted-foreground">
+              Go to <strong>Supabase Dashboard → SQL Editor → New query</strong>, paste and click <strong>Run</strong>. Then try editing an event again.
             </p>
           </div>
         </SectionCard>

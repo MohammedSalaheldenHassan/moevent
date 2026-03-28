@@ -137,15 +137,23 @@ export default function EventsPage() {
           event_date: form.date || null,
           location: form.location.trim() || null,
         };
-        const { error } = await supabase
+        // Use .select("id") so we can detect silent RLS blocks (0 rows returned = blocked)
+        const { data: updated, error } = await supabase
           .from("events")
           .update(payload)
-          .eq("id", editingEvent.id);
+          .eq("id", editingEvent.id)
+          .select("id");
         if (error) {
           console.error("[EventsPage] update error:", error.code, error.message);
           throw error;
         }
-        // Apply update to local list immediately
+        if (!updated || updated.length === 0) {
+          // RLS silently blocked the UPDATE — no rows were affected
+          throw new Error(
+            "Update was blocked by database permissions (RLS). Go to Settings → Database Setup and run the \"Fix Permissions\" SQL to allow updates."
+          );
+        }
+        // Confirmed — apply to local list
         setEvents((prev) =>
           prev.map((e) =>
             e.id === editingEvent.id ? { ...e, ...payload } : e
