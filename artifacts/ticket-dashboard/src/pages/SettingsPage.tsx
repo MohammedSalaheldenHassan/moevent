@@ -99,19 +99,40 @@ export default function SettingsPage() {
       setLogoError(isAr ? "يرجى اختيار ملف صورة صالح" : "Please select a valid image file");
       return;
     }
-    const MAX_BYTES = 800 * 1024; // 800 KB
+    const MAX_BYTES = 5 * 1024 * 1024; // 5 MB raw file limit
     if (file.size > MAX_BYTES) {
-      setLogoError(isAr ? "حجم الصورة أكبر من 800 كيلوبايت. يرجى اختيار صورة أصغر." : "Image is larger than 800 KB. Please choose a smaller image.");
+      setLogoError(isAr ? "حجم الصورة أكبر من 5 ميغابايت." : "Image is larger than 5 MB.");
       return;
     }
     const reader = new FileReader();
     reader.onload = (ev) => {
-      const dataUrl = ev.target?.result as string;
-      setSystemLogo(dataUrl);
-      logActivity("settings_changed", "System logo updated", profile?.email ?? undefined);
+      const rawDataUrl = ev.target?.result as string;
+      // Compress & resize via canvas so it fits comfortably in localStorage
+      const img = new Image();
+      img.onload = () => {
+        const MAX_DIM = 256;
+        let { width, height } = img;
+        if (width > MAX_DIM || height > MAX_DIM) {
+          const ratio = Math.min(MAX_DIM / width, MAX_DIM / height);
+          width = Math.round(width * ratio);
+          height = Math.round(height * ratio);
+        }
+        const canvas = document.createElement("canvas");
+        canvas.width = width;
+        canvas.height = height;
+        canvas.getContext("2d")!.drawImage(img, 0, 0, width, height);
+        const compressed = canvas.toDataURL("image/jpeg", 0.85);
+        try {
+          setSystemLogo(compressed);
+          logActivity("settings_changed", "System logo updated", profile?.email ?? undefined);
+        } catch {
+          setLogoError(isAr ? "فشل حفظ الشعار. مساحة التخزين ممتلئة." : "Failed to save logo — storage is full.");
+        }
+      };
+      img.src = rawDataUrl;
     };
     reader.readAsDataURL(file);
-    // Reset input so the same file can be re-selected
+    // Reset so the same file can be re-selected
     e.target.value = "";
   };
 

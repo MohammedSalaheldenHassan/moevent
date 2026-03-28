@@ -21,13 +21,23 @@ export function BrandingProvider({ children }: { children: React.ReactNode }) {
   );
 
   const setSystemName = (name: string) => {
-    localStorage.setItem(NAME_KEY, name);
+    try { localStorage.setItem(NAME_KEY, name); } catch { /* quota exceeded */ }
     setSystemNameState(name);
   };
 
   const setSystemLogo = (logo: string) => {
-    localStorage.setItem(LOGO_KEY, logo);
-    setSystemLogoState(logo);
+    if (!logo) {
+      localStorage.removeItem(LOGO_KEY);
+      setSystemLogoState("");
+      return;
+    }
+    try {
+      localStorage.setItem(LOGO_KEY, logo);
+      setSystemLogoState(logo);
+    } catch {
+      // QuotaExceededError — surface it so the upload handler can show an error
+      throw new Error("storage_full");
+    }
   };
 
   return (
