@@ -4,6 +4,25 @@
 
 pnpm workspace monorepo using TypeScript. Each package manages its own dependencies.
 
+## Ticket Management Dashboard (`artifacts/ticket-dashboard`)
+
+React + Vite frontend at `/`. Connected to Supabase for auth, events, tickets, and profiles.
+
+### Features
+- Supabase Auth with admin role check (profiles table)
+- Dashboard with real-time stats (Supabase realtime)
+- Events management (grid + Add Event modal)
+- Ticket issuance with QR code + print
+- Staff listing
+- **Full Arabic/English localization** with RTL layout support
+- Language switcher (EN/عربي) on login page and sidebar
+- Cairo font for Arabic, Inter for English
+
+### Key files
+- `src/contexts/LocaleContext.tsx` — i18n translations + RTL
+- `src/contexts/AuthContext.tsx` — Supabase auth + admin role guard
+- `src/lib/supabase.ts` — Supabase client
+
 ## Stack
 
 - **Monorepo tool**: pnpm workspaces

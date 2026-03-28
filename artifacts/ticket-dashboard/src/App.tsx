@@ -1,8 +1,9 @@
-import { Switch, Route, Router as WouterRouter, Redirect } from "wouter";
+import { Switch, Route, Router as WouterRouter } from "wouter";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { Toaster } from "@/components/ui/toaster";
 import { TooltipProvider } from "@/components/ui/tooltip";
 import { AuthProvider, useAuth } from "@/contexts/AuthContext";
+import { LocaleProvider, useLocale } from "@/contexts/LocaleContext";
 import { ErrorBoundary } from "@/components/ErrorBoundary";
 import { Sidebar } from "@/components/Sidebar";
 import LoginPage from "@/pages/LoginPage";
@@ -15,19 +16,17 @@ import { Loader2 } from "lucide-react";
 
 const queryClient = new QueryClient({
   defaultOptions: {
-    queries: {
-      retry: 2,
-      retryDelay: 1000,
-    },
+    queries: { retry: 2, retryDelay: 1000 },
   },
 });
 
 function AppLayout({ children }: { children: React.ReactNode }) {
+  const { isRTL } = useLocale();
   return (
     <div className="flex min-h-screen bg-background">
       <Sidebar />
-      <main className="flex-1 lg:pl-64">
-        <div className="p-6 lg:p-8 max-w-6xl">{children}</div>
+      <main className={`flex-1 ${isRTL ? "lg:pr-64" : "lg:pl-64"} min-w-0`}>
+        <div className="p-6 lg:p-8 max-w-6xl mx-auto">{children}</div>
       </main>
     </div>
   );
@@ -35,13 +34,16 @@ function AppLayout({ children }: { children: React.ReactNode }) {
 
 function ProtectedRoutes() {
   const { user, loading } = useAuth();
+  const { t } = useLocale();
 
   if (loading) {
     return (
       <div className="min-h-screen flex items-center justify-center bg-background">
         <div className="flex flex-col items-center gap-3">
-          <Loader2 className="w-8 h-8 animate-spin text-primary" />
-          <p className="text-sm text-muted-foreground">Loading...</p>
+          <div className="w-12 h-12 rounded-2xl bg-primary/10 flex items-center justify-center">
+            <Loader2 className="w-6 h-6 animate-spin text-primary" />
+          </div>
+          <p className="text-sm text-muted-foreground">{t.loading}</p>
         </div>
       </div>
     );
@@ -67,16 +69,18 @@ function ProtectedRoutes() {
 function App() {
   return (
     <ErrorBoundary>
-      <QueryClientProvider client={queryClient}>
-        <TooltipProvider>
-          <AuthProvider>
-            <WouterRouter base={import.meta.env.BASE_URL.replace(/\/$/, "")}>
-              <ProtectedRoutes />
-            </WouterRouter>
-            <Toaster />
-          </AuthProvider>
-        </TooltipProvider>
-      </QueryClientProvider>
+      <LocaleProvider>
+        <QueryClientProvider client={queryClient}>
+          <TooltipProvider>
+            <AuthProvider>
+              <WouterRouter base={import.meta.env.BASE_URL.replace(/\/$/, "")}>
+                <ProtectedRoutes />
+              </WouterRouter>
+              <Toaster />
+            </AuthProvider>
+          </TooltipProvider>
+        </QueryClientProvider>
+      </LocaleProvider>
     </ErrorBoundary>
   );
 }

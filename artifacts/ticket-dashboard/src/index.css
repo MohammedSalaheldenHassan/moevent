@@ -120,6 +120,7 @@
   --sidebar-ring: 262 83% 58%;
 
   --app-font-sans: 'Inter', system-ui, sans-serif;
+  --app-font-arabic: 'Cairo', 'Noto Sans Arabic', system-ui, sans-serif;
   --app-font-serif: Georgia, serif;
   --app-font-mono: Menlo, monospace;
   --radius: 0.5rem;
@@ -220,6 +221,18 @@
   body {
     @apply font-sans antialiased bg-background text-foreground;
   }
+}
+
+/* RTL support */
+[dir="rtl"] .lg\:pl-64 {
+  padding-left: 0 !important;
+  padding-right: 16rem !important;
+}
+
+/* Arabic font override */
+[lang="ar"] body,
+[lang="ar"] * {
+  font-family: 'Cairo', 'Noto Sans Arabic', system-ui, sans-serif;
 }
 
 @layer utilities {
