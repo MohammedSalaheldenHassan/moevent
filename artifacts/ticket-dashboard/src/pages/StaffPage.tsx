@@ -14,8 +14,8 @@ import {
   X,
   Check,
   Plus,
-  Copy,
-  Link,
+  Eye,
+  EyeOff,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -37,30 +37,36 @@ interface Profile {
   email: string | null;
 }
 
+const API_BASE = `${window.location.origin}/api`;
+
 export default function StaffPage() {
   const { t, lang } = useLocale();
   const { profile: currentProfile } = useAuth();
+  const isAr = lang === "ar";
 
   const [profiles, setProfiles] = useState<Profile[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
-  // Add Staff modal
+  // ── Add Staff ──────────────────────────────────────────────
   const [addOpen, setAddOpen] = useState(false);
-  const [linkCopied, setLinkCopied] = useState(false);
+  const [addForm, setAddForm] = useState({ email: "", password: "", full_name: "", role: "staff" as "admin" | "staff" });
+  const [addSaving, setAddSaving] = useState(false);
+  const [addError, setAddError] = useState<string | null>(null);
+  const [showPassword, setShowPassword] = useState(false);
 
-  // Edit state
+  // ── Edit Staff ─────────────────────────────────────────────
   const [editTarget, setEditTarget] = useState<Profile | null>(null);
-  const [editForm, setEditForm] = useState({ full_name: "", role: "admin" });
+  const [editForm, setEditForm] = useState({ full_name: "", role: "admin" as "admin" | "staff" });
   const [editSaving, setEditSaving] = useState(false);
   const [editError, setEditError] = useState<string | null>(null);
 
-  // Delete state
+  // ── Delete Staff ───────────────────────────────────────────
   const [deleteTarget, setDeleteTarget] = useState<Profile | null>(null);
   const [deleting, setDeleting] = useState(false);
   const [deleteError, setDeleteError] = useState<string | null>(null);
 
-  const APP_URL = window.location.origin;
+  // ──────────────────────────────────────────────────────────
 
   const fetchProfiles = async () => {
     setLoading(true);
@@ -74,7 +80,6 @@ export default function StaffPage() {
       setProfiles(data ?? []);
     } catch (err: unknown) {
       const msg = err instanceof Error ? err.message : "Failed to load staff";
-      console.error("[StaffPage] fetchProfiles error:", msg);
       setError(msg);
       if (currentProfile) {
         setProfiles([{
@@ -91,15 +96,72 @@ export default function StaffPage() {
 
   useEffect(() => { fetchProfiles(); }, []);
 
-  const copyInviteLink = async () => {
-    await navigator.clipboard.writeText(APP_URL);
-    setLinkCopied(true);
-    setTimeout(() => setLinkCopied(false), 2500);
+  // ── Add Staff ──────────────────────────────────────────────
+  const openAdd = () => {
+    setAddForm({ email: "", password: "", full_name: "", role: "staff" });
+    setAddError(null);
+    setShowPassword(false);
+    setAddOpen(true);
   };
 
+  const handleAddStaff = async () => {
+    if (!addForm.email.trim() || !addForm.email.includes("@")) {
+      setAddError(isAr ? "البريد الإلكتروني غير صالح" : "Please enter a valid email address.");
+      return;
+    }
+    if (addForm.password.length < 6) {
+      setAddError(isAr ? "كلمة المرور يجب أن تكون 6 أحرف على الأقل" : "Password must be at least 6 characters.");
+      return;
+    }
+    setAddSaving(true);
+    setAddError(null);
+    try {
+      const res = await fetch(`${API_BASE}/staff/create`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          email: addForm.email.trim().toLowerCase(),
+          password: addForm.password,
+          full_name: addForm.full_name.trim() || null,
+          role: addForm.role,
+        }),
+      });
+      const json = await res.json() as { user?: Profile; error?: string; warning?: string };
+
+      if (!res.ok) {
+        throw new Error(json.error || `Server error ${res.status}`);
+      }
+
+      // Add to local list immediately
+      if (json.user) {
+        setProfiles((prev) => [
+          ...prev,
+          { id: json.user!.id, email: json.user!.email, full_name: json.user!.full_name, role: json.user!.role },
+        ]);
+      }
+
+      logActivity(
+        "settings_changed",
+        `Added staff: ${addForm.email.trim()}`,
+        currentProfile?.email ?? undefined
+      );
+
+      if (json.warning) {
+        setAddError(`⚠️ ${json.warning}`);
+      } else {
+        setAddOpen(false);
+      }
+    } catch (err: unknown) {
+      setAddError(err instanceof Error ? err.message : "Failed to create staff member");
+    } finally {
+      setAddSaving(false);
+    }
+  };
+
+  // ── Edit Staff ─────────────────────────────────────────────
   const openEdit = (profile: Profile) => {
     setEditTarget(profile);
-    setEditForm({ full_name: profile.full_name ?? "", role: profile.role });
+    setEditForm({ full_name: profile.full_name ?? "", role: (profile.role as "admin" | "staff") ?? "staff" });
     setEditError(null);
   };
 
@@ -116,16 +178,16 @@ export default function StaffPage() {
         })
         .eq("id", editTarget.id)
         .select("id");
-      if (error) {
-        console.error("[StaffPage] update error:", error.code, error.message);
-        throw error;
-      }
+
+      if (error) throw error;
       if (!updated || updated.length === 0) {
         throw new Error(
-          "Update blocked by database permissions. Go to Settings → Fix Permissions and run the SQL script."
+          isAr
+            ? "فشل التحديث بسبب صلاحيات قاعدة البيانات. اذهب إلى الإعدادات ← إصلاح الصلاحيات."
+            : "Update blocked by database permissions. Go to Settings → Fix Permissions."
         );
       }
-      // Apply optimistic update to local list
+
       setProfiles((prev) =>
         prev.map((p) =>
           p.id === editTarget.id
@@ -142,10 +204,11 @@ export default function StaffPage() {
     }
   };
 
+  // ── Delete Staff ───────────────────────────────────────────
   const handleDelete = async () => {
     if (!deleteTarget) return;
     if (deleteTarget.id === currentProfile?.id) {
-      setDeleteError("You cannot delete your own account.");
+      setDeleteError(isAr ? "لا يمكنك حذف حسابك الخاص" : "You cannot delete your own account.");
       return;
     }
     setDeleting(true);
@@ -155,10 +218,7 @@ export default function StaffPage() {
         .from("profiles")
         .delete()
         .eq("id", deleteTarget.id);
-      if (error) {
-        console.error("[StaffPage] delete error:", error.code, error.message);
-        throw error;
-      }
+      if (error) throw error;
       logActivity("settings_changed", `Deleted staff: ${deleteTarget.email}`, currentProfile?.email ?? undefined);
       setProfiles((prev) => prev.filter((p) => p.id !== deleteTarget.id));
       setDeleteTarget(null);
@@ -169,7 +229,32 @@ export default function StaffPage() {
     }
   };
 
-  const isAr = lang === "ar";
+  // ── Role toggle button ─────────────────────────────────────
+  const RoleToggle = ({
+    value,
+    onChange,
+  }: {
+    value: "admin" | "staff";
+    onChange: (r: "admin" | "staff") => void;
+  }) => (
+    <div className="flex gap-2">
+      {(["admin", "staff"] as const).map((role) => (
+        <button
+          key={role}
+          type="button"
+          onClick={() => onChange(role)}
+          className={`flex-1 py-2.5 px-4 rounded-xl text-sm font-semibold border-2 transition-all flex items-center justify-center gap-1.5 ${
+            value === role
+              ? "border-primary bg-primary text-primary-foreground"
+              : "border-border text-muted-foreground hover:border-primary/40 hover:text-foreground"
+          }`}
+        >
+          {role === "admin" ? <ShieldCheck className="w-3.5 h-3.5" /> : <User className="w-3.5 h-3.5" />}
+          {isAr ? (role === "admin" ? "مدير" : "موظف") : role.charAt(0).toUpperCase() + role.slice(1)}
+        </button>
+      ))}
+    </div>
+  );
 
   return (
     <div className="space-y-8">
@@ -191,7 +276,7 @@ export default function StaffPage() {
             <span className="hidden sm:inline">{t.tryAgain}</span>
           </Button>
           <Button
-            onClick={() => setAddOpen(true)}
+            onClick={openAdd}
             size="sm"
             className="rounded-xl bg-gradient-to-r from-violet-600 to-purple-600 hover:from-violet-700 hover:to-purple-700 border-0 shadow-md shadow-violet-500/25 font-semibold"
           >
@@ -207,13 +292,9 @@ export default function StaffPage() {
           <div className="flex items-start gap-2.5 p-4 bg-destructive/10 border border-destructive/20 rounded-xl text-sm text-destructive">
             <AlertCircle className="w-4 h-4 shrink-0 mt-0.5" />
             <div>
-              <p className="font-medium">{t.staffTitle} — {t.somethingWrong}</p>
+              <p className="font-medium">{t.somethingWrong}</p>
               <p className="text-xs opacity-80 mt-0.5 font-mono">{error}</p>
             </div>
-          </div>
-          <div className="flex items-start gap-2.5 p-3 bg-amber-50 dark:bg-amber-900/10 border border-amber-200 dark:border-amber-800/30 rounded-xl text-sm text-amber-800 dark:text-amber-400">
-            <AlertCircle className="w-4 h-4 shrink-0 mt-0.5" />
-            <p className="text-xs">{t.rlsHint}</p>
           </div>
         </div>
       )}
@@ -244,11 +325,11 @@ export default function StaffPage() {
           <p className="text-foreground font-semibold text-base">{t.noStaff}</p>
           <p className="text-muted-foreground text-sm mt-1">{t.noStaffDesc}</p>
           <Button
-            onClick={() => setAddOpen(true)}
+            onClick={openAdd}
             className="mt-4 rounded-xl bg-gradient-to-r from-violet-600 to-purple-600 hover:from-violet-700 hover:to-purple-700 border-0 shadow-md shadow-violet-500/25"
           >
             <Plus className="w-4 h-4" />
-            {isAr ? "إضافة موظف" : "Add First Staff Member"}
+            {isAr ? "إضافة أول موظف" : "Add First Staff Member"}
           </Button>
         </div>
       ) : (
@@ -256,7 +337,6 @@ export default function StaffPage() {
           <div className="px-5 py-3 border-b border-border bg-muted/30">
             <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wider">
               {profiles.length} {t.staffTitle}
-              {error && <span className="ms-2 text-amber-600 font-normal normal-case">(showing partial data)</span>}
             </p>
           </div>
           <div className="divide-y divide-border">
@@ -271,7 +351,6 @@ export default function StaffPage() {
                 .slice(0, 2);
               return (
                 <div key={profile.id} className="flex items-center gap-3 px-5 py-4 hover:bg-muted/20 transition-colors">
-                  {/* Avatar */}
                   <div className="relative shrink-0">
                     <div className={`w-11 h-11 rounded-full flex items-center justify-center text-sm font-bold ${
                       isAdmin
@@ -286,8 +365,6 @@ export default function StaffPage() {
                       </div>
                     )}
                   </div>
-
-                  {/* Info */}
                   <div className="flex-1 min-w-0">
                     <div className="flex items-center gap-1.5">
                       <p className="font-semibold text-foreground text-sm truncate">
@@ -301,18 +378,14 @@ export default function StaffPage() {
                     </div>
                     <p className="text-xs text-muted-foreground truncate">{profile.email || profile.id}</p>
                   </div>
-
-                  {/* Role badge */}
                   <span className={`hidden sm:inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full text-xs font-semibold shrink-0 ${
                     isAdmin
                       ? "bg-violet-100 text-violet-700 dark:bg-violet-900/30 dark:text-violet-400"
                       : "bg-blue-100 text-blue-700 dark:bg-blue-900/30 dark:text-blue-400"
                   }`}>
                     {isAdmin ? <ShieldCheck className="w-3 h-3" /> : <User className="w-3 h-3" />}
-                    {profile.role}
+                    {isAr ? (isAdmin ? "مدير" : "موظف") : profile.role}
                   </span>
-
-                  {/* Actions */}
                   <div className="flex items-center gap-1 shrink-0">
                     <button
                       onClick={() => openEdit(profile)}
@@ -348,73 +421,97 @@ export default function StaffPage() {
       </div>
 
       {/* ── Add Staff Modal ───────────────────────────────────── */}
-      <Dialog open={addOpen} onOpenChange={setAddOpen}>
-        <DialogContent className="sm:max-w-md rounded-2xl">
+      <Dialog open={addOpen} onOpenChange={(o) => { if (!o) setAddOpen(false); }}>
+        <DialogContent className="sm:max-w-sm rounded-2xl">
           <DialogHeader>
             <DialogTitle className="text-lg font-bold">
               {isAr ? "إضافة موظف جديد" : "Add New Staff Member"}
             </DialogTitle>
             <DialogDescription className="text-sm text-muted-foreground">
               {isAr
-                ? "شارك رابط التسجيل مع الموظف — سيظهر تلقائياً هنا بعد إنشاء حسابه."
-                : "Share the sign-up link with the staff member — they'll appear here automatically after creating their account."}
+                ? "سيتم إنشاء حساب لهم مباشرةً ويمكنهم تسجيل الدخول فوراً."
+                : "An account will be created for them — they can log in immediately."}
             </DialogDescription>
           </DialogHeader>
 
-          <div className="space-y-5 py-2">
-            {/* How it works */}
-            <div className="rounded-xl bg-muted/50 border border-border p-4 space-y-3">
-              <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wider">
-                {isAr ? "كيف يعمل" : "How it works"}
-              </p>
-              <div className="space-y-2">
-                {[
-                  isAr ? "شارك رابط التطبيق أدناه مع الموظف" : "Share the app link below with your staff member",
-                  isAr ? "يقوم الموظف بإنشاء حساب جديد" : "They sign up and create their account",
-                  isAr ? "يظهر حسابهم في هذه الصفحة تلقائياً" : "Their profile appears on this page automatically",
-                  isAr ? "يمكنك تعديل دورهم (مدير / موظف) بعدها" : "You can then edit their role (admin / staff)",
-                ].map((step, i) => (
-                  <div key={i} className="flex items-start gap-2.5">
-                    <div className="w-5 h-5 rounded-full bg-primary/10 text-primary text-[10px] font-bold flex items-center justify-center shrink-0 mt-0.5">
-                      {i + 1}
-                    </div>
-                    <p className="text-sm text-foreground">{step}</p>
-                  </div>
-                ))}
+          <div className="space-y-4 py-1">
+            {/* Full name */}
+            <div className="space-y-1.5">
+              <Label className="font-medium">
+                {isAr ? "الاسم الكامل" : "Full Name"}
+                <span className="text-muted-foreground font-normal text-xs ms-1">({isAr ? "اختياري" : "optional"})</span>
+              </Label>
+              <Input
+                placeholder={isAr ? "مثال: أحمد الرشيدي" : "e.g. Ahmed Al-Rashidi"}
+                value={addForm.full_name}
+                onChange={(e) => setAddForm((f) => ({ ...f, full_name: e.target.value }))}
+                className="h-11 rounded-xl"
+              />
+            </div>
+
+            {/* Email */}
+            <div className="space-y-1.5">
+              <Label className="font-medium">{isAr ? "البريد الإلكتروني" : "Email Address"} *</Label>
+              <Input
+                type="email"
+                placeholder="staff@example.com"
+                value={addForm.email}
+                onChange={(e) => setAddForm((f) => ({ ...f, email: e.target.value }))}
+                className="h-11 rounded-xl"
+                dir="ltr"
+              />
+            </div>
+
+            {/* Password */}
+            <div className="space-y-1.5">
+              <Label className="font-medium">{isAr ? "كلمة المرور" : "Password"} *</Label>
+              <div className="relative">
+                <Input
+                  type={showPassword ? "text" : "password"}
+                  placeholder={isAr ? "6 أحرف على الأقل" : "Min. 6 characters"}
+                  value={addForm.password}
+                  onChange={(e) => setAddForm((f) => ({ ...f, password: e.target.value }))}
+                  className="h-11 rounded-xl pe-10"
+                  dir="ltr"
+                />
+                <button
+                  type="button"
+                  onClick={() => setShowPassword((v) => !v)}
+                  className="absolute inset-y-0 end-3 flex items-center text-muted-foreground hover:text-foreground transition-colors"
+                >
+                  {showPassword ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
+                </button>
               </div>
             </div>
 
-            {/* Invite link */}
+            {/* Role */}
             <div className="space-y-1.5">
-              <Label className="font-medium flex items-center gap-1.5">
-                <Link className="w-3.5 h-3.5 text-primary" />
-                {isAr ? "رابط التطبيق" : "App Sign-up Link"}
-              </Label>
-              <div className="flex gap-2">
-                <div className="flex-1 h-11 bg-muted/60 border border-border rounded-xl px-3 flex items-center">
-                  <span className="text-sm font-mono text-muted-foreground truncate">{APP_URL}</span>
-                </div>
-                <Button
-                  onClick={copyInviteLink}
-                  variant="outline"
-                  className="h-11 px-4 rounded-xl shrink-0 gap-1.5"
-                >
-                  {linkCopied
-                    ? <><Check className="w-4 h-4 text-emerald-500" />{isAr ? "تم النسخ" : "Copied!"}</>
-                    : <><Copy className="w-4 h-4" />{isAr ? "نسخ" : "Copy"}</>
-                  }
-                </Button>
-              </div>
+              <Label className="font-medium">{isAr ? "الدور" : "Role"}</Label>
+              <RoleToggle value={addForm.role} onChange={(r) => setAddForm((f) => ({ ...f, role: r }))} />
             </div>
+
+            {addError && (
+              <div className="flex items-start gap-2 p-3 bg-destructive/10 border border-destructive/20 rounded-xl text-sm text-destructive">
+                <AlertCircle className="w-4 h-4 shrink-0 mt-0.5" />
+                <p className="text-xs">{addError}</p>
+              </div>
+            )}
           </div>
 
-          <DialogFooter>
+          <DialogFooter className="gap-2">
+            <Button variant="outline" onClick={() => setAddOpen(false)} className="rounded-xl" disabled={addSaving}>
+              <X className="w-4 h-4" />
+              {t.cancel}
+            </Button>
             <Button
-              onClick={() => setAddOpen(false)}
-              className="w-full rounded-xl bg-gradient-to-r from-violet-600 to-purple-600 hover:from-violet-700 hover:to-purple-700 border-0 shadow-md shadow-violet-500/20"
+              onClick={handleAddStaff}
+              disabled={addSaving}
+              className="rounded-xl bg-gradient-to-r from-violet-600 to-purple-600 border-0 shadow-md shadow-violet-500/20"
             >
-              <Check className="w-4 h-4" />
-              {isAr ? "تم الفهم" : "Got it"}
+              {addSaving
+                ? <><Loader2 className="w-4 h-4 animate-spin" />{isAr ? "جارٍ الإنشاء..." : "Creating..."}</>
+                : <><Plus className="w-4 h-4" />{isAr ? "إنشاء الحساب" : "Create Account"}</>
+              }
             </Button>
           </DialogFooter>
         </DialogContent>
@@ -445,22 +542,7 @@ export default function StaffPage() {
             </div>
             <div className="space-y-1.5">
               <Label className="font-medium">{isAr ? "الدور" : "Role"}</Label>
-              <div className="flex gap-2">
-                {(["admin", "staff"] as const).map((role) => (
-                  <button
-                    key={role}
-                    onClick={() => setEditForm((f) => ({ ...f, role }))}
-                    className={`flex-1 py-2.5 px-4 rounded-xl text-sm font-semibold border-2 transition-all capitalize flex items-center justify-center gap-1.5 ${
-                      editForm.role === role
-                        ? "border-primary bg-primary text-primary-foreground"
-                        : "border-border text-muted-foreground hover:border-primary/40 hover:text-foreground"
-                    }`}
-                  >
-                    {role === "admin" ? <ShieldCheck className="w-3.5 h-3.5" /> : <User className="w-3.5 h-3.5" />}
-                    {isAr ? (role === "admin" ? "مدير" : "موظف") : role}
-                  </button>
-                ))}
-              </div>
+              <RoleToggle value={editForm.role} onChange={(r) => setEditForm((f) => ({ ...f, role: r }))} />
             </div>
             {editError && (
               <div className="flex items-start gap-2 p-3 bg-destructive/10 border border-destructive/20 rounded-xl text-sm text-destructive">
@@ -495,8 +577,8 @@ export default function StaffPage() {
             <DialogTitle className="text-lg font-bold text-destructive">{t.confirmDelete}</DialogTitle>
             <DialogDescription className="text-sm text-muted-foreground">
               {isAr
-                ? "سيتم حذف سجل الملف الشخصي فقط. حساب المصادقة سيبقى."
-                : "This removes the profile record only. Their Supabase Auth account will remain."}
+                ? "سيتم حذف سجل الملف الشخصي فقط. يمكنك إعادة إنشائه لاحقاً."
+                : "This removes the profile record only. Their login credentials remain unchanged."}
             </DialogDescription>
           </DialogHeader>
           <div className="py-2">
