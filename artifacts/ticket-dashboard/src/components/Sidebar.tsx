@@ -28,11 +28,13 @@ export function Sidebar() {
   const displayLogo = systemLogo || "";
   const isImageLogo = displayLogo.startsWith("data:") || displayLogo.startsWith("http");
 
+  const isAdmin = !profile || profile.role === "admin";
+
   const navItems = [
     { href: "/", label: t.dashboard, icon: LayoutDashboard },
     { href: "/events", label: t.events, icon: CalendarDays },
     { href: "/issue-ticket", label: t.issueTicket, icon: Ticket },
-    { href: "/staff", label: t.staff, icon: Users },
+    ...(isAdmin ? [{ href: "/staff", label: t.staff, icon: Users }] : []),
   ];
 
   const bottomNavItems = [

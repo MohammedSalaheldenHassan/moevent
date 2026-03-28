@@ -78,14 +78,8 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         const p = await fetchProfileFromSupabase(sess.user.id);
         if (!mountedRef.current) return;
 
-        if (p && p.role === "admin") {
+        if (p) {
           setProfile(p);
-        } else if (p && p.role !== "admin") {
-          // Non-admin user — reject
-          setProfile(null);
-          setUser(null);
-          setSession(null);
-          await supabase.auth.signOut();
         } else {
           // Profile row not found — allow through (tables may not exist yet)
           setProfile(null);
@@ -120,14 +114,6 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
           setLoading(false);
           logActivity("user_login", `Signed in as ${email} (no profile row)`, email);
           return { error: null };
-        }
-        if (p.role !== "admin") {
-          // Reset state and deny access
-          setUser(null);
-          setSession(null);
-          setProfile(null);
-          await supabase.auth.signOut();
-          return { error: "Access Denied: You do not have admin privileges." };
         }
         setProfile(p);
         setLoading(false);

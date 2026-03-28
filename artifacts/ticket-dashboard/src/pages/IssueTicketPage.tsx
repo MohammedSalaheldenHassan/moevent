@@ -2,6 +2,7 @@ import { useEffect, useRef, useState } from "react";
 import { supabase } from "@/lib/supabase";
 import { useLocale } from "@/contexts/LocaleContext";
 import { useBranding } from "@/contexts/BrandingContext";
+import { useAuth } from "@/contexts/useAuth";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -28,7 +29,9 @@ interface IssuedTicket {
 export default function IssueTicketPage() {
   const { t, lang } = useLocale();
   const { systemName, systemLogo } = useBranding();
+  const { profile } = useAuth();
   const isAr = lang === "ar";
+  const isAdmin = !profile || profile.role === "admin";
 
   const [events, setEvents] = useState<Event[]>([]);
   const [eventsLoading, setEventsLoading] = useState(true);
@@ -41,10 +44,28 @@ export default function IssueTicketPage() {
   useEffect(() => {
     const fetchEvents = async () => {
       try {
-        const { data, error } = await supabase
+        let eventIds: string[] | null = null;
+
+        if (!isAdmin && profile?.id) {
+          const { data: accessData, error: accessErr } = await supabase
+            .from("event_access")
+            .select("event_id")
+            .eq("profile_id", profile.id);
+          if (accessErr) throw accessErr;
+          eventIds = (accessData ?? []).map((a: { event_id: string }) => a.event_id);
+          if (eventIds.length === 0) {
+            setEvents([]);
+            setEventsLoading(false);
+            return;
+          }
+        }
+
+        let query = supabase
           .from("events")
           .select("id, title, event_date, location, price")
           .order("created_at", { ascending: false });
+        if (eventIds) query = query.in("id", eventIds);
+        const { data, error } = await query;
         if (error) throw error;
         setEvents(data as Event[] ?? []);
       } catch (err: unknown) {

@@ -72,16 +72,37 @@ export default function DashboardPage() {
 
   const ArrowIcon = isRTL ? ArrowLeft : ArrowRight;
 
+  const isAdmin = !profile || profile.role === "admin";
+
   const fetchStats = async () => {
     setLoading(true);
     const errs: string[] = [];
     let totalEvents = 0, totalTickets = 0, scannedTickets = 0, totalRevenue = 0;
 
+    // For staff: get their accessible event IDs first
+    let allowedEventIds: string[] | null = null;
+    if (!isAdmin && profile?.id) {
+      const { data: accessData } = await supabase
+        .from("event_access")
+        .select("event_id")
+        .eq("profile_id", profile.id);
+      allowedEventIds = (accessData ?? []).map((a: { event_id: string }) => a.event_id);
+    }
+
+    const eventsQuery = supabase.from("events").select("id, price", { count: "exact" });
+    const recentQuery = supabase.from("events").select("id, title, event_date, price").order("created_at", { ascending: false }).limit(5);
+
+    const safeIds = allowedEventIds && allowedEventIds.length === 0 ? ["__none__"] : (allowedEventIds ?? null);
+
     const [eventsRes, allTicketsRes, scannedRes, recentRes] = await Promise.all([
-      supabase.from("events").select("id, price", { count: "exact" }),
-      supabase.from("tickets").select("event_id"),
-      supabase.from("tickets").select("id", { count: "exact", head: true }).eq("is_scanned", true),
-      supabase.from("events").select("id, title, event_date, price").order("created_at", { ascending: false }).limit(5),
+      safeIds ? eventsQuery.in("id", safeIds) : eventsQuery,
+      safeIds
+        ? supabase.from("tickets").select("event_id").in("event_id", safeIds)
+        : supabase.from("tickets").select("event_id"),
+      safeIds
+        ? supabase.from("tickets").select("id", { count: "exact", head: true }).eq("is_scanned", true).in("event_id", safeIds)
+        : supabase.from("tickets").select("id", { count: "exact", head: true }).eq("is_scanned", true),
+      safeIds ? recentQuery.in("id", safeIds) : recentQuery,
     ]);
 
     if (eventsRes.error) errs.push(`Events: ${eventsRes.error.message}`);

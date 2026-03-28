@@ -62,12 +62,30 @@ export default function EventsPage() {
   const [deleteTarget, setDeleteTarget] = useState<Event | null>(null);
   const [deleting, setDeleting] = useState(false);
 
+  const isAdmin = !profile || profile.role === "admin";
+
   const fetchEvents = async () => {
     try {
-      const { data, error } = await supabase
-        .from("events")
-        .select("*")
-        .order("created_at", { ascending: false });
+      let eventIds: string[] | null = null;
+
+      if (!isAdmin && profile?.id) {
+        const { data: accessData, error: accessErr } = await supabase
+          .from("event_access")
+          .select("event_id")
+          .eq("profile_id", profile.id);
+        if (accessErr) throw accessErr;
+        eventIds = (accessData ?? []).map((a: { event_id: string }) => a.event_id);
+        if (eventIds.length === 0) {
+          setEvents([]);
+          setError(null);
+          setLoading(false);
+          return;
+        }
+      }
+
+      let query = supabase.from("events").select("*").order("created_at", { ascending: false });
+      if (eventIds) query = query.in("id", eventIds);
+      const { data, error } = await query;
       if (error) throw error;
       setEvents(data ?? []);
       setError(null);

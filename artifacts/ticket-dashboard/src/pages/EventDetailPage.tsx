@@ -3,13 +3,14 @@ import { useParams, useLocation } from "wouter";
 import { supabase } from "@/lib/supabase";
 import { useLocale } from "@/contexts/LocaleContext";
 import { useBranding } from "@/contexts/BrandingContext";
+import { useAuth } from "@/contexts/useAuth";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Dialog, DialogContent, DialogTitle, DialogDescription } from "@/components/ui/dialog";
 import {
   ArrowLeft, ArrowRight, CalendarDays, MapPin, Ticket,
   Search, CheckCircle2, Clock, AlertCircle, Loader2,
-  Eye, Printer, X, User, Phone, Hash, DollarSign, Users,
+  Eye, Printer, X, User, Phone, Hash, DollarSign, Users, UserPlus, Trash2, ShieldCheck,
 } from "lucide-react";
 import { format } from "date-fns";
 import { cn } from "@/lib/utils";
@@ -31,6 +32,19 @@ interface TicketRow {
   created_at: string;
 }
 
+interface StaffProfile {
+  id: string;
+  full_name: string | null;
+  email: string | null;
+  role: string;
+}
+
+interface AccessRow {
+  id: string;
+  profile_id: string;
+  profiles: StaffProfile;
+}
+
 type Filter = "all" | "scanned" | "not_scanned";
 
 export default function EventDetailPage() {
@@ -39,7 +53,9 @@ export default function EventDetailPage() {
   const [, navigate] = useLocation();
   const { t, isRTL, lang } = useLocale();
   const { systemName, systemLogo } = useBranding();
+  const { profile: currentProfile } = useAuth();
   const isAr = lang === "ar";
+  const isAdmin = !currentProfile || currentProfile.role === "admin";
 
   const [event, setEvent] = useState<Event | null>(null);
   const [tickets, setTickets] = useState<TicketRow[]>([]);
@@ -52,6 +68,50 @@ export default function EventDetailPage() {
   const [qrDataUrl, setQrDataUrl] = useState<string | null>(null);
   const [qrLoading, setQrLoading] = useState(false);
   const printRef = useRef<HTMLDivElement>(null);
+
+  // ── Assigned Staff ────────────────────────────────────────────
+  const [staffAccess, setStaffAccess] = useState<AccessRow[]>([]);
+  const [allStaff, setAllStaff] = useState<StaffProfile[]>([]);
+  const [staffLoading, setStaffLoading] = useState(false);
+  const [addingStaffId, setAddingStaffId] = useState("");
+  const [removingId, setRemovingId] = useState<string | null>(null);
+  const [staffError, setStaffError] = useState<string | null>(null);
+
+  const fetchStaffAccess = async () => {
+    if (!id) return;
+    setStaffLoading(true);
+    const [accessRes, allStaffRes] = await Promise.all([
+      supabase
+        .from("event_access")
+        .select("id, profile_id, profiles(id, full_name, email, role)")
+        .eq("event_id", id),
+      isAdmin
+        ? supabase.from("profiles").select("id, full_name, email, role").eq("role", "staff")
+        : Promise.resolve({ data: [], error: null }),
+    ]);
+    if (!accessRes.error) setStaffAccess((accessRes.data ?? []) as AccessRow[]);
+    if (!allStaffRes.error) setAllStaff((allStaffRes.data ?? []) as StaffProfile[]);
+    setStaffLoading(false);
+  };
+
+  const handleAddStaff = async () => {
+    if (!addingStaffId || !id) return;
+    setStaffError(null);
+    const { error } = await supabase.from("event_access").insert({ event_id: id, profile_id: addingStaffId });
+    if (error) { setStaffError(error.message); return; }
+    setAddingStaffId("");
+    fetchStaffAccess();
+  };
+
+  const handleRemoveStaff = async (accessRowId: string) => {
+    setRemovingId(accessRowId);
+    await supabase.from("event_access").delete().eq("id", accessRowId);
+    setRemovingId(null);
+    fetchStaffAccess();
+  };
+
+  const assignedIds = new Set(staffAccess.map((a) => a.profile_id));
+  const availableStaff = allStaff.filter((s) => !assignedIds.has(s.id));
 
   useEffect(() => {
     if (!id) return;
@@ -72,6 +132,7 @@ export default function EventDetailPage() {
       }
     };
     load();
+    fetchStaffAccess();
   }, [id]);
 
   const openTicketDetail = async (tk: TicketRow) => {
@@ -379,6 +440,99 @@ export default function EventDetailPage() {
           </div>
         </>
       ) : null}
+
+      {/* ── Assigned Staff Panel ─────────────────────────────── */}
+      <div className="bg-card border border-card-border rounded-2xl overflow-hidden shadow-sm">
+        <div className="flex items-center gap-2.5 px-5 py-4 border-b border-border bg-muted/20">
+          <div className="w-7 h-7 bg-primary/10 rounded-lg flex items-center justify-center">
+            <Users className="w-3.5 h-3.5 text-primary" />
+          </div>
+          <h3 className="font-semibold text-foreground text-sm flex-1">
+            {isAr ? "الكوادر المسؤولة" : "Assigned Staff"}
+          </h3>
+          {staffLoading && <Loader2 className="w-4 h-4 animate-spin text-muted-foreground" />}
+        </div>
+        <div className="px-5 py-4 space-y-3">
+          {/* Add staff (admin only) */}
+          {isAdmin && (
+            <div className="flex items-center gap-2">
+              <select
+                value={addingStaffId}
+                onChange={(e) => setAddingStaffId(e.target.value)}
+                className="flex-1 h-9 rounded-xl border border-border bg-background text-sm px-3 text-foreground focus:outline-none focus:ring-2 focus:ring-primary/30"
+              >
+                <option value="">{isAr ? "اختر موظفاً للإضافة…" : "Select staff to add…"}</option>
+                {availableStaff.map((s) => (
+                  <option key={s.id} value={s.id}>
+                    {s.full_name || s.email || s.id}
+                  </option>
+                ))}
+              </select>
+              <Button
+                size="sm"
+                onClick={handleAddStaff}
+                disabled={!addingStaffId}
+                className="h-9 px-3 rounded-xl bg-gradient-to-r from-violet-600 to-purple-600 border-0 shrink-0"
+              >
+                <UserPlus className="w-4 h-4" />
+              </Button>
+            </div>
+          )}
+          {staffError && (
+            <p className="text-xs text-destructive flex items-center gap-1.5">
+              <AlertCircle className="w-3.5 h-3.5 shrink-0" />{staffError}
+            </p>
+          )}
+          {/* Staff list */}
+          {staffAccess.length === 0 ? (
+            <div className="text-center py-6 text-muted-foreground text-sm">
+              <User className="w-8 h-8 mx-auto mb-2 opacity-30" />
+              {isAr ? "لم يُسنَد أي موظف لهذا الفعالية بعد" : "No staff assigned to this event yet"}
+            </div>
+          ) : (
+            <div className="divide-y divide-border rounded-xl border border-border overflow-hidden">
+              {staffAccess.map((row) => {
+                const s = row.profiles;
+                const initials = (s.full_name || s.email || "?")
+                  .split(" ").map((w) => w[0]).join("").toUpperCase().slice(0, 2);
+                return (
+                  <div key={row.id} className="flex items-center gap-3 px-4 py-3 bg-card hover:bg-muted/20 transition-colors">
+                    <div className="w-8 h-8 rounded-lg bg-primary/10 flex items-center justify-center shrink-0 text-xs font-bold text-primary">
+                      {initials}
+                    </div>
+                    <div className="flex-1 min-w-0">
+                      <p className="text-sm font-semibold text-foreground truncate">{s.full_name || (isAr ? "بدون اسم" : "No name")}</p>
+                      <p className="text-xs text-muted-foreground truncate">{s.email}</p>
+                    </div>
+                    <div className="flex items-center gap-2 shrink-0">
+                      <span className={cn(
+                        "inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-bold",
+                        s.role === "admin"
+                          ? "bg-violet-100 text-violet-700 dark:bg-violet-900/30 dark:text-violet-400"
+                          : "bg-emerald-100 text-emerald-700 dark:bg-emerald-900/30 dark:text-emerald-400"
+                      )}>
+                        <ShieldCheck className="w-2.5 h-2.5" />
+                        {s.role}
+                      </span>
+                      {isAdmin && (
+                        <button
+                          onClick={() => handleRemoveStaff(row.id)}
+                          disabled={removingId === row.id}
+                          className="w-7 h-7 rounded-lg bg-destructive/10 hover:bg-destructive/20 text-destructive flex items-center justify-center transition-colors"
+                        >
+                          {removingId === row.id
+                            ? <Loader2 className="w-3.5 h-3.5 animate-spin" />
+                            : <Trash2 className="w-3.5 h-3.5" />}
+                        </button>
+                      )}
+                    </div>
+                  </div>
+                );
+              })}
+            </div>
+          )}
+        </div>
+      </div>
 
       {/* Ticket Detail Modal */}
       <Dialog open={!!selectedTicket} onOpenChange={(o) => !o && setSelectedTicket(null)}>
