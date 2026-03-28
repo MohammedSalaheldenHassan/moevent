@@ -1,6 +1,7 @@
-import React, { createContext, useContext, useEffect, useState } from "react";
+import React, { createContext, useContext, useEffect, useState, useRef } from "react";
 import { supabase } from "@/lib/supabase";
 import type { User, Session } from "@supabase/supabase-js";
+import { logActivity } from "@/lib/activityLogger";
 
 interface Profile {
   id: string;
@@ -25,6 +26,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   const [session, setSession] = useState<Session | null>(null);
   const [profile, setProfile] = useState<Profile | null>(null);
   const [loading, setLoading] = useState(true);
+  const mountedRef = useRef(true);
 
   const fetchProfile = async (userId: string): Promise<Profile | null> => {
     try {
@@ -41,69 +43,57 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   };
 
   useEffect(() => {
-    let mounted = true;
+    mountedRef.current = true;
 
-    const init = async () => {
-      try {
-        const { data: { session } } = await supabase.auth.getSession();
-        if (!mounted) return;
+    // Safety net: never stay loading more than 8 seconds
+    const safetyTimer = setTimeout(() => {
+      if (mountedRef.current) setLoading(false);
+    }, 8000);
 
-        if (session?.user) {
-          setSession(session);
-          setUser(session.user);
-          const p = await fetchProfile(session.user.id);
-          if (!mounted) return;
-          if (p && p.role === "admin") {
-            setProfile(p);
-          } else if (p) {
-            await supabase.auth.signOut();
-            setUser(null);
-            setSession(null);
-            setProfile(null);
-          }
-        }
-      } catch {
-        // silently handle connection errors
-      } finally {
-        if (mounted) setLoading(false);
-      }
-    };
-
-    init();
-
+    // Supabase v2: onAuthStateChange fires immediately with INITIAL_SESSION
+    // This is the canonical way to initialize auth — no need for getSession()
     const { data: { subscription } } = supabase.auth.onAuthStateChange(
-      async (event, session) => {
-        if (!mounted) return;
-        if (event === "SIGNED_OUT") {
+      async (event, sess) => {
+        if (!mountedRef.current) return;
+
+        if (event === "SIGNED_OUT" || !sess?.user) {
           setUser(null);
           setSession(null);
           setProfile(null);
           setLoading(false);
+          clearTimeout(safetyTimer);
           return;
         }
-        if (session?.user) {
-          setSession(session);
-          setUser(session.user);
-          const p = await fetchProfile(session.user.id);
-          if (!mounted) return;
-          if (p && p.role === "admin") {
-            setProfile(p);
-          } else if (p) {
-            await supabase.auth.signOut();
-          } else {
-            setProfile(null);
-          }
-        } else {
+
+        // User is authenticated — fetch their profile
+        setSession(sess);
+        setUser(sess.user);
+
+        const p = await fetchProfile(sess.user.id);
+        if (!mountedRef.current) return;
+
+        if (p && p.role === "admin") {
+          setProfile(p);
+        } else if (p && p.role !== "admin") {
+          // Not an admin — sign them out
+          setProfile(null);
           setUser(null);
           setSession(null);
+          await supabase.auth.signOut();
+        } else {
+          // Profile not found — still let them through if they have a session
+          // (the page will show an error if they try to access data)
           setProfile(null);
         }
-        if (mounted) setLoading(false);
+
+        if (mountedRef.current) setLoading(false);
+        clearTimeout(safetyTimer);
       }
     );
 
     return () => {
-      mounted = false;
+      mountedRef.current = false;
+      clearTimeout(safetyTimer);
       subscription.unsubscribe();
     };
   }, []);
@@ -120,6 +110,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
           return { error: "Access Denied: You do not have admin privileges." };
         }
         setProfile(p);
+        logActivity("user_login", `Signed in as ${email}`, email);
       }
       return { error: null };
     } catch {
@@ -128,10 +119,12 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   };
 
   const signOut = async () => {
+    const email = profile?.email ?? user?.email;
     try {
+      if (email) logActivity("user_logout", `Signed out`, email);
       await supabase.auth.signOut();
     } catch {
-      // ignore errors on sign out
+      // ignore sign-out errors
     }
   };
 

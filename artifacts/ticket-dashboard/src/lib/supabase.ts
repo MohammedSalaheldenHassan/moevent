@@ -1,27 +1,30 @@
-import { createClient } from "@supabase/supabase-js";
+import { createClient, SupabaseClient } from "@supabase/supabase-js";
 
 const supabaseUrl = import.meta.env.VITE_SUPABASE_URL as string;
 const supabaseAnonKey = import.meta.env.VITE_SUPABASE_ANON_KEY as string;
 
 if (!supabaseUrl || !supabaseAnonKey) {
-  throw new Error("Missing Supabase environment variables");
+  throw new Error("Missing Supabase environment variables: VITE_SUPABASE_URL and VITE_SUPABASE_ANON_KEY must be set.");
 }
 
-export const supabase = createClient(supabaseUrl, supabaseAnonKey, {
-  auth: {
-    persistSession: true,
-    autoRefreshToken: true,
-  },
-  global: {
-    fetch: (url, options = {}) => {
-      const controller = new AbortController();
-      const timeout = setTimeout(() => controller.abort(), 15000);
-      return fetch(url, { ...options, signal: controller.signal }).finally(() =>
-        clearTimeout(timeout)
-      );
+// Use a window-level singleton so HMR doesn't create multiple GoTrueClient instances
+declare global {
+  interface Window {
+    __tickethub_supabase__?: SupabaseClient;
+  }
+}
+
+if (!window.__tickethub_supabase__) {
+  window.__tickethub_supabase__ = createClient(supabaseUrl, supabaseAnonKey, {
+    auth: {
+      persistSession: true,
+      autoRefreshToken: true,
+      detectSessionInUrl: false,
     },
-  },
-});
+  });
+}
+
+export const supabase = window.__tickethub_supabase__;
 
 export type Database = {
   public: {
