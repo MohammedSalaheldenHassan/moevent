@@ -25,7 +25,8 @@ export function Sidebar() {
   const [mobileOpen, setMobileOpen] = useState(false);
 
   const displayName = systemName || t.appName;
-  const displayLogo = systemLogo || "🎟️";
+  const displayLogo = systemLogo || "";
+  const isImageLogo = displayLogo.startsWith("data:") || displayLogo.startsWith("http");
 
   const navItems = [
     { href: "/", label: t.dashboard, icon: LayoutDashboard },
@@ -77,9 +78,17 @@ export function Sidebar() {
       {/* Logo */}
       <div className="px-5 py-5 border-b border-sidebar-border">
         <div className="flex items-center gap-3">
-          <div className="w-9 h-9 bg-gradient-to-br from-violet-500 to-purple-700 rounded-xl flex items-center justify-center shadow-md text-lg">
-            {displayLogo}
-          </div>
+          {isImageLogo ? (
+            <img
+              src={displayLogo}
+              alt="Logo"
+              className="w-9 h-9 rounded-xl object-cover shadow-md shrink-0"
+            />
+          ) : (
+            <div className="w-9 h-9 bg-gradient-to-br from-violet-500 to-purple-700 rounded-xl flex items-center justify-center shadow-md text-lg shrink-0">
+              🎟️
+            </div>
+          )}
           <div className="min-w-0">
             <p className="font-bold text-sidebar-foreground text-sm leading-tight truncate">{displayName}</p>
             <p className="text-[10px] text-sidebar-foreground/50 truncate leading-tight">{t.appTagline}</p>

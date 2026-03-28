@@ -136,7 +136,7 @@ export default function IssueTicketPage() {
         <body>
           <div class="ticket">
             <div class="ticket-header">
-              <div class="ticket-logo">${systemLogo || "🎫"}</div>
+              <div class="ticket-logo">${systemLogo && systemLogo.startsWith("data:") ? `<img src="${systemLogo}" style="width:40px;height:40px;border-radius:10px;object-fit:cover;margin:0 auto 2px;" />` : (systemLogo || "🎫")}</div>
               <div class="ticket-app">${systemName || (isAr ? "نظام التذاكر" : "TicketHub")}</div>
             </div>
             <div class="ticket-body">
@@ -307,7 +307,13 @@ export default function IssueTicketPage() {
           {/* Ticket card preview */}
           <div ref={printRef} className="m-5 rounded-2xl overflow-hidden border border-border shadow-sm">
             <div className="bg-gradient-to-br from-violet-600 to-purple-700 p-5 text-center">
-              <div className="text-2xl mb-1.5">{systemLogo || "🎫"}</div>
+              <div className="mb-1.5 flex justify-center">
+                {systemLogo && systemLogo.startsWith("data:") ? (
+                  <img src={systemLogo} alt="Logo" className="w-10 h-10 rounded-xl object-cover" />
+                ) : (
+                  <span className="text-2xl">🎫</span>
+                )}
+              </div>
               <div className="text-white font-bold text-lg leading-tight">{issuedTicket.event.title}</div>
               <div className="flex items-center justify-center flex-wrap gap-3 mt-2 text-white/70 text-xs">
                 {issuedTicket.event.event_date && (

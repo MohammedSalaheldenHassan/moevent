@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useRef, useState } from "react";
 import { supabase } from "@/lib/supabase";
 import { useLocale } from "@/contexts/LocaleContext";
 import { useAuth } from "@/contexts/useAuth";
@@ -22,11 +22,11 @@ import {
   Loader2,
   Pencil,
   X,
+  Upload,
+  ImageIcon,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { type Theme } from "@/contexts/ThemeContext";
-
-const LOGO_OPTIONS = ["🎟️", "🎫", "🎪", "🎭", "🏟️", "🎬", "🎤", "🌟", "🎯", "⚡", "🚀", "💎"];
 
 export default function SettingsPage() {
   const { t, lang, setLang } = useLocale();
@@ -65,6 +65,8 @@ export default function SettingsPage() {
   // ── Branding ────────────────────────────────────────────────
   const [nameInputBrand, setNameInputBrand] = useState(systemName);
   const [brandSaved, setBrandSaved] = useState(false);
+  const [logoError, setLogoError] = useState<string | null>(null);
+  const logoInputRef = useRef<HTMLInputElement>(null);
 
   const handleSaveBranding = () => {
     setSystemName(nameInputBrand.trim());
@@ -73,6 +75,30 @@ export default function SettingsPage() {
     }
     setBrandSaved(true);
     setTimeout(() => setBrandSaved(false), 2500);
+  };
+
+  const handleLogoUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
+    setLogoError(null);
+    const file = e.target.files?.[0];
+    if (!file) return;
+    if (!file.type.startsWith("image/")) {
+      setLogoError(isAr ? "يرجى اختيار ملف صورة صالح" : "Please select a valid image file");
+      return;
+    }
+    const MAX_BYTES = 800 * 1024; // 800 KB
+    if (file.size > MAX_BYTES) {
+      setLogoError(isAr ? "حجم الصورة أكبر من 800 كيلوبايت. يرجى اختيار صورة أصغر." : "Image is larger than 800 KB. Please choose a smaller image.");
+      return;
+    }
+    const reader = new FileReader();
+    reader.onload = (ev) => {
+      const dataUrl = ev.target?.result as string;
+      setSystemLogo(dataUrl);
+      logActivity("settings_changed", "System logo updated", profile?.email ?? undefined);
+    };
+    reader.readAsDataURL(file);
+    // Reset input so the same file can be re-selected
+    e.target.value = "";
   };
 
   // ── Activity Logs ───────────────────────────────────────────
@@ -180,44 +206,76 @@ export default function SettingsPage() {
         {/* ── System Branding ────────────────────────────────── */}
         <SectionCard title={isAr ? "هوية النظام" : "System Branding"} icon={Palette}>
           <div className="space-y-4">
-            {/* Logo picker */}
-            <div className="space-y-2">
-              <Label className="font-medium text-sm">{isAr ? "أيقونة النظام" : "System Icon"}</Label>
-              <div className="flex flex-wrap gap-2">
-                {LOGO_OPTIONS.map((emoji) => (
-                  <button
-                    key={emoji}
-                    onClick={() => setSystemLogo(emoji)}
-                    className={cn(
-                      "w-10 h-10 rounded-xl text-xl flex items-center justify-center border-2 transition-all",
-                      systemLogo === emoji
-                        ? "border-primary bg-primary/10 scale-110 shadow-sm"
-                        : "border-border hover:border-primary/40 hover:bg-muted"
-                    )}
-                  >
-                    {emoji}
-                  </button>
-                ))}
-                {systemLogo && !LOGO_OPTIONS.includes(systemLogo) && (
-                  <button
-                    onClick={() => setSystemLogo("")}
-                    className="w-10 h-10 rounded-xl border-2 border-border text-xs text-muted-foreground hover:bg-muted transition-all flex items-center justify-center"
-                    title="Remove custom logo"
-                  >
-                    <X className="w-3.5 h-3.5" />
-                  </button>
-                )}
-                <button
-                  onClick={() => setSystemLogo("")}
-                  className={cn(
-                    "w-10 h-10 rounded-xl border-2 transition-all text-sm font-bold",
-                    !systemLogo ? "border-primary bg-primary/10 text-primary" : "border-border text-muted-foreground hover:border-primary/40 hover:bg-muted"
+            {/* Logo upload */}
+            <div className="space-y-3">
+              <Label className="font-medium text-sm">{isAr ? "شعار النظام" : "System Logo"}</Label>
+
+              <div className="flex items-center gap-4">
+                {/* Current logo preview */}
+                <div className="w-20 h-20 rounded-2xl border-2 border-dashed border-border bg-muted/30 flex items-center justify-center shrink-0 overflow-hidden">
+                  {systemLogo && systemLogo.startsWith("data:") ? (
+                    <img
+                      src={systemLogo}
+                      alt="Logo"
+                      className="w-full h-full object-cover rounded-2xl"
+                    />
+                  ) : (
+                    <div className="flex flex-col items-center gap-1 text-muted-foreground">
+                      <ImageIcon className="w-7 h-7 opacity-40" />
+                      <span className="text-[10px]">{isAr ? "لا يوجد شعار" : "No logo"}</span>
+                    </div>
                   )}
-                  title="Default icon"
-                >
-                  🎟
-                </button>
+                </div>
+
+                {/* Upload actions */}
+                <div className="flex-1 space-y-2">
+                  <input
+                    ref={logoInputRef}
+                    type="file"
+                    accept="image/*"
+                    className="hidden"
+                    onChange={handleLogoUpload}
+                  />
+                  <Button
+                    type="button"
+                    variant="outline"
+                    className="w-full h-10 rounded-xl border-dashed border-2 hover:border-primary/50 hover:bg-primary/5 transition-all font-medium"
+                    onClick={() => { setLogoError(null); logoInputRef.current?.click(); }}
+                  >
+                    <Upload className="w-4 h-4" />
+                    {isAr ? "رفع شعار" : "Upload Logo"}
+                  </Button>
+                  {systemLogo && systemLogo.startsWith("data:") && (
+                    <Button
+                      type="button"
+                      variant="outline"
+                      size="sm"
+                      className="w-full h-8 rounded-xl text-destructive hover:text-destructive hover:bg-destructive/10 border-destructive/30 font-medium text-xs"
+                      onClick={() => { setSystemLogo(""); setLogoError(null); }}
+                    >
+                      <X className="w-3.5 h-3.5" />
+                      {isAr ? "إزالة الشعار" : "Remove Logo"}
+                    </Button>
+                  )}
+                  <p className="text-[11px] text-muted-foreground">
+                    {isAr ? "PNG، JPG، SVG — بحد أقصى 800 كيلوبايت" : "PNG, JPG, SVG — max 800 KB"}
+                  </p>
+                </div>
               </div>
+
+              {logoError && (
+                <div className="flex items-center gap-2 text-sm text-destructive bg-destructive/10 rounded-xl px-3 py-2">
+                  <AlertTriangle className="w-4 h-4 shrink-0" />
+                  {logoError}
+                </div>
+              )}
+
+              {systemLogo && systemLogo.startsWith("data:") && (
+                <div className="flex items-center gap-2 text-sm text-emerald-600 bg-emerald-50 dark:bg-emerald-900/20 rounded-xl px-3 py-2">
+                  <CheckCircle2 className="w-4 h-4 shrink-0" />
+                  {isAr ? "تم رفع الشعار بنجاح — يظهر في الشريط الجانبي" : "Logo uploaded — now showing in the sidebar"}
+                </div>
+              )}
             </div>
 
             {/* Name input */}
@@ -244,8 +302,14 @@ export default function SettingsPage() {
 
             {/* Preview */}
             <div className="flex items-center gap-3 p-3 bg-muted/40 rounded-xl border border-border">
-              <div className="w-9 h-9 bg-gradient-to-br from-violet-500 to-purple-700 rounded-xl flex items-center justify-center text-lg shadow-sm">
-                {systemLogo || "🎟️"}
+              <div className="w-9 h-9 rounded-xl overflow-hidden shadow-sm shrink-0">
+                {systemLogo && systemLogo.startsWith("data:") ? (
+                  <img src={systemLogo} alt="Logo preview" className="w-full h-full object-cover" />
+                ) : (
+                  <div className="w-full h-full bg-gradient-to-br from-violet-500 to-purple-700 flex items-center justify-center text-lg">
+                    🎟️
+                  </div>
+                )}
               </div>
               <div>
                 <p className="font-bold text-foreground text-sm leading-tight">{nameInputBrand || "TicketHub"}</p>
