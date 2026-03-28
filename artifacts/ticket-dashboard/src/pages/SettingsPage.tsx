@@ -28,6 +28,20 @@ import {
 import { cn } from "@/lib/utils";
 import { type Theme } from "@/contexts/ThemeContext";
 
+function SectionCard({ title, icon: Icon, children }: { title: string; icon: React.ElementType; children: React.ReactNode }) {
+  return (
+    <div className="bg-card border border-card-border rounded-2xl overflow-hidden shadow-sm">
+      <div className="flex items-center gap-2.5 px-5 py-4 border-b border-border bg-muted/20">
+        <div className="w-7 h-7 bg-primary/10 rounded-lg flex items-center justify-center">
+          <Icon className="w-3.5 h-3.5 text-primary" />
+        </div>
+        <h3 className="font-semibold text-foreground text-sm">{title}</h3>
+      </div>
+      <div className="px-5 py-4 space-y-4">{children}</div>
+    </div>
+  );
+}
+
 export default function SettingsPage() {
   const { t, lang, setLang } = useLocale();
   const { profile, user } = useAuth();
@@ -114,18 +128,6 @@ export default function SettingsPage() {
       setTimeout(() => setClearMsg(""), 3000);
     });
   };
-
-  const SectionCard = ({ title, icon: Icon, children }: { title: string; icon: React.ElementType; children: React.ReactNode }) => (
-    <div className="bg-card border border-card-border rounded-2xl overflow-hidden shadow-sm">
-      <div className="flex items-center gap-2.5 px-5 py-4 border-b border-border bg-muted/20">
-        <div className="w-7 h-7 bg-primary/10 rounded-lg flex items-center justify-center">
-          <Icon className="w-3.5 h-3.5 text-primary" />
-        </div>
-        <h3 className="font-semibold text-foreground text-sm">{title}</h3>
-      </div>
-      <div className="px-5 py-4 space-y-4">{children}</div>
-    </div>
-  );
 
   const themeOptions: { value: Theme; label: string; arLabel: string; icon: React.ElementType }[] = [
     { value: "light", label: "Light", arLabel: "فاتح", icon: Sun },
