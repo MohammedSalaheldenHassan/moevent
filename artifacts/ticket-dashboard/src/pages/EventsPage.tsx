@@ -19,15 +19,17 @@ import {
   Ticket,
   ChevronRight,
   ChevronLeft,
+  RefreshCw,
 } from "lucide-react";
 import { format } from "date-fns";
 
 interface Event {
   id: string;
   title: string;
-  date: string;
-  location: string;
+  date?: string | null;       // may be named differently in user's table
+  location?: string | null;
   created_at: string;
+  [key: string]: unknown;     // allow extra columns from user's actual schema
 }
 
 type ModalMode = "add" | "edit";
@@ -56,12 +58,17 @@ export default function EventsPage() {
       const { data, error } = await supabase
         .from("events")
         .select("*")
-        .order("date", { ascending: true });
-      if (error) throw error;
+        .order("created_at", { ascending: false });
+      if (error) {
+        console.error("[EventsPage] Supabase error:", error.code, error.message);
+        throw error;
+      }
       setEvents(data ?? []);
       setError(null);
     } catch (err: unknown) {
-      const msg = err instanceof Error ? err.message : t.failedLoadEvents;
+      const msg = err instanceof Error ? err.message :
+        (err as { message?: string })?.message ?? t.failedLoadEvents;
+      console.error("[EventsPage] fetchEvents failed:", msg);
       setError(msg);
     } finally {
       setLoading(false);
@@ -71,6 +78,10 @@ export default function EventsPage() {
   useEffect(() => {
     fetchEvents();
   }, []);
+
+  // Derived helper: detect table-not-found vs other errors
+  const isTableMissing = error?.includes("does not exist") || error?.includes("42P01");
+  const isNetworkError = error?.includes("fetch") || error?.includes("network") || error?.includes("Failed");
 
   const openAddModal = () => {
     setModalMode("add");
@@ -85,8 +96,8 @@ export default function EventsPage() {
     setEditingEvent(event);
     setForm({
       title: event.title,
-      date: event.date,
-      location: event.location,
+      date: event.date ?? "",
+      location: event.location ?? "",
     });
     setFormError(null);
     setModalOpen(true);
@@ -151,7 +162,8 @@ export default function EventsPage() {
     }
   };
 
-  const isUpcoming = (dateStr: string) => new Date(dateStr) >= new Date();
+  const isUpcoming = (dateStr?: string | null) =>
+    dateStr ? new Date(dateStr) >= new Date() : false;
   const ChevronIcon = isRTL ? ChevronLeft : ChevronRight;
 
   return (
@@ -174,15 +186,30 @@ export default function EventsPage() {
         <div className="space-y-2">
           <div className="flex items-start gap-2.5 p-4 bg-destructive/10 border border-destructive/20 rounded-xl text-sm text-destructive">
             <AlertCircle className="w-4 h-4 shrink-0 mt-0.5" />
-            <div>
+            <div className="flex-1 min-w-0">
               <p className="font-medium">{t.failedLoadEvents}</p>
-              <p className="text-xs opacity-80 mt-0.5">{error}</p>
+              <p className="text-xs opacity-80 mt-0.5 font-mono break-all">{error}</p>
             </div>
+            <Button variant="outline" size="sm" onClick={() => { setLoading(true); fetchEvents(); }} className="rounded-xl shrink-0 text-foreground border-border">
+              <RefreshCw className="w-3.5 h-3.5" />
+              Retry
+            </Button>
           </div>
-          <div className="flex items-start gap-2.5 p-3 bg-amber-50 dark:bg-amber-900/10 border border-amber-200 dark:border-amber-800/30 rounded-xl text-sm text-amber-800 dark:text-amber-400">
-            <AlertCircle className="w-4 h-4 shrink-0 mt-0.5" />
-            <p className="text-xs">{t.rlsHint}</p>
-          </div>
+          {isTableMissing && (
+            <div className="flex items-start gap-2.5 p-3 bg-amber-50 dark:bg-amber-900/10 border border-amber-200 dark:border-amber-800/30 rounded-xl text-sm text-amber-800 dark:text-amber-400">
+              <AlertCircle className="w-4 h-4 shrink-0 mt-0.5" />
+              <p className="text-xs">
+                The <code className="bg-amber-100 dark:bg-amber-900/30 px-1 rounded font-mono">events</code> table does not exist yet.
+                Go to <strong>Settings → Database Setup</strong> and run the SQL script in your Supabase project to create it.
+              </p>
+            </div>
+          )}
+          {!isTableMissing && (
+            <div className="flex items-start gap-2.5 p-3 bg-amber-50 dark:bg-amber-900/10 border border-amber-200 dark:border-amber-800/30 rounded-xl text-sm text-amber-800 dark:text-amber-400">
+              <AlertCircle className="w-4 h-4 shrink-0 mt-0.5" />
+              <p className="text-xs">{t.rlsHint}</p>
+            </div>
+          )}
         </div>
       )}
 
@@ -234,11 +261,15 @@ export default function EventsPage() {
                 <div className="space-y-2 mb-4">
                   <div className="flex items-center gap-2 text-sm text-muted-foreground">
                     <CalendarDays className="w-3.5 h-3.5 shrink-0 text-primary/60" />
-                    <span className="font-medium">{format(new Date(event.date), "PPP")}</span>
+                    <span className="font-medium">
+                      {event.date
+                        ? (() => { try { return format(new Date(event.date), "PPP"); } catch { return event.date; } })()
+                        : <span className="italic opacity-50">No date</span>}
+                    </span>
                   </div>
                   <div className="flex items-center gap-2 text-sm text-muted-foreground">
                     <MapPin className="w-3.5 h-3.5 shrink-0 text-primary/60" />
-                    <span className="truncate">{event.location}</span>
+                    <span className="truncate">{event.location || <span className="italic opacity-50">No location</span>}</span>
                   </div>
                 </div>
 
