@@ -119,13 +119,17 @@ export default function EventsPage() {
             event_date: form.date || null,
             location: form.location.trim() || null,
           })
-          .select()
-          .single();
+          .select();
         if (error) {
           console.error("[EventsPage] insert error:", error.code, error.message);
           throw error;
         }
-        if (data) setEvents((prev) => [data as Event, ...prev]);
+        const inserted = data?.[0];
+        if (inserted) {
+          setEvents((prev) => [inserted as Event, ...prev]);
+        } else {
+          await fetchEvents();
+        }
         logActivity("event_created", `Event: "${form.title.trim()}"`, profile?.email ?? undefined);
       } else if (editingEvent) {
         const payload = {
@@ -133,22 +137,18 @@ export default function EventsPage() {
           event_date: form.date || null,
           location: form.location.trim() || null,
         };
-        const { data, error } = await supabase
+        const { error } = await supabase
           .from("events")
           .update(payload)
-          .eq("id", editingEvent.id)
-          .select()
-          .single();
+          .eq("id", editingEvent.id);
         if (error) {
           console.error("[EventsPage] update error:", error.code, error.message);
           throw error;
         }
-        // Apply optimistic update immediately to the local list
+        // Apply update to local list immediately
         setEvents((prev) =>
           prev.map((e) =>
-            e.id === editingEvent.id
-              ? { ...e, ...payload, ...(data ?? {}) }
-              : e
+            e.id === editingEvent.id ? { ...e, ...payload } : e
           )
         );
         logActivity("event_updated", `Event: "${form.title.trim()}"`, profile?.email ?? undefined);
