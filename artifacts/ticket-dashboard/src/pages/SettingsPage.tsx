@@ -2,190 +2,85 @@ import { useState } from "react";
 import { supabase } from "@/lib/supabase";
 import { useLocale } from "@/contexts/LocaleContext";
 import { useAuth } from "@/contexts/useAuth";
+import { useTheme } from "@/contexts/ThemeContext";
+import { useBranding } from "@/contexts/BrandingContext";
 import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
 import { logActivity } from "@/lib/activityLogger";
 import {
   Globe,
-  Database,
   Trash2,
   CheckCircle2,
-  XCircle,
-  Loader2,
   AlertTriangle,
-  Copy,
   Check,
-  Code2,
-  ShieldCheck,
+  Sun,
+  Moon,
+  Monitor,
+  User,
+  Palette,
+  Loader2,
+  Pencil,
+  X,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
+import { type Theme } from "@/contexts/ThemeContext";
 
-const SETUP_SQL = `-- 1. Create the events table
-create table if not exists public.events (
-  id uuid primary key default gen_random_uuid(),
-  title text not null,
-  event_date date,
-  location text,
-  created_at timestamptz default now()
-);
-
--- 2. Create the tickets table
-create table if not exists public.tickets (
-  id uuid primary key default gen_random_uuid(),
-  event_id uuid references public.events(id) on delete cascade not null,
-  customer_name text not null,
-  customer_phone text,
-  is_scanned boolean default false,
-  created_at timestamptz default now()
-);
-
--- 3. Create the profiles table (if not exists)
-create table if not exists public.profiles (
-  id uuid primary key references auth.users(id) on delete cascade,
-  role text not null default 'user',
-  full_name text,
-  email text
-);
-
--- 4. Enable Row Level Security on all tables
-alter table public.events enable row level security;
-alter table public.tickets enable row level security;
-alter table public.profiles enable row level security;
-
--- 5. RLS Policies for events (admins can do everything)
-create policy "Authenticated users can read events"
-  on public.events for select to authenticated using (true);
-
-create policy "Authenticated users can insert events"
-  on public.events for insert to authenticated with check (true);
-
-create policy "Authenticated users can update events"
-  on public.events for update to authenticated using (true);
-
-create policy "Authenticated users can delete events"
-  on public.events for delete to authenticated using (true);
-
--- 6. RLS Policies for tickets
-create policy "Authenticated users can read tickets"
-  on public.tickets for select to authenticated using (true);
-
-create policy "Authenticated users can insert tickets"
-  on public.tickets for insert to authenticated with check (true);
-
-create policy "Authenticated users can update tickets"
-  on public.tickets for update to authenticated using (true);
-
--- 7. RLS Policies for profiles
-create policy "Users can read all profiles"
-  on public.profiles for select to authenticated using (true);
-
-create policy "Users can update own profile"
-  on public.profiles for update to authenticated using (auth.uid() = id);
-
--- 8. Auto-create profile on signup
-create or replace function public.handle_new_user()
-returns trigger as $$
-begin
-  insert into public.profiles (id, email, role)
-  values (new.id, new.email, 'admin')
-  on conflict (id) do nothing;
-  return new;
-end;
-$$ language plpgsql security definer;
-
-create or replace trigger on_auth_user_created
-  after insert on auth.users
-  for each row execute procedure public.handle_new_user();`;
-
-const FIX_PERMISSIONS_SQL = `-- Fix permissions for existing tables
--- Run this if you can read events but cannot update, insert, or delete them.
-
--- Drop old policies (safe — ignores if they don't exist)
-drop policy if exists "Authenticated users can read events"   on public.events;
-drop policy if exists "Authenticated users can insert events" on public.events;
-drop policy if exists "Authenticated users can update events" on public.events;
-drop policy if exists "Authenticated users can delete events" on public.events;
-drop policy if exists "Authenticated users can read tickets"  on public.tickets;
-drop policy if exists "Authenticated users can insert tickets" on public.tickets;
-drop policy if exists "Authenticated users can update tickets" on public.tickets;
-
--- Re-create all policies
-create policy "Authenticated users can read events"
-  on public.events for select to authenticated using (true);
-
-create policy "Authenticated users can insert events"
-  on public.events for insert to authenticated with check (true);
-
-create policy "Authenticated users can update events"
-  on public.events for update to authenticated using (true) with check (true);
-
-create policy "Authenticated users can delete events"
-  on public.events for delete to authenticated using (true);
-
-create policy "Authenticated users can read tickets"
-  on public.tickets for select to authenticated using (true);
-
-create policy "Authenticated users can insert tickets"
-  on public.tickets for insert to authenticated with check (true);
-
-create policy "Authenticated users can update tickets"
-  on public.tickets for update to authenticated using (true) with check (true);
-
--- Add event_date column if your table used a different name
-alter table public.events add column if not exists event_date date;
-alter table public.events add column if not exists location text;`;
+const LOGO_OPTIONS = ["🎟️", "🎫", "🎪", "🎭", "🏟️", "🎬", "🎤", "🌟", "🎯", "⚡", "🚀", "💎"];
 
 export default function SettingsPage() {
   const { t, lang, setLang } = useLocale();
-  const { profile } = useAuth();
+  const { profile, user } = useAuth();
+  const { theme, setTheme } = useTheme();
+  const { systemName, systemLogo, setSystemName, setSystemLogo } = useBranding();
+  const isAr = lang === "ar";
 
-  const [testStatus, setTestStatus] = useState<"idle" | "testing" | "ok" | "fail">("idle");
-  const [testDetails, setTestDetails] = useState<{ events: string; tickets: string; profiles: string } | null>(null);
+  // ── Admin Profile ───────────────────────────────────────────
+  const [editingProfile, setEditingProfile] = useState(false);
+  const [nameInput, setNameInput] = useState(profile?.full_name || "");
+  const [profileSaving, setProfileSaving] = useState(false);
+  const [profileMsg, setProfileMsg] = useState<{ type: "ok" | "err"; text: string } | null>(null);
+
+  const handleSaveProfile = async () => {
+    setProfileSaving(true);
+    setProfileMsg(null);
+    try {
+      const { data: updated, error } = await supabase
+        .from("profiles")
+        .update({ full_name: nameInput.trim() || null })
+        .eq("id", user!.id)
+        .select("id");
+      if (error) throw error;
+      if (!updated || updated.length === 0) throw new Error(isAr ? "فشل الحفظ — تحقق من صلاحيات قاعدة البيانات" : "Save blocked — check database permissions");
+      logActivity("settings_changed", "Updated admin profile name", profile?.email ?? undefined);
+      setProfileMsg({ type: "ok", text: isAr ? "تم حفظ الاسم بنجاح" : "Name saved successfully" });
+      setEditingProfile(false);
+    } catch (err: unknown) {
+      setProfileMsg({ type: "err", text: err instanceof Error ? err.message : "Failed to save" });
+    } finally {
+      setProfileSaving(false);
+    }
+  };
+
+  // ── Branding ────────────────────────────────────────────────
+  const [nameInputBrand, setNameInputBrand] = useState(systemName);
+  const [brandSaved, setBrandSaved] = useState(false);
+
+  const handleSaveBranding = () => {
+    setSystemName(nameInputBrand.trim());
+    if (nameInputBrand.trim()) {
+      logActivity("settings_changed", `System name changed to: ${nameInputBrand.trim()}`, profile?.email ?? undefined);
+    }
+    setBrandSaved(true);
+    setTimeout(() => setBrandSaved(false), 2500);
+  };
+
+  // ── Activity Logs ───────────────────────────────────────────
   const [clearConfirm, setClearConfirm] = useState(false);
   const [clearMsg, setClearMsg] = useState("");
-  const [sqlCopied, setSqlCopied] = useState(false);
-  const [fixCopied, setFixCopied] = useState(false);
-
-  const handleCopyFixSQL = async () => {
-    await navigator.clipboard.writeText(FIX_PERMISSIONS_SQL);
-    setFixCopied(true);
-    setTimeout(() => setFixCopied(false), 2000);
-  };
-
-  const handleTestConnection = async () => {
-    setTestStatus("testing");
-    setTestDetails(null);
-    try {
-      const [eventsRes, ticketsRes, profilesRes] = await Promise.all([
-        supabase.from("events").select("id", { count: "exact", head: true }),
-        supabase.from("tickets").select("id", { count: "exact", head: true }),
-        supabase.from("profiles").select("id", { count: "exact", head: true }),
-      ]);
-      const details = {
-        events: eventsRes.error ? `❌ ${eventsRes.error.message}` : `✅ ${eventsRes.count ?? 0} rows`,
-        tickets: ticketsRes.error ? `❌ ${ticketsRes.error.message}` : `✅ ${ticketsRes.count ?? 0} rows`,
-        profiles: profilesRes.error ? `❌ ${profilesRes.error.message}` : `✅ ${profilesRes.count ?? 0} rows`,
-      };
-      setTestDetails(details);
-      const allOk = !eventsRes.error && !ticketsRes.error && !profilesRes.error;
-      setTestStatus(allOk ? "ok" : "fail");
-      logActivity("settings_changed", "Connection test ran", profile?.email ?? undefined);
-    } catch (err: unknown) {
-      setTestStatus("fail");
-      setTestDetails({ events: "❌ Could not connect", tickets: "❌ Could not connect", profiles: "❌ Could not connect" });
-    }
-  };
-
-  const handleCopySQL = async () => {
-    await navigator.clipboard.writeText(SETUP_SQL);
-    setSqlCopied(true);
-    setTimeout(() => setSqlCopied(false), 2000);
-  };
 
   const handleClearLogs = () => {
-    if (!clearConfirm) {
-      setClearConfirm(true);
-      return;
-    }
+    if (!clearConfirm) { setClearConfirm(true); return; }
     import("@/lib/activityLogger").then(({ clearActivityLogs }) => {
       clearActivityLogs();
       setClearMsg(t.logsCleared);
@@ -194,15 +89,7 @@ export default function SettingsPage() {
     });
   };
 
-  const SectionCard = ({
-    title,
-    icon: Icon,
-    children,
-  }: {
-    title: string;
-    icon: React.ElementType;
-    children: React.ReactNode;
-  }) => (
+  const SectionCard = ({ title, icon: Icon, children }: { title: string; icon: React.ElementType; children: React.ReactNode }) => (
     <div className="bg-card border border-card-border rounded-2xl overflow-hidden shadow-sm">
       <div className="flex items-center gap-2.5 px-5 py-4 border-b border-border bg-muted/20">
         <div className="w-7 h-7 bg-primary/10 rounded-lg flex items-center justify-center">
@@ -214,6 +101,15 @@ export default function SettingsPage() {
     </div>
   );
 
+  const themeOptions: { value: Theme; label: string; arLabel: string; icon: React.ElementType }[] = [
+    { value: "light", label: "Light", arLabel: "فاتح", icon: Sun },
+    { value: "dark",  label: "Dark",  arLabel: "داكن", icon: Moon },
+    { value: "system", label: "System", arLabel: "تلقائي", icon: Monitor },
+  ];
+
+  const initials = (profile?.full_name || profile?.email || "A")
+    .split(" ").map((w) => w[0]).join("").toUpperCase().slice(0, 2);
+
   return (
     <div className="space-y-8">
       <div>
@@ -223,10 +119,171 @@ export default function SettingsPage() {
 
       <div className="space-y-4 max-w-2xl">
 
-        {/* Language */}
+        {/* ── Admin Profile ──────────────────────────────────── */}
+        <SectionCard title={isAr ? "الملف الشخصي" : "Admin Profile"} icon={User}>
+          <div className="flex items-center gap-4">
+            <div className="w-14 h-14 rounded-2xl bg-gradient-to-br from-violet-500 to-purple-700 flex items-center justify-center text-white text-lg font-bold shrink-0 shadow-md">
+              {initials}
+            </div>
+            <div className="flex-1 min-w-0">
+              <p className="font-semibold text-foreground">{profile?.full_name || (isAr ? "بدون اسم" : "No name set")}</p>
+              <p className="text-sm text-muted-foreground truncate">{user?.email || profile?.email}</p>
+              <span className="inline-flex items-center gap-1 mt-1 text-[11px] font-semibold px-2 py-0.5 rounded-full bg-violet-100 text-violet-700 dark:bg-violet-900/30 dark:text-violet-400">
+                {isAr ? "مدير" : "Admin"}
+              </span>
+            </div>
+            {!editingProfile && (
+              <Button variant="outline" size="sm" className="rounded-xl shrink-0" onClick={() => { setNameInput(profile?.full_name || ""); setEditingProfile(true); setProfileMsg(null); }}>
+                <Pencil className="w-3.5 h-3.5" />
+                {isAr ? "تعديل" : "Edit"}
+              </Button>
+            )}
+          </div>
+
+          {editingProfile && (
+            <div className="space-y-3 pt-1">
+              <div className="space-y-1.5">
+                <Label className="font-medium text-sm">{isAr ? "الاسم الكامل" : "Full Name"}</Label>
+                <Input
+                  placeholder={isAr ? "أدخل اسمك الكامل" : "Enter your full name"}
+                  value={nameInput}
+                  onChange={(e) => setNameInput(e.target.value)}
+                  className="h-11 rounded-xl"
+                />
+              </div>
+              <div className="flex gap-2">
+                <Button
+                  onClick={handleSaveProfile}
+                  disabled={profileSaving}
+                  className="flex-1 rounded-xl bg-gradient-to-r from-violet-600 to-purple-600 border-0"
+                >
+                  {profileSaving
+                    ? <><Loader2 className="w-4 h-4 animate-spin" />{isAr ? "جارٍ الحفظ..." : "Saving..."}</>
+                    : <><Check className="w-4 h-4" />{isAr ? "حفظ" : "Save"}</>
+                  }
+                </Button>
+                <Button variant="outline" onClick={() => { setEditingProfile(false); setProfileMsg(null); }} className="rounded-xl px-3">
+                  <X className="w-4 h-4" />
+                </Button>
+              </div>
+            </div>
+          )}
+
+          {profileMsg && (
+            <div className={cn("flex items-center gap-2 text-sm rounded-xl px-3 py-2", profileMsg.type === "ok" ? "text-emerald-600 bg-emerald-50 dark:bg-emerald-900/20" : "text-destructive bg-destructive/10")}>
+              {profileMsg.type === "ok" ? <CheckCircle2 className="w-4 h-4 shrink-0" /> : <AlertTriangle className="w-4 h-4 shrink-0" />}
+              {profileMsg.text}
+            </div>
+          )}
+        </SectionCard>
+
+        {/* ── System Branding ────────────────────────────────── */}
+        <SectionCard title={isAr ? "هوية النظام" : "System Branding"} icon={Palette}>
+          <div className="space-y-4">
+            {/* Logo picker */}
+            <div className="space-y-2">
+              <Label className="font-medium text-sm">{isAr ? "أيقونة النظام" : "System Icon"}</Label>
+              <div className="flex flex-wrap gap-2">
+                {LOGO_OPTIONS.map((emoji) => (
+                  <button
+                    key={emoji}
+                    onClick={() => setSystemLogo(emoji)}
+                    className={cn(
+                      "w-10 h-10 rounded-xl text-xl flex items-center justify-center border-2 transition-all",
+                      systemLogo === emoji
+                        ? "border-primary bg-primary/10 scale-110 shadow-sm"
+                        : "border-border hover:border-primary/40 hover:bg-muted"
+                    )}
+                  >
+                    {emoji}
+                  </button>
+                ))}
+                {systemLogo && !LOGO_OPTIONS.includes(systemLogo) && (
+                  <button
+                    onClick={() => setSystemLogo("")}
+                    className="w-10 h-10 rounded-xl border-2 border-border text-xs text-muted-foreground hover:bg-muted transition-all flex items-center justify-center"
+                    title="Remove custom logo"
+                  >
+                    <X className="w-3.5 h-3.5" />
+                  </button>
+                )}
+                <button
+                  onClick={() => setSystemLogo("")}
+                  className={cn(
+                    "w-10 h-10 rounded-xl border-2 transition-all text-sm font-bold",
+                    !systemLogo ? "border-primary bg-primary/10 text-primary" : "border-border text-muted-foreground hover:border-primary/40 hover:bg-muted"
+                  )}
+                  title="Default icon"
+                >
+                  🎟
+                </button>
+              </div>
+            </div>
+
+            {/* Name input */}
+            <div className="space-y-1.5">
+              <Label className="font-medium text-sm">{isAr ? "اسم النظام" : "System Name"}</Label>
+              <div className="flex gap-2">
+                <Input
+                  placeholder={isAr ? "مثال: نظام التذاكر" : "e.g. EventPro, TicketHub"}
+                  value={nameInputBrand}
+                  onChange={(e) => setNameInputBrand(e.target.value)}
+                  className="h-11 rounded-xl flex-1"
+                />
+                <Button
+                  onClick={handleSaveBranding}
+                  className="h-11 px-4 rounded-xl bg-gradient-to-r from-violet-600 to-purple-600 border-0 shrink-0"
+                >
+                  {brandSaved ? <><Check className="w-4 h-4 text-white" />{isAr ? "تم" : "Saved"}</> : (isAr ? "حفظ" : "Save")}
+                </Button>
+              </div>
+              <p className="text-xs text-muted-foreground">
+                {isAr ? "يظهر في الشريط الجانبي وشريط العنوان." : "Shown in the sidebar and browser tab title."}
+              </p>
+            </div>
+
+            {/* Preview */}
+            <div className="flex items-center gap-3 p-3 bg-muted/40 rounded-xl border border-border">
+              <div className="w-9 h-9 bg-gradient-to-br from-violet-500 to-purple-700 rounded-xl flex items-center justify-center text-lg shadow-sm">
+                {systemLogo || "🎟️"}
+              </div>
+              <div>
+                <p className="font-bold text-foreground text-sm leading-tight">{nameInputBrand || "TicketHub"}</p>
+                <p className="text-[10px] text-muted-foreground">{isAr ? "معاينة" : "Preview"}</p>
+              </div>
+            </div>
+          </div>
+        </SectionCard>
+
+        {/* ── Appearance ─────────────────────────────────────── */}
+        <SectionCard title={isAr ? "المظهر" : "Appearance"} icon={Sun}>
+          <div className="grid grid-cols-3 gap-2">
+            {themeOptions.map(({ value, label, arLabel, icon: Icon }) => (
+              <button
+                key={value}
+                onClick={() => {
+                  setTheme(value);
+                  logActivity("settings_changed", `Theme changed to ${value}`, profile?.email ?? undefined);
+                }}
+                className={cn(
+                  "flex flex-col items-center gap-2 py-4 px-3 rounded-xl border-2 transition-all font-medium text-sm",
+                  theme === value
+                    ? "border-primary bg-primary/10 text-primary shadow-sm"
+                    : "border-border text-muted-foreground hover:border-primary/40 hover:text-foreground hover:bg-muted/50"
+                )}
+              >
+                <Icon className="w-5 h-5" />
+                {isAr ? arLabel : label}
+                {theme === value && <div className="w-1.5 h-1.5 rounded-full bg-primary" />}
+              </button>
+            ))}
+          </div>
+        </SectionCard>
+
+        {/* ── Language ───────────────────────────────────────── */}
         <SectionCard title={t.languagePref} icon={Globe}>
           <div className="flex gap-2">
-            {([["en", "English"], ["ar", "عربي"]] as const).map(([code, label]) => (
+            {([["en", "English", "إنجليزي"], ["ar", "عربي", "عربي"]] as const).map(([code, label, arLabel]) => (
               <button
                 key={code}
                 onClick={() => {
@@ -240,116 +297,13 @@ export default function SettingsPage() {
                     : "border-border text-muted-foreground hover:border-primary/40 hover:text-foreground"
                 )}
               >
-                {label}
+                {isAr ? arLabel : label}
               </button>
             ))}
           </div>
         </SectionCard>
 
-        {/* Database Setup */}
-        <SectionCard title="Database Setup" icon={Code2}>
-          <div className="space-y-3">
-            <p className="text-sm text-muted-foreground">
-              Run this SQL in your Supabase project's <strong>SQL Editor</strong> to create all required tables and RLS policies. Only needed once.
-            </p>
-            <div className="relative">
-              <pre className="bg-muted/60 rounded-xl p-4 text-xs font-mono overflow-auto max-h-48 text-foreground/80 leading-relaxed whitespace-pre-wrap">
-                {SETUP_SQL}
-              </pre>
-              <button
-                onClick={handleCopySQL}
-                className="absolute top-2 end-2 flex items-center gap-1.5 px-2.5 py-1.5 bg-card border border-border rounded-lg text-xs font-medium hover:bg-muted transition-colors"
-              >
-                {sqlCopied ? <Check className="w-3.5 h-3.5 text-emerald-500" /> : <Copy className="w-3.5 h-3.5" />}
-                {sqlCopied ? "Copied!" : "Copy"}
-              </button>
-            </div>
-            <p className="text-xs text-muted-foreground">
-              Go to <strong>Supabase Dashboard → SQL Editor → New query</strong>, paste the script above, and click <strong>Run</strong>.
-            </p>
-          </div>
-        </SectionCard>
-
-        {/* Fix Permissions */}
-        <SectionCard title="Fix Permissions (RLS)" icon={ShieldCheck}>
-          <div className="space-y-3">
-            <div className="flex items-start gap-2.5 p-3 bg-amber-50 dark:bg-amber-900/10 border border-amber-200 dark:border-amber-800/30 rounded-xl text-sm text-amber-800 dark:text-amber-400">
-              <AlertTriangle className="w-4 h-4 shrink-0 mt-0.5" />
-              <p className="text-xs leading-relaxed">
-                <strong>Run this if edits, additions, or deletes don't save to the database.</strong>{" "}
-                This safely drops and recreates all RLS policies on your existing tables — nothing is deleted.
-              </p>
-            </div>
-            <div className="relative">
-              <pre className="bg-muted/60 rounded-xl p-4 text-xs font-mono overflow-auto max-h-48 text-foreground/80 leading-relaxed whitespace-pre-wrap">
-                {FIX_PERMISSIONS_SQL}
-              </pre>
-              <button
-                onClick={handleCopyFixSQL}
-                className="absolute top-2 end-2 flex items-center gap-1.5 px-2.5 py-1.5 bg-card border border-border rounded-lg text-xs font-medium hover:bg-muted transition-colors"
-              >
-                {fixCopied ? <Check className="w-3.5 h-3.5 text-emerald-500" /> : <Copy className="w-3.5 h-3.5" />}
-                {fixCopied ? "Copied!" : "Copy"}
-              </button>
-            </div>
-            <p className="text-xs text-muted-foreground">
-              Go to <strong>Supabase Dashboard → SQL Editor → New query</strong>, paste and click <strong>Run</strong>. Then try editing an event again.
-            </p>
-          </div>
-        </SectionCard>
-
-        {/* Connection Test */}
-        <SectionCard title={t.connectionSection} icon={Database}>
-          <div className="flex items-center justify-between gap-4">
-            <div>
-              <p className="text-sm font-medium text-foreground">{t.connectionStatus}</p>
-              <p className="text-xs text-muted-foreground mt-0.5 font-mono">lzkitwefaxolgnuwdvuk.supabase.co</p>
-            </div>
-            {testStatus === "idle" && (
-              <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-emerald-100 text-emerald-700 dark:bg-emerald-900/30 dark:text-emerald-400 text-xs font-semibold">
-                <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse" />
-                {t.connected}
-              </span>
-            )}
-            {testStatus === "ok" && (
-              <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-emerald-100 text-emerald-700 dark:bg-emerald-900/30 dark:text-emerald-400 text-xs font-semibold">
-                <CheckCircle2 className="w-3.5 h-3.5" />
-                All tables OK
-              </span>
-            )}
-            {testStatus === "fail" && (
-              <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-destructive/10 text-destructive text-xs font-semibold">
-                <XCircle className="w-3.5 h-3.5" />
-                Issues found
-              </span>
-            )}
-          </div>
-
-          {testDetails && (
-            <div className="rounded-xl border border-border bg-muted/30 divide-y divide-border">
-              {Object.entries(testDetails).map(([table, status]) => (
-                <div key={table} className="flex items-center justify-between px-4 py-2.5 text-sm">
-                  <span className="font-mono text-xs font-medium">{table}</span>
-                  <span className="text-xs text-muted-foreground">{status}</span>
-                </div>
-              ))}
-            </div>
-          )}
-
-          <Button
-            onClick={handleTestConnection}
-            disabled={testStatus === "testing"}
-            variant="outline"
-            className="w-full rounded-xl h-10"
-          >
-            {testStatus === "testing"
-              ? <><Loader2 className="w-4 h-4 animate-spin" />{t.testing}</>
-              : t.testConnection
-            }
-          </Button>
-        </SectionCard>
-
-        {/* Data Management */}
+        {/* ── Activity Logs ──────────────────────────────────── */}
         <SectionCard title={t.dataSection} icon={Trash2}>
           <p className="text-sm text-muted-foreground">{t.clearLogsConfirm}</p>
           {clearMsg && (

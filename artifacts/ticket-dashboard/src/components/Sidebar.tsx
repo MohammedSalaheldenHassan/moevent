@@ -1,6 +1,7 @@
 import { Link, useLocation } from "wouter";
 import { useAuth } from "@/contexts/useAuth";
 import { useLocale } from "@/contexts/LocaleContext";
+import { useBranding } from "@/contexts/BrandingContext";
 import { cn } from "@/lib/utils";
 import {
   LayoutDashboard,
@@ -20,7 +21,11 @@ export function Sidebar() {
   const [location] = useLocation();
   const { signOut, profile } = useAuth();
   const { t, lang, setLang, isRTL } = useLocale();
+  const { systemName, systemLogo } = useBranding();
   const [mobileOpen, setMobileOpen] = useState(false);
+
+  const displayName = systemName || t.appName;
+  const displayLogo = systemLogo || "🎟️";
 
   const navItems = [
     { href: "/", label: t.dashboard, icon: LayoutDashboard },
@@ -72,11 +77,11 @@ export function Sidebar() {
       {/* Logo */}
       <div className="px-5 py-5 border-b border-sidebar-border">
         <div className="flex items-center gap-3">
-          <div className="w-9 h-9 bg-gradient-to-br from-violet-500 to-purple-700 rounded-xl flex items-center justify-center shadow-md">
-            <Ticket className="w-4 h-4 text-white" />
+          <div className="w-9 h-9 bg-gradient-to-br from-violet-500 to-purple-700 rounded-xl flex items-center justify-center shadow-md text-lg">
+            {displayLogo}
           </div>
           <div className="min-w-0">
-            <p className="font-bold text-sidebar-foreground text-sm leading-tight">{t.appName}</p>
+            <p className="font-bold text-sidebar-foreground text-sm leading-tight truncate">{displayName}</p>
             <p className="text-[10px] text-sidebar-foreground/50 truncate leading-tight">{t.appTagline}</p>
           </div>
         </div>
@@ -88,12 +93,10 @@ export function Sidebar() {
           <NavLink key={item.href} {...item} />
         ))}
 
-        {/* Divider */}
         <div className="pt-3 pb-1">
           <div className="h-px bg-sidebar-border mx-1" />
         </div>
 
-        {/* Secondary nav */}
         {bottomNavItems.map((item) => (
           <NavLink key={item.href} {...item} />
         ))}
@@ -105,28 +108,20 @@ export function Sidebar() {
         <div className="flex items-center gap-1 px-3 py-2 rounded-xl bg-sidebar-accent/50">
           <Globe className="w-4 h-4 text-sidebar-foreground/50 shrink-0" />
           <div className="flex ms-auto gap-1">
-            <button
-              onClick={() => setLang("en")}
-              className={cn(
-                "px-2.5 py-1 rounded-lg text-xs font-semibold transition-all",
-                lang === "en"
-                  ? "bg-violet-600 text-white shadow-sm"
-                  : "text-sidebar-foreground/60 hover:text-sidebar-foreground hover:bg-sidebar-accent"
-              )}
-            >
-              EN
-            </button>
-            <button
-              onClick={() => setLang("ar")}
-              className={cn(
-                "px-2.5 py-1 rounded-lg text-xs font-semibold transition-all",
-                lang === "ar"
-                  ? "bg-violet-600 text-white shadow-sm"
-                  : "text-sidebar-foreground/60 hover:text-sidebar-foreground hover:bg-sidebar-accent"
-              )}
-            >
-              عربي
-            </button>
+            {(["en", "ar"] as const).map((code) => (
+              <button
+                key={code}
+                onClick={() => setLang(code)}
+                className={cn(
+                  "px-2.5 py-1 rounded-lg text-xs font-semibold transition-all",
+                  lang === code
+                    ? "bg-violet-600 text-white shadow-sm"
+                    : "text-sidebar-foreground/60 hover:text-sidebar-foreground hover:bg-sidebar-accent"
+                )}
+              >
+                {code === "en" ? "EN" : "عربي"}
+              </button>
+            ))}
           </div>
         </div>
 
@@ -142,7 +137,9 @@ export function Sidebar() {
             <p className="text-xs font-medium text-sidebar-foreground truncate">
               {profile?.full_name || profile?.email || "Admin"}
             </p>
-            <p className="text-[10px] text-sidebar-foreground/40 truncate">{t.admin}</p>
+            <p className="text-[10px] text-sidebar-foreground/40 truncate">
+              {profile?.email || t.admin}
+            </p>
           </div>
           <LogOut className="w-3.5 h-3.5 text-sidebar-foreground/30 group-hover:text-sidebar-foreground/70 transition-colors shrink-0" />
         </div>
@@ -152,16 +149,19 @@ export function Sidebar() {
 
   return (
     <>
+      {/* Mobile hamburger */}
       <button
         className={cn(
           "lg:hidden fixed top-4 z-50 p-2.5 bg-sidebar rounded-xl border border-sidebar-border shadow-lg",
           isRTL ? "right-4" : "left-4"
         )}
         onClick={() => setMobileOpen(!mobileOpen)}
+        aria-label="Toggle menu"
       >
         {mobileOpen ? <X className="w-4 h-4 text-sidebar-foreground" /> : <Menu className="w-4 h-4 text-sidebar-foreground" />}
       </button>
 
+      {/* Mobile overlay */}
       {mobileOpen && (
         <div
           className="lg:hidden fixed inset-0 bg-black/60 z-40 backdrop-blur-sm"
@@ -169,6 +169,7 @@ export function Sidebar() {
         />
       )}
 
+      {/* Sidebar drawer */}
       <aside
         className={cn(
           "fixed top-0 h-full w-64 bg-sidebar border-sidebar-border flex flex-col z-40 transition-transform duration-200",

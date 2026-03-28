@@ -5,6 +5,8 @@ import { TooltipProvider } from "@/components/ui/tooltip";
 import { AuthProvider } from "@/contexts/AuthContext";
 import { useAuth } from "@/contexts/useAuth";
 import { LocaleProvider, useLocale } from "@/contexts/LocaleContext";
+import { ThemeProvider } from "@/contexts/ThemeContext";
+import { BrandingProvider, useBranding } from "@/contexts/BrandingContext";
 import { ErrorBoundary } from "@/components/ErrorBoundary";
 import { Sidebar } from "@/components/Sidebar";
 import LoginPage from "@/pages/LoginPage";
@@ -27,11 +29,21 @@ const queryClient = new QueryClient({
 
 function AppLayout({ children }: { children: React.ReactNode }) {
   const { isRTL } = useLocale();
+  const { systemName } = useBranding();
+
+  // Update page title with system name
+  useEffect(() => {
+    document.title = systemName || "TicketHub";
+  }, [systemName]);
+
   return (
     <div className="flex min-h-screen bg-background">
       <Sidebar />
       <main className={`flex-1 ${isRTL ? "lg:pr-64" : "lg:pl-64"} min-w-0`}>
-        <div className="p-6 lg:p-8 max-w-6xl mx-auto">{children}</div>
+        {/* pt-16 on mobile so content is below the fixed hamburger button */}
+        <div className="p-4 pt-16 sm:p-6 sm:pt-16 lg:p-8 lg:pt-8 max-w-6xl mx-auto">
+          {children}
+        </div>
       </main>
     </div>
   );
@@ -69,13 +81,8 @@ function LoadingScreen() {
 function ProtectedRoutes() {
   const { user, loading } = useAuth();
 
-  if (loading) {
-    return <LoadingScreen />;
-  }
-
-  if (!user) {
-    return <LoginPage />;
-  }
+  if (loading) return <LoadingScreen />;
+  if (!user) return <LoginPage />;
 
   return (
     <AppLayout>
@@ -96,18 +103,22 @@ function ProtectedRoutes() {
 function App() {
   return (
     <ErrorBoundary>
-      <LocaleProvider>
-        <QueryClientProvider client={queryClient}>
-          <TooltipProvider>
-            <AuthProvider>
-              <WouterRouter base={import.meta.env.BASE_URL.replace(/\/$/, "")}>
-                <ProtectedRoutes />
-              </WouterRouter>
-              <Toaster />
-            </AuthProvider>
-          </TooltipProvider>
-        </QueryClientProvider>
-      </LocaleProvider>
+      <ThemeProvider>
+        <BrandingProvider>
+          <LocaleProvider>
+            <QueryClientProvider client={queryClient}>
+              <TooltipProvider>
+                <AuthProvider>
+                  <WouterRouter base={import.meta.env.BASE_URL.replace(/\/$/, "")}>
+                    <ProtectedRoutes />
+                  </WouterRouter>
+                  <Toaster />
+                </AuthProvider>
+              </TooltipProvider>
+            </QueryClientProvider>
+          </LocaleProvider>
+        </BrandingProvider>
+      </ThemeProvider>
     </ErrorBoundary>
   );
 }
