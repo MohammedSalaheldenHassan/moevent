@@ -1,6 +1,7 @@
 import { useState } from "react";
 import { useAuth } from "@/contexts/useAuth";
 import { useLocale } from "@/contexts/LocaleContext";
+import { useBranding } from "@/contexts/BrandingContext";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -10,6 +11,9 @@ import { cn } from "@/lib/utils";
 export default function LoginPage() {
   const { signIn } = useAuth();
   const { t, lang, setLang } = useLocale();
+  const { systemName, systemLogo } = useBranding();
+  const displayName = systemName || t.appName;
+  const isImageLogo = systemLogo && (systemLogo.startsWith("data:") || systemLogo.startsWith("http"));
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [error, setError] = useState<string | null>(null);
@@ -56,10 +60,16 @@ export default function LoginPage() {
         <div className="w-full max-w-sm">
           {/* Logo */}
           <div className="text-center mb-8">
-            <div className="inline-flex items-center justify-center w-16 h-16 rounded-2xl bg-gradient-to-br from-violet-500 to-purple-700 mb-5 shadow-lg shadow-violet-500/25">
-              <Ticket className="w-8 h-8 text-white" />
+            <div className="inline-flex items-center justify-center w-16 h-16 rounded-2xl mb-5 shadow-lg shadow-violet-500/25 overflow-hidden">
+              {isImageLogo ? (
+                <img src={systemLogo!} alt="Logo" className="w-full h-full object-cover" />
+              ) : (
+                <div className="w-full h-full bg-gradient-to-br from-violet-500 to-purple-700 flex items-center justify-center">
+                  <Ticket className="w-8 h-8 text-white" />
+                </div>
+              )}
             </div>
-            <h1 className="text-3xl font-bold text-foreground tracking-tight">{t.appName}</h1>
+            <h1 className="text-3xl font-bold text-foreground tracking-tight">{displayName}</h1>
             <p className="text-sm text-muted-foreground mt-2">{t.signInToAdmin}</p>
           </div>
 
@@ -119,7 +129,7 @@ export default function LoginPage() {
           </div>
 
           <p className="text-center text-xs text-muted-foreground mt-6">
-            {t.appName} &copy; {new Date().getFullYear()}
+            {displayName} &copy; {new Date().getFullYear()}
           </p>
         </div>
       </div>
