@@ -10,7 +10,17 @@ import { AuthContext, type Profile } from "./authContextObject";
 // eliminating the "Invalid hook call" HMR crash.
 
 function fetchProfileFromSupabase(userId: string): Promise<Profile | null> {
-  return supabase
+  // 3-second hard timeout — prevents slow DB (cold start / paused project)
+  // from blocking the auth resolution. If it times out, user gets in without
+  // a profile row (data pages will show Supabase errors explaining why).
+  const timeout = new Promise<null>((resolve) =>
+    setTimeout(() => {
+      console.warn("[AuthContext] profile fetch timed out — allowing access without profile");
+      resolve(null);
+    }, 3000)
+  );
+
+  const fetch = supabase
     .from("profiles")
     .select("id, role, full_name, email")
     .eq("id", userId)
@@ -23,6 +33,8 @@ function fetchProfileFromSupabase(userId: string): Promise<Profile | null> {
       return data as Profile;
     })
     .catch(() => null);
+
+  return Promise.race([fetch, timeout]);
 }
 
 export function AuthProvider({ children }: { children: React.ReactNode }) {
@@ -35,13 +47,14 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   useEffect(() => {
     mountedRef.current = true;
 
-    // Safety net: never stay loading more than 8 seconds
+    // Safety net: never stay loading more than 5 seconds
+    // (profile fetch itself has a 3s timeout, so this is a true last resort)
     const safetyTimer = setTimeout(() => {
       if (mountedRef.current) {
         console.warn("[AuthContext] Safety timer fired — forcing loading=false");
         setLoading(false);
       }
-    }, 8000);
+    }, 5000);
 
     // Supabase v2: onAuthStateChange fires immediately with INITIAL_SESSION.
     // This is the canonical init pattern — no getSession() race condition.
@@ -95,19 +108,29 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       const { data, error } = await supabase.auth.signInWithPassword({ email, password });
       if (error) return { error: error.message };
 
-      if (data.user) {
+      if (data.user && data.session) {
+        // Set user + session immediately so the UI doesn't wait for onAuthStateChange
+        setUser(data.user);
+        setSession(data.session);
+
         const p = await fetchProfileFromSupabase(data.user.id);
         if (!p) {
-          // Profile missing — still allow if they authenticated successfully
-          console.warn("[AuthContext] No profile found for user, allowing access without role check");
+          console.warn("[AuthContext] No profile row found — allowing access");
+          setProfile(null);
+          setLoading(false);
           logActivity("user_login", `Signed in as ${email} (no profile row)`, email);
           return { error: null };
         }
         if (p.role !== "admin") {
+          // Reset state and deny access
+          setUser(null);
+          setSession(null);
+          setProfile(null);
           await supabase.auth.signOut();
           return { error: "Access Denied: You do not have admin privileges." };
         }
         setProfile(p);
+        setLoading(false);
         logActivity("user_login", `Signed in as ${email}`, email);
       }
       return { error: null };
@@ -119,11 +142,17 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
   const signOut = async () => {
     const email = profile?.email ?? user?.email;
+    // Clear local state immediately — don't wait for Supabase round-trip
+    if (email) logActivity("user_logout", "Signed out", email);
+    setUser(null);
+    setSession(null);
+    setProfile(null);
+    setLoading(false);
+    // Then tell Supabase to invalidate the session server-side
     try {
-      if (email) logActivity("user_logout", "Signed out", email);
       await supabase.auth.signOut();
-    } catch {
-      // ignore sign-out errors
+    } catch (err) {
+      console.warn("[AuthContext] signOut network error (local state already cleared):", err);
     }
   };
 
