@@ -1,5 +1,5 @@
 import { Link, useLocation } from "wouter";
-import { useAuth } from "@/contexts/AuthContext";
+import { useAuth } from "@/contexts/useAuth";
 import { useLocale } from "@/contexts/LocaleContext";
 import { cn } from "@/lib/utils";
 import {

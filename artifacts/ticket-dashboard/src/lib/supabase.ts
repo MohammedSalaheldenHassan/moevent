@@ -1,13 +1,23 @@
 import { createClient, SupabaseClient } from "@supabase/supabase-js";
 
-const supabaseUrl = import.meta.env.VITE_SUPABASE_URL as string;
+// Public Supabase project URL — not a secret
+const supabaseUrl = import.meta.env.VITE_SUPABASE_URL || "https://lzkitwefaxolgnuwdvuk.supabase.co";
 const supabaseAnonKey = import.meta.env.VITE_SUPABASE_ANON_KEY as string;
 
-if (!supabaseUrl || !supabaseAnonKey) {
-  throw new Error("Missing Supabase environment variables: VITE_SUPABASE_URL and VITE_SUPABASE_ANON_KEY must be set.");
+if (!supabaseAnonKey) {
+  console.error(
+    "[TicketHub] VITE_SUPABASE_ANON_KEY is not set.\n" +
+    "Go to Replit Secrets and add:\n" +
+    "  Key: VITE_SUPABASE_ANON_KEY\n" +
+    "  Value: your Supabase project anon key\n" +
+    "You can find it at: https://supabase.com/dashboard/project/lzkitwefaxolgnuwdvuk/settings/api"
+  );
 }
 
-// Use a window-level singleton so HMR doesn't create multiple GoTrueClient instances
+console.log("[TicketHub] Supabase URL:", supabaseUrl);
+console.log("[TicketHub] Anon key present:", !!supabaseAnonKey);
+
+// Use a window-level singleton so HMR never creates multiple GoTrueClient instances
 declare global {
   interface Window {
     __tickethub_supabase__?: SupabaseClient;
@@ -15,13 +25,17 @@ declare global {
 }
 
 if (!window.__tickethub_supabase__) {
-  window.__tickethub_supabase__ = createClient(supabaseUrl, supabaseAnonKey, {
-    auth: {
-      persistSession: true,
-      autoRefreshToken: true,
-      detectSessionInUrl: false,
-    },
-  });
+  window.__tickethub_supabase__ = createClient(
+    supabaseUrl,
+    supabaseAnonKey || "MISSING_KEY",
+    {
+      auth: {
+        persistSession: true,
+        autoRefreshToken: true,
+        detectSessionInUrl: false,
+      },
+    }
+  );
 }
 
 export const supabase = window.__tickethub_supabase__;
