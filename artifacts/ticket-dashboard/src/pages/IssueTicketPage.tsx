@@ -11,8 +11,8 @@ import QRCode from "qrcode";
 interface Event {
   id: string;
   title: string;
-  date: string;
-  location: string;
+  event_date: string | null;
+  location: string | null;
 }
 
 interface IssuedTicket {
@@ -38,8 +38,8 @@ export default function IssueTicketPage() {
       try {
         const { data, error } = await supabase
           .from("events")
-          .select("id, title, date, location")
-          .order("date", { ascending: true });
+          .select("id, title, event_date, location")
+          .order("created_at", { ascending: false });
         if (error) throw error;
         setEvents(data ?? []);
       } catch (err: unknown) {
@@ -133,7 +133,7 @@ export default function IssueTicketPage() {
             <div class="ticket-body">
               <div class="event-name">${issuedTicket?.event.title}</div>
               <div class="event-meta">
-                <span>📅 ${new Date(issuedTicket?.event.date ?? "").toLocaleDateString(lang === "ar" ? "ar-SA" : "en-US", { year: "numeric", month: "long", day: "numeric" })}</span>
+                <span>📅 ${issuedTicket?.event.event_date ? new Date(issuedTicket.event.event_date).toLocaleDateString(lang === "ar" ? "ar-SA" : "en-US", { year: "numeric", month: "long", day: "numeric" }) : ""}</span>
                 <span>📍 ${issuedTicket?.event.location}</span>
               </div>
               <hr class="divider" />
@@ -186,7 +186,7 @@ export default function IssueTicketPage() {
                 ) : (
                   events.map((e) => (
                     <SelectItem key={e.id} value={e.id}>
-                      {e.title} — {new Date(e.date).toLocaleDateString()}
+                      {e.title}{e.event_date ? ` — ${new Date(e.event_date).toLocaleDateString()}` : ""}
                     </SelectItem>
                   ))
                 )}
@@ -261,7 +261,7 @@ export default function IssueTicketPage() {
               <div className="text-2xl mb-1">🎫</div>
               <div className="text-white font-bold text-lg">{issuedTicket.event.title}</div>
               <div className="text-white/70 text-xs mt-1">
-                {new Date(issuedTicket.event.date).toLocaleDateString(lang === "ar" ? "ar-SA" : "en-US", { year: "numeric", month: "long", day: "numeric" })} · {issuedTicket.event.location}
+                {issuedTicket.event.event_date ? new Date(issuedTicket.event.event_date).toLocaleDateString(lang === "ar" ? "ar-SA" : "en-US", { year: "numeric", month: "long", day: "numeric" }) : ""}{issuedTicket.event.location ? ` · ${issuedTicket.event.location}` : ""}
               </div>
             </div>
             <div className="bg-white p-5">

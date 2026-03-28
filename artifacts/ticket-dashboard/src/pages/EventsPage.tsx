@@ -26,10 +26,10 @@ import { format } from "date-fns";
 interface Event {
   id: string;
   title: string;
-  date?: string | null;       // may be named differently in user's table
+  event_date?: string | null;
   location?: string | null;
   created_at: string;
-  [key: string]: unknown;     // allow extra columns from user's actual schema
+  [key: string]: unknown;
 }
 
 type ModalMode = "add" | "edit";
@@ -96,7 +96,7 @@ export default function EventsPage() {
     setEditingEvent(event);
     setForm({
       title: event.title,
-      date: event.date ?? "",
+      date: event.event_date ?? "",
       location: event.location ?? "",
     });
     setFormError(null);
@@ -114,8 +114,8 @@ export default function EventsPage() {
       if (modalMode === "add") {
         const { error } = await supabase.from("events").insert({
           title: form.title.trim(),
-          date: form.date,
-          location: form.location.trim(),
+          event_date: form.date || null,
+          location: form.location.trim() || null,
         });
         if (error) throw error;
         logActivity("event_created", `Event: "${form.title.trim()}"`, profile?.email ?? undefined);
@@ -124,8 +124,8 @@ export default function EventsPage() {
           .from("events")
           .update({
             title: form.title.trim(),
-            date: form.date,
-            location: form.location.trim(),
+            event_date: form.date || null,
+            location: form.location.trim() || null,
           })
           .eq("id", editingEvent.id);
         if (error) throw error;
@@ -234,7 +234,7 @@ export default function EventsPage() {
       ) : (
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
           {events.map((event) => {
-            const upcoming = isUpcoming(event.date);
+            const upcoming = isUpcoming(event.event_date);
             return (
               <div
                 key={event.id}
@@ -262,8 +262,8 @@ export default function EventsPage() {
                   <div className="flex items-center gap-2 text-sm text-muted-foreground">
                     <CalendarDays className="w-3.5 h-3.5 shrink-0 text-primary/60" />
                     <span className="font-medium">
-                      {event.date
-                        ? (() => { try { return format(new Date(event.date), "PPP"); } catch { return event.date; } })()
+                      {event.event_date
+                        ? (() => { try { return format(new Date(event.event_date as string), "PPP"); } catch { return String(event.event_date); } })()
                         : <span className="italic opacity-50">No date</span>}
                     </span>
                   </div>

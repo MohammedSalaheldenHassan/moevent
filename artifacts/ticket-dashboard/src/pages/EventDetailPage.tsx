@@ -22,8 +22,8 @@ import { cn } from "@/lib/utils";
 interface Event {
   id: string;
   title: string;
-  date: string;
-  location: string;
+  event_date: string | null;
+  location: string | null;
 }
 
 interface TicketRow {
@@ -54,7 +54,7 @@ export default function EventDetailPage() {
     const load = async () => {
       try {
         const [eventRes, ticketsRes] = await Promise.all([
-          supabase.from("events").select("id, title, date, location").eq("id", id).single(),
+          supabase.from("events").select("id, title, event_date, location").eq("id", id).single(),
           supabase.from("tickets").select("*").eq("event_id", id).order("created_at", { ascending: false }),
         ]);
         if (eventRes.error) throw eventRes.error;
@@ -123,7 +123,9 @@ export default function EventDetailPage() {
             <div className="flex flex-wrap gap-4 text-sm text-white/80">
               <span className="flex items-center gap-1.5">
                 <CalendarDays className="w-4 h-4" />
-                {format(new Date(event.date), "PPP")}
+                {event.event_date
+                  ? (() => { try { return format(new Date(event.event_date), "PPP"); } catch { return event.event_date; } })()
+                  : "—"}
               </span>
               <span className="flex items-center gap-1.5">
                 <MapPin className="w-4 h-4" />
