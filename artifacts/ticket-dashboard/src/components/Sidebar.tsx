@@ -11,6 +11,8 @@ import {
   Menu,
   X,
   Globe,
+  Settings,
+  ClipboardList,
 } from "lucide-react";
 import { useState } from "react";
 
@@ -27,12 +29,43 @@ export function Sidebar() {
     { href: "/staff", label: t.staff, icon: Users },
   ];
 
+  const bottomNavItems = [
+    { href: "/logs", label: t.activityLogs, icon: ClipboardList },
+    { href: "/settings", label: t.settings, icon: Settings },
+  ];
+
   const initials = (profile?.full_name || profile?.email || "A")
     .split(" ")
     .map((w) => w[0])
     .join("")
     .toUpperCase()
     .slice(0, 2);
+
+  const isActive = (href: string) => {
+    if (href === "/") return location === "/";
+    return location.startsWith(href);
+  };
+
+  const NavLink = ({ href, label, icon: Icon }: { href: string; label: string; icon: React.ElementType }) => {
+    const active = isActive(href);
+    return (
+      <Link href={href}>
+        <div
+          onClick={() => setMobileOpen(false)}
+          className={cn(
+            "group flex items-center gap-3 px-3 py-2.5 rounded-xl text-sm font-medium cursor-pointer transition-all duration-150",
+            active
+              ? "bg-gradient-to-r from-violet-600 to-purple-600 text-white shadow-sm shadow-violet-900/30"
+              : "text-sidebar-foreground/70 hover:bg-sidebar-accent hover:text-sidebar-foreground"
+          )}
+        >
+          <Icon className={cn("w-4 h-4 shrink-0 transition-transform", active ? "" : "group-hover:scale-110")} />
+          <span>{label}</span>
+          {active && <div className="ms-auto w-1.5 h-1.5 rounded-full bg-white/70" />}
+        </div>
+      </Link>
+    );
+  };
 
   const NavContent = () => (
     <div className="flex flex-col h-full">
@@ -49,30 +82,21 @@ export function Sidebar() {
         </div>
       </div>
 
-      {/* Nav */}
+      {/* Main Nav */}
       <nav className="flex-1 px-3 py-4 space-y-0.5 overflow-y-auto">
-        {navItems.map(({ href, label, icon: Icon }) => {
-          const active = location === href;
-          return (
-            <Link key={href} href={href}>
-              <div
-                onClick={() => setMobileOpen(false)}
-                className={cn(
-                  "group flex items-center gap-3 px-3 py-2.5 rounded-xl text-sm font-medium cursor-pointer transition-all duration-150",
-                  active
-                    ? "bg-gradient-to-r from-violet-600 to-purple-600 text-white shadow-sm shadow-violet-900/30"
-                    : "text-sidebar-foreground/70 hover:bg-sidebar-accent hover:text-sidebar-foreground"
-                )}
-              >
-                <Icon className={cn("w-4 h-4 shrink-0 transition-transform", active ? "" : "group-hover:scale-110")} />
-                <span>{label}</span>
-                {active && (
-                  <div className={`ms-auto w-1.5 h-1.5 rounded-full bg-white/70`} />
-                )}
-              </div>
-            </Link>
-          );
-        })}
+        {navItems.map((item) => (
+          <NavLink key={item.href} {...item} />
+        ))}
+
+        {/* Divider */}
+        <div className="pt-3 pb-1">
+          <div className="h-px bg-sidebar-border mx-1" />
+        </div>
+
+        {/* Secondary nav */}
+        {bottomNavItems.map((item) => (
+          <NavLink key={item.href} {...item} />
+        ))}
       </nav>
 
       {/* Bottom */}
@@ -107,7 +131,10 @@ export function Sidebar() {
         </div>
 
         {/* User + sign out */}
-        <div className="flex items-center gap-3 px-3 py-2.5 rounded-xl hover:bg-sidebar-accent transition-colors group cursor-pointer" onClick={signOut}>
+        <div
+          className="flex items-center gap-3 px-3 py-2.5 rounded-xl hover:bg-sidebar-accent transition-colors group cursor-pointer"
+          onClick={signOut}
+        >
           <div className="w-8 h-8 rounded-full bg-gradient-to-br from-violet-500 to-purple-700 flex items-center justify-center text-white text-xs font-bold shrink-0">
             {initials}
           </div>

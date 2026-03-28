@@ -9,8 +9,11 @@ import { Sidebar } from "@/components/Sidebar";
 import LoginPage from "@/pages/LoginPage";
 import DashboardPage from "@/pages/DashboardPage";
 import EventsPage from "@/pages/EventsPage";
+import EventDetailPage from "@/pages/EventDetailPage";
 import IssueTicketPage from "@/pages/IssueTicketPage";
 import StaffPage from "@/pages/StaffPage";
+import SettingsPage from "@/pages/SettingsPage";
+import ActivityLogsPage from "@/pages/ActivityLogsPage";
 import NotFound from "@/pages/not-found";
 import { Loader2 } from "lucide-react";
 
@@ -58,8 +61,11 @@ function ProtectedRoutes() {
       <Switch>
         <Route path="/" component={DashboardPage} />
         <Route path="/events" component={EventsPage} />
+        <Route path="/events/:id" component={EventDetailPage} />
         <Route path="/issue-ticket" component={IssueTicketPage} />
         <Route path="/staff" component={StaffPage} />
+        <Route path="/settings" component={SettingsPage} />
+        <Route path="/logs" component={ActivityLogsPage} />
         <Route component={NotFound} />
       </Switch>
     </AppLayout>

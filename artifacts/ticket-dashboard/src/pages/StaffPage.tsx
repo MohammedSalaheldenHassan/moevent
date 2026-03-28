@@ -1,7 +1,9 @@
 import { useEffect, useState } from "react";
 import { supabase } from "@/lib/supabase";
 import { useLocale } from "@/contexts/LocaleContext";
-import { Users, AlertCircle, ShieldCheck, User } from "lucide-react";
+import { useAuth } from "@/contexts/AuthContext";
+import { Users, AlertCircle, ShieldCheck, User, RefreshCw } from "lucide-react";
+import { Button } from "@/components/ui/button";
 
 interface Profile {
   id: string;
@@ -12,39 +14,72 @@ interface Profile {
 
 export default function StaffPage() {
   const { t } = useLocale();
+  const { profile: currentProfile } = useAuth();
   const [profiles, setProfiles] = useState<Profile[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
-  useEffect(() => {
-    const fetchProfiles = async () => {
-      try {
-        const { data, error } = await supabase
-          .from("profiles")
-          .select("id, role, full_name, email")
-          .order("role", { ascending: false });
-        if (error) throw error;
-        setProfiles(data ?? []);
-      } catch (err: unknown) {
-        setError(err instanceof Error ? err.message : "Failed to load staff");
-      } finally {
-        setLoading(false);
+  const fetchProfiles = async () => {
+    setLoading(true);
+    setError(null);
+    try {
+      const { data, error } = await supabase
+        .from("profiles")
+        .select("id, role, full_name, email")
+        .order("role", { ascending: false });
+      if (error) throw error;
+      setProfiles(data ?? []);
+    } catch (err: unknown) {
+      const msg = err instanceof Error ? err.message : "Failed to load staff";
+      setError(msg);
+      // Fall back to showing the current user's profile
+      if (currentProfile) {
+        setProfiles([
+          {
+            id: currentProfile.id ?? "",
+            role: currentProfile.role ?? "admin",
+            full_name: currentProfile.full_name,
+            email: currentProfile.email,
+          },
+        ]);
       }
-    };
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  useEffect(() => {
     fetchProfiles();
   }, []);
 
   return (
     <div className="space-y-8">
-      <div>
-        <h1 className="text-2xl font-bold text-foreground">{t.staffTitle}</h1>
-        <p className="text-muted-foreground text-sm mt-1">{t.staffSubtitle}</p>
+      <div className="flex items-start justify-between gap-4">
+        <div>
+          <h1 className="text-2xl font-bold text-foreground">{t.staffTitle}</h1>
+          <p className="text-muted-foreground text-sm mt-1">{t.staffSubtitle}</p>
+        </div>
+        {error && (
+          <Button variant="outline" size="sm" onClick={fetchProfiles} className="rounded-xl shrink-0">
+            <RefreshCw className="w-3.5 h-3.5" />
+            {t.tryAgain}
+          </Button>
+        )}
       </div>
 
       {error && (
-        <div className="flex items-center gap-2.5 p-4 bg-destructive/10 border border-destructive/20 rounded-xl text-sm text-destructive">
-          <AlertCircle className="w-4 h-4 shrink-0" />
-          {error}
+        <div className="space-y-2">
+          <div className="flex items-start gap-2.5 p-4 bg-destructive/10 border border-destructive/20 rounded-xl text-sm text-destructive">
+            <AlertCircle className="w-4 h-4 shrink-0 mt-0.5" />
+            <div>
+              <p className="font-medium">{t.staffTitle} — {t.somethingWrong}</p>
+              <p className="text-xs opacity-80 mt-0.5">{error}</p>
+            </div>
+          </div>
+          <div className="flex items-start gap-2.5 p-3 bg-amber-50 dark:bg-amber-900/10 border border-amber-200 dark:border-amber-800/30 rounded-xl text-sm text-amber-800 dark:text-amber-400">
+            <AlertCircle className="w-4 h-4 shrink-0 mt-0.5" />
+            <p className="text-xs">{t.rlsHint}</p>
+          </div>
         </div>
       )}
 
@@ -71,14 +106,14 @@ export default function StaffPage() {
         </div>
       ) : (
         <div className="bg-card border border-card-border rounded-2xl overflow-hidden shadow-sm">
-          {/* Header row */}
           <div className="px-5 py-3 border-b border-border bg-muted/30">
             <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wider">
               {profiles.length} {t.staffTitle}
+              {error && <span className="ms-2 text-amber-600 font-normal">(showing partial data)</span>}
             </p>
           </div>
           <div className="divide-y divide-border">
-            {profiles.map((profile, idx) => {
+            {profiles.map((profile) => {
               const isAdmin = profile.role === "admin";
               const initials = (profile.full_name || profile.email || "U")
                 .split(" ")
@@ -97,7 +132,7 @@ export default function StaffPage() {
                       {initials}
                     </div>
                     {isAdmin && (
-                      <div className="absolute -bottom-0.5 -end-0.5 w-4.5 h-4.5 bg-amber-400 rounded-full flex items-center justify-center border-2 border-card">
+                      <div className="absolute -bottom-0.5 -end-0.5 w-5 h-5 bg-amber-400 rounded-full flex items-center justify-center border-2 border-card">
                         <ShieldCheck className="w-2.5 h-2.5 text-amber-900" />
                       </div>
                     )}
