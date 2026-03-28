@@ -35,7 +35,7 @@ interface Event {
 type ModalMode = "add" | "edit";
 
 export default function EventsPage() {
-  const { t, isRTL } = useLocale();
+  const { t, isRTL, lang } = useLocale();
   const { profile } = useAuth();
   const [, navigate] = useLocation();
 
@@ -104,7 +104,7 @@ export default function EventsPage() {
   };
 
   const handleSave = async () => {
-    if (!form.title.trim() || !form.date || !form.location.trim()) {
+    if (!form.title.trim()) {
       setFormError(t.allFieldsRequired);
       return;
     }
@@ -112,35 +112,54 @@ export default function EventsPage() {
     setFormError(null);
     try {
       if (modalMode === "add") {
-        const { error } = await supabase.from("events").insert({
-          title: form.title.trim(),
-          event_date: form.date || null,
-          location: form.location.trim() || null,
-        });
-        if (error) throw error;
-        logActivity("event_created", `Event: "${form.title.trim()}"`, profile?.email ?? undefined);
-      } else if (editingEvent) {
-        const { error } = await supabase
+        const { data, error } = await supabase
           .from("events")
-          .update({
+          .insert({
             title: form.title.trim(),
             event_date: form.date || null,
             location: form.location.trim() || null,
           })
-          .eq("id", editingEvent.id);
-        if (error) throw error;
+          .select()
+          .single();
+        if (error) {
+          console.error("[EventsPage] insert error:", error.code, error.message);
+          throw error;
+        }
+        if (data) setEvents((prev) => [data as Event, ...prev]);
+        logActivity("event_created", `Event: "${form.title.trim()}"`, profile?.email ?? undefined);
+      } else if (editingEvent) {
+        const payload = {
+          title: form.title.trim(),
+          event_date: form.date || null,
+          location: form.location.trim() || null,
+        };
+        const { data, error } = await supabase
+          .from("events")
+          .update(payload)
+          .eq("id", editingEvent.id)
+          .select()
+          .single();
+        if (error) {
+          console.error("[EventsPage] update error:", error.code, error.message);
+          throw error;
+        }
+        // Apply optimistic update immediately to the local list
+        setEvents((prev) =>
+          prev.map((e) =>
+            e.id === editingEvent.id
+              ? { ...e, ...payload, ...(data ?? {}) }
+              : e
+          )
+        );
         logActivity("event_updated", `Event: "${form.title.trim()}"`, profile?.email ?? undefined);
       }
       setModalOpen(false);
-      fetchEvents();
     } catch (err: unknown) {
-      setFormError(
-        err instanceof Error
-          ? err.message
-          : modalMode === "add"
-          ? t.failedAddEvent
-          : t.failedUpdateEvent
-      );
+      const msg = err instanceof Error
+        ? err.message
+        : (err as { message?: string })?.message
+        ?? (modalMode === "add" ? t.failedAddEvent : t.failedUpdateEvent);
+      setFormError(msg);
     } finally {
       setSaving(false);
     }
@@ -151,10 +170,13 @@ export default function EventsPage() {
     setDeleting(true);
     try {
       const { error } = await supabase.from("events").delete().eq("id", deleteTarget.id);
-      if (error) throw error;
+      if (error) {
+        console.error("[EventsPage] delete error:", error.code, error.message);
+        throw error;
+      }
       logActivity("event_deleted", `Event: "${deleteTarget.title}"`, profile?.email ?? undefined);
+      setEvents((prev) => prev.filter((e) => e.id !== deleteTarget.id));
       setDeleteTarget(null);
-      fetchEvents();
     } catch (err: unknown) {
       alert(err instanceof Error ? err.message : t.failedDeleteEvent);
     } finally {
@@ -324,7 +346,10 @@ export default function EventsPage() {
               />
             </div>
             <div className="space-y-1.5">
-              <Label className="font-medium">{t.date}</Label>
+              <div className="flex items-center gap-2">
+                <Label className="font-medium">{t.date}</Label>
+                <span className="text-xs text-muted-foreground">({lang === "ar" ? "اختياري" : "optional"})</span>
+              </div>
               <Input
                 type="date"
                 value={form.date}
@@ -333,7 +358,10 @@ export default function EventsPage() {
               />
             </div>
             <div className="space-y-1.5">
-              <Label className="font-medium">{t.location}</Label>
+              <div className="flex items-center gap-2">
+                <Label className="font-medium">{t.location}</Label>
+                <span className="text-xs text-muted-foreground">({lang === "ar" ? "اختياري" : "optional"})</span>
+              </div>
               <Input
                 placeholder={t.locationPlaceholder}
                 value={form.location}
