@@ -97,7 +97,7 @@ export default function IssueTicketPage() {
   const formatPrice = (price: number | null) => {
     if (price == null) return null;
     if (price === 0) return isAr ? "مجاني" : "Free";
-    return `SAR ${price.toLocaleString()}`;
+    return `RWF ${price.toLocaleString()}`;
   };
 
   const handlePrint = () => {

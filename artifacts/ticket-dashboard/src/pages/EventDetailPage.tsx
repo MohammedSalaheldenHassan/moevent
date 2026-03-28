@@ -94,7 +94,7 @@ export default function EventDetailPage() {
       ? new Date(event.event_date).toLocaleDateString(isAr ? "ar-SA" : "en-US", { year: "numeric", month: "long", day: "numeric" })
       : "";
     const priceStr = event.price != null
-      ? (event.price === 0 ? (isAr ? "مجاني" : "Free") : `SAR ${event.price.toLocaleString()}`)
+      ? (event.price === 0 ? (isAr ? "مجاني" : "Free") : `RWF ${event.price.toLocaleString()}`)
       : "";
     win.document.write(`
       <html dir="${isAr ? "rtl" : "ltr"}" lang="${lang}">
@@ -195,7 +195,7 @@ export default function EventDetailPage() {
   const formatPrice = (price: number | null) => {
     if (price == null) return null;
     if (price === 0) return isAr ? "مجاني" : "Free";
-    return `SAR ${price.toLocaleString()}`;
+    return `RWF ${price.toLocaleString()}`;
   };
 
   return (

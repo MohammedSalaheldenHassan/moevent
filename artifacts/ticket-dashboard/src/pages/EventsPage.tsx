@@ -181,7 +181,7 @@ export default function EventsPage() {
     if (price == null) return null;
     return price === 0
       ? (isAr ? "مجاني" : "Free")
-      : new Intl.NumberFormat(isAr ? "ar-SA" : "en-US", { style: "currency", currency: "SAR", minimumFractionDigits: 0 }).format(price);
+      : `RWF ${price.toLocaleString()}`;
   };
 
   return (
@@ -380,7 +380,7 @@ export default function EventsPage() {
                 <span className="text-xs text-muted-foreground font-normal">({isAr ? "اختياري — 0 للمجاني" : "optional — 0 for free"})</span>
               </Label>
               <div className="relative">
-                <span className="absolute inset-y-0 start-3 flex items-center text-muted-foreground text-sm font-medium">SAR</span>
+                <span className="absolute inset-y-0 start-3 flex items-center text-muted-foreground text-sm font-medium">RWF</span>
                 <Input
                   type="number"
                   min="0"

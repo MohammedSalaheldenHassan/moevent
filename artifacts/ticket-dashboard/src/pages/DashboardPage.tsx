@@ -77,25 +77,37 @@ export default function DashboardPage() {
     const errs: string[] = [];
     let totalEvents = 0, totalTickets = 0, scannedTickets = 0, totalRevenue = 0;
 
-    const [eventsRes, ticketsRes, scannedRes, recentRes] = await Promise.all([
-      supabase.from("events").select("id", { count: "exact", head: true }),
-      supabase.from("tickets").select("id", { count: "exact", head: true }),
+    const [eventsRes, allTicketsRes, scannedRes, recentRes] = await Promise.all([
+      supabase.from("events").select("id, price", { count: "exact" }),
+      supabase.from("tickets").select("event_id"),
       supabase.from("tickets").select("id", { count: "exact", head: true }).eq("is_scanned", true),
       supabase.from("events").select("id, title, event_date, price").order("created_at", { ascending: false }).limit(5),
     ]);
 
     if (eventsRes.error) errs.push(`Events: ${eventsRes.error.message}`);
-    else totalEvents = eventsRes.count ?? 0;
+    else {
+      totalEvents = eventsRes.count ?? 0;
+      // Revenue = sum of (event.price × ticket_count_for_that_event)
+      if (!allTicketsRes.error && allTicketsRes.data && eventsRes.data) {
+        // Count tickets per event
+        const ticketCountByEvent: Record<string, number> = {};
+        for (const tk of allTicketsRes.data) {
+          ticketCountByEvent[tk.event_id] = (ticketCountByEvent[tk.event_id] ?? 0) + 1;
+        }
+        totalRevenue = eventsRes.data.reduce((sum, ev) => {
+          const count = ticketCountByEvent[ev.id] ?? 0;
+          return sum + (ev.price ?? 0) * count;
+        }, 0);
+        totalTickets = allTicketsRes.data.length;
+      }
+    }
 
-    if (ticketsRes.error) errs.push(`Tickets: ${ticketsRes.error.message}`);
-    else totalTickets = ticketsRes.count ?? 0;
+    if (allTicketsRes.error) errs.push(`Tickets: ${allTicketsRes.error.message}`);
 
     if (!scannedRes.error) scannedTickets = scannedRes.count ?? 0;
 
     if (!recentRes.error && recentRes.data) {
       setRecentEvents(recentRes.data as RecentEvent[]);
-      // Calculate estimated revenue (price × ticket count per event — simplified as avg)
-      totalRevenue = recentRes.data.reduce((sum, e) => sum + (e.price ?? 0), 0);
     }
 
     setStats({ totalEvents, totalTickets, scannedTickets, totalRevenue });
@@ -169,7 +181,7 @@ export default function DashboardPage() {
         <StatCard
           label={isAr ? "إجمالي الإيرادات" : "Est. Revenue"} value={stats.totalRevenue} icon={DollarSign}
           gradient="bg-gradient-to-br from-orange-500 via-amber-500 to-yellow-500 shadow-orange-500/25"
-          loading={loading} prefix="﷼"
+          loading={loading} prefix="RWF "
         />
       </div>
 
@@ -269,7 +281,7 @@ export default function DashboardPage() {
                   </div>
                   {event.price != null && (
                     <span className="text-xs font-bold text-violet-600 dark:text-violet-400 shrink-0">
-                      {event.price === 0 ? (isAr ? "مجاني" : "Free") : `﷼${event.price}`}
+                      {event.price === 0 ? (isAr ? "مجاني" : "Free") : `RWF ${event.price?.toLocaleString()}`}
                     </span>
                   )}
                 </button>
