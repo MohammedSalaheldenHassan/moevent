@@ -6,38 +6,47 @@ import { useAuth } from "@/contexts/useAuth";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog";
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter } from "@/components/ui/dialog";
 import { logActivity } from "@/lib/activityLogger";
 import {
-  Plus,
-  CalendarDays,
-  MapPin,
-  Loader2,
-  AlertCircle,
-  Pencil,
-  Trash2,
-  Ticket,
-  ChevronRight,
-  ChevronLeft,
-  RefreshCw,
+  Plus, CalendarDays, MapPin, Loader2, AlertCircle,
+  Pencil, Trash2, Ticket, ChevronRight, ChevronLeft,
+  RefreshCw, DollarSign, Clock, X,
 } from "lucide-react";
 import { format } from "date-fns";
+import { cn } from "@/lib/utils";
 
 interface Event {
   id: string;
   title: string;
   event_date?: string | null;
   location?: string | null;
+  price?: number | null;
   created_at: string;
   [key: string]: unknown;
 }
 
 type ModalMode = "add" | "edit";
 
+const CARD_ACCENTS = [
+  "from-violet-500 to-purple-600",
+  "from-blue-500 to-cyan-600",
+  "from-emerald-500 to-green-600",
+  "from-orange-500 to-amber-500",
+  "from-rose-500 to-pink-600",
+  "from-indigo-500 to-violet-600",
+];
+
+function getAccent(id: string) {
+  const n = id.charCodeAt(0) + id.charCodeAt(id.length - 1);
+  return CARD_ACCENTS[n % CARD_ACCENTS.length];
+}
+
 export default function EventsPage() {
   const { t, isRTL, lang } = useLocale();
   const { profile } = useAuth();
   const [, navigate] = useLocation();
+  const isAr = lang === "ar";
 
   const [events, setEvents] = useState<Event[]>([]);
   const [loading, setLoading] = useState(true);
@@ -47,7 +56,7 @@ export default function EventsPage() {
   const [modalMode, setModalMode] = useState<ModalMode>("add");
   const [editingEvent, setEditingEvent] = useState<Event | null>(null);
   const [saving, setSaving] = useState(false);
-  const [form, setForm] = useState({ title: "", date: "", location: "" });
+  const [form, setForm] = useState({ title: "", date: "", location: "", price: "" });
   const [formError, setFormError] = useState<string | null>(null);
 
   const [deleteTarget, setDeleteTarget] = useState<Event | null>(null);
@@ -59,34 +68,23 @@ export default function EventsPage() {
         .from("events")
         .select("*")
         .order("created_at", { ascending: false });
-      if (error) {
-        console.error("[EventsPage] Supabase error:", error.code, error.message);
-        throw error;
-      }
+      if (error) throw error;
       setEvents(data ?? []);
       setError(null);
     } catch (err: unknown) {
-      const msg = err instanceof Error ? err.message :
-        (err as { message?: string })?.message ?? t.failedLoadEvents;
-      console.error("[EventsPage] fetchEvents failed:", msg);
+      const msg = err instanceof Error ? err.message : t.failedLoadEvents;
       setError(msg);
     } finally {
       setLoading(false);
     }
   };
 
-  useEffect(() => {
-    fetchEvents();
-  }, []);
-
-  // Derived helper: detect table-not-found vs other errors
-  const isTableMissing = error?.includes("does not exist") || error?.includes("42P01");
-  const isNetworkError = error?.includes("fetch") || error?.includes("network") || error?.includes("Failed");
+  useEffect(() => { fetchEvents(); }, []);
 
   const openAddModal = () => {
     setModalMode("add");
     setEditingEvent(null);
-    setForm({ title: "", date: "", location: "" });
+    setForm({ title: "", date: "", location: "", price: "" });
     setFormError(null);
     setModalOpen(true);
   };
@@ -98,6 +96,7 @@ export default function EventsPage() {
       title: event.title,
       date: event.event_date ?? "",
       location: event.location ?? "",
+      price: event.price != null ? String(event.price) : "",
     });
     setFormError(null);
     setModalOpen(true);
@@ -108,66 +107,51 @@ export default function EventsPage() {
       setFormError(t.allFieldsRequired);
       return;
     }
+    const priceVal = form.price.trim() ? parseFloat(form.price) : null;
+    if (form.price.trim() && (isNaN(priceVal!) || priceVal! < 0)) {
+      setFormError(isAr ? "السعر يجب أن يكون رقماً صحيحاً" : "Price must be a valid number");
+      return;
+    }
     setSaving(true);
     setFormError(null);
     try {
+      const payload = {
+        title: form.title.trim(),
+        event_date: form.date || null,
+        location: form.location.trim() || null,
+        price: priceVal,
+      };
+
       if (modalMode === "add") {
-        const { data, error } = await supabase
-          .from("events")
-          .insert({
-            title: form.title.trim(),
-            event_date: form.date || null,
-            location: form.location.trim() || null,
-          })
-          .select();
-        if (error) {
-          console.error("[EventsPage] insert error:", error.code, error.message);
-          throw error;
-        }
+        const { data, error } = await supabase.from("events").insert(payload).select();
+        if (error) throw error;
         const inserted = data?.[0];
-        if (inserted) {
-          setEvents((prev) => [inserted as Event, ...prev]);
-        } else {
-          await fetchEvents();
-        }
+        if (inserted) setEvents((prev) => [inserted as Event, ...prev]);
+        else await fetchEvents();
         logActivity("event_created", `Event: "${form.title.trim()}"`, profile?.email ?? undefined);
       } else if (editingEvent) {
-        const payload = {
-          title: form.title.trim(),
-          event_date: form.date || null,
-          location: form.location.trim() || null,
-        };
-        // Use .select("id") so we can detect silent RLS blocks (0 rows returned = blocked)
         const { data: updated, error } = await supabase
           .from("events")
           .update(payload)
           .eq("id", editingEvent.id)
           .select("id");
-        if (error) {
-          console.error("[EventsPage] update error:", error.code, error.message);
-          throw error;
-        }
-        if (!updated || updated.length === 0) {
-          // RLS silently blocked the UPDATE — no rows were affected
-          throw new Error(
-            "Update was blocked by database permissions (RLS). Go to Settings → Database Setup and run the \"Fix Permissions\" SQL to allow updates."
-          );
-        }
-        // Confirmed — apply to local list
-        setEvents((prev) =>
-          prev.map((e) =>
-            e.id === editingEvent.id ? { ...e, ...payload } : e
-          )
+        if (error) throw error;
+        if (!updated || updated.length === 0) throw new Error(
+          isAr ? "تم رفض التحديث بواسطة قاعدة البيانات. اذهب إلى الإعدادات وأصلح الصلاحيات."
+                : "Update blocked by database permissions. Go to Settings → Fix Permissions."
         );
+        setEvents((prev) => prev.map((e) => e.id === editingEvent.id ? { ...e, ...payload } : e));
         logActivity("event_updated", `Event: "${form.title.trim()}"`, profile?.email ?? undefined);
       }
       setModalOpen(false);
     } catch (err: unknown) {
-      const msg = err instanceof Error
-        ? err.message
-        : (err as { message?: string })?.message
-        ?? (modalMode === "add" ? t.failedAddEvent : t.failedUpdateEvent);
-      setFormError(msg);
+      const msg = err instanceof Error ? err.message : (modalMode === "add" ? t.failedAddEvent : t.failedUpdateEvent);
+      // Friendly hint for missing price column
+      const friendly = msg.includes("price") && msg.includes("column")
+        ? (isAr ? 'عمود "price" غير موجود في الجدول. شغّل SQL: ALTER TABLE public.events ADD COLUMN price numeric;'
+                : 'Column "price" missing. Run in Supabase SQL Editor: ALTER TABLE public.events ADD COLUMN price numeric;')
+        : msg;
+      setFormError(friendly);
     } finally {
       setSaving(false);
     }
@@ -178,10 +162,7 @@ export default function EventsPage() {
     setDeleting(true);
     try {
       const { error } = await supabase.from("events").delete().eq("id", deleteTarget.id);
-      if (error) {
-        console.error("[EventsPage] delete error:", error.code, error.message);
-        throw error;
-      }
+      if (error) throw error;
       logActivity("event_deleted", `Event: "${deleteTarget.title}"`, profile?.email ?? undefined);
       setEvents((prev) => prev.filter((e) => e.id !== deleteTarget.id));
       setDeleteTarget(null);
@@ -192,142 +173,172 @@ export default function EventsPage() {
     }
   };
 
-  const isUpcoming = (dateStr?: string | null) =>
-    dateStr ? new Date(dateStr) >= new Date() : false;
+  const isUpcoming = (dateStr?: string | null) => dateStr ? new Date(dateStr) >= new Date() : false;
+  const isPast = (dateStr?: string | null) => dateStr ? new Date(dateStr) < new Date() : false;
   const ChevronIcon = isRTL ? ChevronLeft : ChevronRight;
+
+  const formatPrice = (price: number | null | undefined) => {
+    if (price == null) return null;
+    return price === 0
+      ? (isAr ? "مجاني" : "Free")
+      : new Intl.NumberFormat(isAr ? "ar-SA" : "en-US", { style: "currency", currency: "SAR", minimumFractionDigits: 0 }).format(price);
+  };
 
   return (
     <div className="space-y-8">
-      <div className="flex items-center justify-between">
+      {/* Header */}
+      <div className="flex items-center justify-between gap-4">
         <div>
           <h1 className="text-2xl font-bold text-foreground">{t.eventsTitle}</h1>
           <p className="text-muted-foreground text-sm mt-1">{t.eventsSubtitle}</p>
         </div>
-        <Button
-          onClick={openAddModal}
-          className="h-10 rounded-xl bg-gradient-to-r from-violet-600 to-purple-600 hover:from-violet-700 hover:to-purple-700 border-0 shadow-md shadow-violet-500/25 font-semibold"
-        >
-          <Plus className="w-4 h-4" />
-          {t.addEvent}
-        </Button>
+        <div className="flex items-center gap-2 shrink-0">
+          <Button variant="outline" size="sm" onClick={() => { setLoading(true); fetchEvents(); }} disabled={loading} className="rounded-xl">
+            <RefreshCw className={cn("w-3.5 h-3.5", loading && "animate-spin")} />
+          </Button>
+          <Button onClick={openAddModal} className="h-10 rounded-xl bg-gradient-to-r from-violet-600 to-purple-600 hover:from-violet-700 hover:to-purple-700 border-0 shadow-md shadow-violet-500/25 font-semibold">
+            <Plus className="w-4 h-4" />
+            {t.addEvent}
+          </Button>
+        </div>
       </div>
 
+      {/* Error */}
       {error && (
-        <div className="space-y-2">
-          <div className="flex items-start gap-2.5 p-4 bg-destructive/10 border border-destructive/20 rounded-xl text-sm text-destructive">
-            <AlertCircle className="w-4 h-4 shrink-0 mt-0.5" />
-            <div className="flex-1 min-w-0">
-              <p className="font-medium">{t.failedLoadEvents}</p>
-              <p className="text-xs opacity-80 mt-0.5 font-mono break-all">{error}</p>
-            </div>
-            <Button variant="outline" size="sm" onClick={() => { setLoading(true); fetchEvents(); }} className="rounded-xl shrink-0 text-foreground border-border">
-              <RefreshCw className="w-3.5 h-3.5" />
-              Retry
-            </Button>
+        <div className="flex items-start gap-3 p-4 bg-destructive/10 border border-destructive/20 rounded-2xl text-sm text-destructive">
+          <AlertCircle className="w-4 h-4 shrink-0 mt-0.5" />
+          <div className="flex-1 min-w-0">
+            <p className="font-semibold">{t.failedLoadEvents}</p>
+            <p className="text-xs opacity-70 mt-0.5 font-mono break-all">{error}</p>
           </div>
-          {isTableMissing && (
-            <div className="flex items-start gap-2.5 p-3 bg-amber-50 dark:bg-amber-900/10 border border-amber-200 dark:border-amber-800/30 rounded-xl text-sm text-amber-800 dark:text-amber-400">
-              <AlertCircle className="w-4 h-4 shrink-0 mt-0.5" />
-              <p className="text-xs">
-                The <code className="bg-amber-100 dark:bg-amber-900/30 px-1 rounded font-mono">events</code> table does not exist yet.
-                Go to <strong>Settings → Database Setup</strong> and run the SQL script in your Supabase project to create it.
-              </p>
-            </div>
-          )}
-          {!isTableMissing && (
-            <div className="flex items-start gap-2.5 p-3 bg-amber-50 dark:bg-amber-900/10 border border-amber-200 dark:border-amber-800/30 rounded-xl text-sm text-amber-800 dark:text-amber-400">
-              <AlertCircle className="w-4 h-4 shrink-0 mt-0.5" />
-              <p className="text-xs">{t.rlsHint}</p>
-            </div>
-          )}
         </div>
       )}
 
+      {/* Loading skeletons */}
       {loading ? (
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-5">
           {[...Array(6)].map((_, i) => (
-            <div key={i} className="bg-card border border-card-border rounded-2xl p-5 animate-pulse">
-              <div className="h-5 bg-muted rounded-lg w-3/4 mb-4" />
-              <div className="h-4 bg-muted rounded-lg w-1/2 mb-2" />
-              <div className="h-4 bg-muted rounded-lg w-2/3" />
+            <div key={i} className="bg-card border border-card-border rounded-2xl overflow-hidden animate-pulse">
+              <div className="h-2 bg-muted" />
+              <div className="p-5 space-y-3">
+                <div className="h-5 bg-muted rounded-lg w-3/4" />
+                <div className="h-4 bg-muted rounded-lg w-1/2" />
+                <div className="h-4 bg-muted rounded-lg w-2/3" />
+              </div>
             </div>
           ))}
         </div>
       ) : events.length === 0 && !error ? (
-        <div className="text-center py-20 bg-card border border-card-border rounded-2xl">
-          <div className="w-16 h-16 bg-primary/10 rounded-2xl flex items-center justify-center mx-auto mb-4">
-            <CalendarDays className="w-8 h-8 text-primary" />
+        <div className="text-center py-24 bg-card border border-card-border rounded-2xl">
+          <div className="w-20 h-20 bg-gradient-to-br from-violet-100 to-purple-100 dark:from-violet-900/20 dark:to-purple-900/20 rounded-3xl flex items-center justify-center mx-auto mb-5">
+            <CalendarDays className="w-10 h-10 text-violet-500" />
           </div>
-          <p className="text-foreground font-semibold text-base">{t.noEvents}</p>
-          <p className="text-muted-foreground text-sm mt-1">{t.noEventsDesc}</p>
+          <p className="text-foreground font-bold text-lg">{t.noEvents}</p>
+          <p className="text-muted-foreground text-sm mt-1 mb-5">{t.noEventsDesc}</p>
+          <Button onClick={openAddModal} className="rounded-xl bg-gradient-to-r from-violet-600 to-purple-600 border-0 shadow-md shadow-violet-500/20">
+            <Plus className="w-4 h-4" />
+            {t.addEvent}
+          </Button>
         </div>
       ) : (
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-5">
           {events.map((event) => {
             const upcoming = isUpcoming(event.event_date);
+            const past = isPast(event.event_date);
+            const accent = getAccent(event.id);
+            const price = formatPrice(event.price as number | null);
+
             return (
               <div
                 key={event.id}
-                className="group bg-card border border-card-border rounded-2xl p-5 hover:shadow-lg hover:shadow-black/5 hover:border-primary/20 transition-all duration-200"
+                className="group bg-card border border-card-border rounded-2xl overflow-hidden hover:shadow-xl hover:shadow-black/8 hover:-translate-y-0.5 hover:border-primary/20 transition-all duration-200 cursor-pointer"
+                onClick={() => navigate(`/events/${event.id}`)}
               >
-                {/* Header: title + badge */}
-                <div className="flex items-start justify-between mb-3">
-                  <h3
-                    className="font-semibold text-foreground text-base line-clamp-2 leading-snug flex-1 me-2 cursor-pointer hover:text-primary transition-colors"
-                    onClick={() => navigate(`/events/${event.id}`)}
-                  >
+                {/* Gradient top bar */}
+                <div className={`h-1.5 bg-gradient-to-r ${accent}`} />
+
+                <div className="p-5">
+                  {/* Status + Price row */}
+                  <div className="flex items-center justify-between mb-3">
+                    <span className={cn(
+                      "inline-flex items-center gap-1.5 text-[11px] font-bold px-2.5 py-1 rounded-full",
+                      upcoming
+                        ? "bg-emerald-100 text-emerald-700 dark:bg-emerald-900/30 dark:text-emerald-400"
+                        : past
+                        ? "bg-muted text-muted-foreground"
+                        : "bg-blue-100 text-blue-700 dark:bg-blue-900/30 dark:text-blue-400"
+                    )}>
+                      <span className={cn("w-1.5 h-1.5 rounded-full", upcoming ? "bg-emerald-500 animate-pulse" : past ? "bg-gray-400" : "bg-blue-500")} />
+                      {upcoming ? (isAr ? "قادم" : "Upcoming") : past ? (isAr ? "منتهي" : "Past") : (isAr ? "اليوم" : "Today")}
+                    </span>
+                    {price != null && (
+                      <span className="inline-flex items-center gap-1 text-xs font-bold text-violet-700 dark:text-violet-400 bg-violet-100 dark:bg-violet-900/30 px-2.5 py-1 rounded-full">
+                        {event.price === 0 ? "🎁" : <DollarSign className="w-3 h-3" />}
+                        {price}
+                      </span>
+                    )}
+                  </div>
+
+                  {/* Title */}
+                  <h3 className="font-bold text-foreground text-base leading-snug mb-3 group-hover:text-primary transition-colors line-clamp-2">
                     {event.title}
                   </h3>
-                  <span className={`shrink-0 text-xs font-semibold px-2.5 py-1 rounded-full ${
-                    upcoming
-                      ? "bg-emerald-100 text-emerald-700 dark:bg-emerald-900/30 dark:text-emerald-400"
-                      : "bg-muted text-muted-foreground"
-                  }`}>
-                    {upcoming ? "●" : "○"}
-                  </span>
-                </div>
 
-                {/* Date + Location */}
-                <div className="space-y-2 mb-4">
-                  <div className="flex items-center gap-2 text-sm text-muted-foreground">
-                    <CalendarDays className="w-3.5 h-3.5 shrink-0 text-primary/60" />
-                    <span className="font-medium">
-                      {event.event_date
-                        ? (() => { try { return format(new Date(event.event_date as string), "PPP"); } catch { return String(event.event_date); } })()
-                        : <span className="italic opacity-50">No date</span>}
-                    </span>
+                  {/* Meta */}
+                  <div className="space-y-1.5 mb-4">
+                    {event.event_date ? (
+                      <div className="flex items-center gap-2 text-sm text-muted-foreground">
+                        <CalendarDays className="w-3.5 h-3.5 shrink-0 text-primary/50" />
+                        <span>{(() => { try { return format(new Date(event.event_date as string), "PPP"); } catch { return String(event.event_date); } })()}</span>
+                      </div>
+                    ) : (
+                      <div className="flex items-center gap-2 text-sm text-muted-foreground/50">
+                        <Clock className="w-3.5 h-3.5 shrink-0" />
+                        <span className="italic text-xs">{isAr ? "لا يوجد تاريخ" : "No date set"}</span>
+                      </div>
+                    )}
+                    {event.location ? (
+                      <div className="flex items-center gap-2 text-sm text-muted-foreground">
+                        <MapPin className="w-3.5 h-3.5 shrink-0 text-primary/50" />
+                        <span className="truncate">{event.location as string}</span>
+                      </div>
+                    ) : (
+                      <div className="flex items-center gap-2 text-sm text-muted-foreground/50">
+                        <MapPin className="w-3.5 h-3.5 shrink-0" />
+                        <span className="italic text-xs">{isAr ? "لا يوجد موقع" : "No location"}</span>
+                      </div>
+                    )}
                   </div>
-                  <div className="flex items-center gap-2 text-sm text-muted-foreground">
-                    <MapPin className="w-3.5 h-3.5 shrink-0 text-primary/60" />
-                    <span className="truncate">{event.location || <span className="italic opacity-50">No location</span>}</span>
-                  </div>
-                </div>
 
-                {/* Actions */}
-                <div className="flex items-center gap-2 pt-3 border-t border-border">
-                  <button
-                    onClick={() => navigate(`/events/${event.id}`)}
-                    className="flex items-center gap-1.5 text-xs font-semibold text-primary hover:text-primary/80 transition-colors"
+                  {/* Footer */}
+                  <div
+                    className="flex items-center gap-2 pt-3 border-t border-border"
+                    onClick={(e) => e.stopPropagation()}
                   >
-                    <Ticket className="w-3.5 h-3.5" />
-                    {t.viewTickets}
-                    <ChevronIcon className="w-3 h-3" />
-                  </button>
-                  <div className="flex-1" />
-                  <button
-                    onClick={() => openEditModal(event)}
-                    className="p-1.5 rounded-lg text-muted-foreground hover:text-foreground hover:bg-muted transition-all"
-                    title={t.editEvent}
-                  >
-                    <Pencil className="w-3.5 h-3.5" />
-                  </button>
-                  <button
-                    onClick={() => setDeleteTarget(event)}
-                    className="p-1.5 rounded-lg text-muted-foreground hover:text-destructive hover:bg-destructive/10 transition-all"
-                    title={t.deleteEvent}
-                  >
-                    <Trash2 className="w-3.5 h-3.5" />
-                  </button>
+                    <button
+                      onClick={() => navigate(`/events/${event.id}`)}
+                      className="flex items-center gap-1.5 text-xs font-bold text-primary hover:text-primary/80 transition-colors"
+                    >
+                      <Ticket className="w-3.5 h-3.5" />
+                      {t.viewTickets}
+                      <ChevronIcon className="w-3 h-3" />
+                    </button>
+                    <div className="flex-1" />
+                    <button
+                      onClick={() => openEditModal(event)}
+                      className="p-1.5 rounded-lg text-muted-foreground hover:text-foreground hover:bg-muted transition-all"
+                      title={t.editEvent}
+                    >
+                      <Pencil className="w-3.5 h-3.5" />
+                    </button>
+                    <button
+                      onClick={() => setDeleteTarget(event)}
+                      className="p-1.5 rounded-lg text-muted-foreground hover:text-destructive hover:bg-destructive/10 transition-all"
+                      title={t.deleteEvent}
+                    >
+                      <Trash2 className="w-3.5 h-3.5" />
+                    </button>
+                  </div>
                 </div>
               </div>
             );
@@ -342,10 +353,17 @@ export default function EventsPage() {
             <DialogTitle className="text-lg font-bold">
               {modalMode === "add" ? t.addNewEvent : t.editEventTitle}
             </DialogTitle>
+            <DialogDescription className="text-sm text-muted-foreground">
+              {modalMode === "add"
+                ? (isAr ? "أضف حدثاً جديداً مع تفاصيله وسعر التذكرة." : "Add a new event with details and ticket price.")
+                : (isAr ? "تعديل تفاصيل الحدث وسعر التذكرة." : "Edit the event details and ticket price.")}
+            </DialogDescription>
           </DialogHeader>
+
           <div className="space-y-4 py-2">
+            {/* Title */}
             <div className="space-y-1.5">
-              <Label className="font-medium">{t.eventTitle}</Label>
+              <Label className="font-semibold text-sm">{t.eventTitle} *</Label>
               <Input
                 placeholder={t.eventTitlePlaceholder}
                 value={form.title}
@@ -353,39 +371,68 @@ export default function EventsPage() {
                 className="h-11 rounded-xl"
               />
             </div>
+
+            {/* Price */}
             <div className="space-y-1.5">
-              <div className="flex items-center gap-2">
-                <Label className="font-medium">{t.date}</Label>
-                <span className="text-xs text-muted-foreground">({lang === "ar" ? "اختياري" : "optional"})</span>
+              <Label className="font-semibold text-sm flex items-center gap-1.5">
+                <DollarSign className="w-3.5 h-3.5 text-primary" />
+                {isAr ? "سعر التذكرة" : "Ticket Price"}
+                <span className="text-xs text-muted-foreground font-normal">({isAr ? "اختياري — 0 للمجاني" : "optional — 0 for free"})</span>
+              </Label>
+              <div className="relative">
+                <span className="absolute inset-y-0 start-3 flex items-center text-muted-foreground text-sm font-medium">SAR</span>
+                <Input
+                  type="number"
+                  min="0"
+                  step="0.01"
+                  placeholder="0.00"
+                  value={form.price}
+                  onChange={(e) => setForm((f) => ({ ...f, price: e.target.value }))}
+                  className="h-11 rounded-xl ps-12"
+                  dir="ltr"
+                />
               </div>
-              <Input
-                type="date"
-                value={form.date}
-                onChange={(e) => setForm((f) => ({ ...f, date: e.target.value }))}
-                className="h-11 rounded-xl"
-              />
             </div>
-            <div className="space-y-1.5">
-              <div className="flex items-center gap-2">
-                <Label className="font-medium">{t.location}</Label>
-                <span className="text-xs text-muted-foreground">({lang === "ar" ? "اختياري" : "optional"})</span>
+
+            {/* Date + Location in two columns */}
+            <div className="grid grid-cols-2 gap-3">
+              <div className="space-y-1.5">
+                <Label className="font-semibold text-sm">
+                  {t.date}
+                  <span className="text-muted-foreground font-normal text-xs ms-1">({isAr ? "اختياري" : "opt."})</span>
+                </Label>
+                <Input
+                  type="date"
+                  value={form.date}
+                  onChange={(e) => setForm((f) => ({ ...f, date: e.target.value }))}
+                  className="h-11 rounded-xl"
+                />
               </div>
-              <Input
-                placeholder={t.locationPlaceholder}
-                value={form.location}
-                onChange={(e) => setForm((f) => ({ ...f, location: e.target.value }))}
-                className="h-11 rounded-xl"
-              />
+              <div className="space-y-1.5">
+                <Label className="font-semibold text-sm">
+                  {t.location}
+                  <span className="text-muted-foreground font-normal text-xs ms-1">({isAr ? "اختياري" : "opt."})</span>
+                </Label>
+                <Input
+                  placeholder={t.locationPlaceholder}
+                  value={form.location}
+                  onChange={(e) => setForm((f) => ({ ...f, location: e.target.value }))}
+                  className="h-11 rounded-xl"
+                />
+              </div>
             </div>
+
             {formError && (
               <div className="flex items-start gap-2 p-3 bg-destructive/10 border border-destructive/20 rounded-xl text-sm text-destructive">
                 <AlertCircle className="w-4 h-4 shrink-0 mt-0.5" />
-                <p>{formError}</p>
+                <p className="text-xs">{formError}</p>
               </div>
             )}
           </div>
+
           <DialogFooter className="gap-2">
             <Button variant="outline" onClick={() => setModalOpen(false)} className="rounded-xl">
+              <X className="w-4 h-4" />
               {t.cancel}
             </Button>
             <Button
@@ -393,16 +440,7 @@ export default function EventsPage() {
               disabled={saving}
               className="rounded-xl bg-gradient-to-r from-violet-600 to-purple-600 hover:from-violet-700 hover:to-purple-700 border-0 shadow-md shadow-violet-500/20"
             >
-              {saving ? (
-                <>
-                  <Loader2 className="w-4 h-4 animate-spin" />
-                  {t.saving}
-                </>
-              ) : modalMode === "add" ? (
-                t.addEvent
-              ) : (
-                t.saveSettings
-              )}
+              {saving ? <><Loader2 className="w-4 h-4 animate-spin" />{t.saving}</> : modalMode === "add" ? t.addEvent : t.saveSettings}
             </Button>
           </DialogFooter>
         </DialogContent>
@@ -413,31 +451,22 @@ export default function EventsPage() {
         <DialogContent className="sm:max-w-sm rounded-2xl">
           <DialogHeader>
             <DialogTitle className="text-lg font-bold text-destructive">{t.confirmDelete}</DialogTitle>
+            <DialogDescription className="text-sm text-muted-foreground">{t.confirmDeleteDesc}</DialogDescription>
           </DialogHeader>
           <div className="py-2">
-            <p className="text-sm text-muted-foreground">{t.confirmDeleteDesc}</p>
             {deleteTarget && (
-              <p className="mt-2 font-semibold text-foreground text-sm">"{deleteTarget.title}"</p>
+              <div className="flex items-center gap-3 p-3 bg-muted/50 rounded-xl border border-border">
+                <div className={`w-9 h-9 rounded-xl bg-gradient-to-br ${getAccent(deleteTarget.id)} flex items-center justify-center shrink-0`}>
+                  <CalendarDays className="w-4 h-4 text-white" />
+                </div>
+                <p className="font-semibold text-foreground text-sm truncate">"{deleteTarget.title}"</p>
+              </div>
             )}
           </div>
           <DialogFooter className="gap-2">
-            <Button variant="outline" onClick={() => setDeleteTarget(null)} className="rounded-xl">
-              {t.cancel}
-            </Button>
-            <Button
-              onClick={handleDelete}
-              disabled={deleting}
-              variant="destructive"
-              className="rounded-xl"
-            >
-              {deleting ? (
-                <>
-                  <Loader2 className="w-4 h-4 animate-spin" />
-                  {t.deleting}
-                </>
-              ) : (
-                t.confirmDeleteBtn
-              )}
+            <Button variant="outline" onClick={() => setDeleteTarget(null)} className="rounded-xl">{t.cancel}</Button>
+            <Button onClick={handleDelete} disabled={deleting} variant="destructive" className="rounded-xl">
+              {deleting ? <><Loader2 className="w-4 h-4 animate-spin" />{t.deleting}</> : t.confirmDeleteBtn}
             </Button>
           </DialogFooter>
         </DialogContent>
