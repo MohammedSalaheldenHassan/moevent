@@ -7,11 +7,12 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter } from "@/components/ui/dialog";
+import { useToast } from "@/hooks/use-toast";
 import { logActivity } from "@/lib/activityLogger";
 import {
   Plus, CalendarDays, MapPin, Loader2, AlertCircle,
   Pencil, Trash2, Ticket, ChevronRight, ChevronLeft,
-  RefreshCw, DollarSign, Clock, X, ImageIcon, Upload,
+  RefreshCw, DollarSign, Clock, X, ImageIcon, Upload, CheckCircle2,
 } from "lucide-react";
 import { format } from "date-fns";
 import { cn } from "@/lib/utils";
@@ -46,6 +47,7 @@ function getAccent(id: string) {
 export default function EventsPage() {
   const { t, isRTL, lang } = useLocale();
   const { profile } = useAuth();
+  const { toast } = useToast();
   const [, navigate] = useLocation();
   const isAr = lang === "ar";
 
@@ -201,6 +203,12 @@ export default function EventsPage() {
         if (inserted) setEvents((prev) => [inserted as Event, ...prev]);
         else await fetchEvents();
         logActivity("event_created", `Event: "${form.title.trim()}"`, profile?.email ?? undefined);
+        toast({
+          title: isAr ? "تم إنشاء الحدث" : "Event Created",
+          description: isAr
+            ? `تم إضافة "${form.title.trim()}" بنجاح`
+            : `"${form.title.trim()}" has been added successfully.`,
+        });
       } else if (editingEvent) {
         const { data: updated, error } = await supabase
           .from("events")
@@ -214,15 +222,32 @@ export default function EventsPage() {
         );
         setEvents((prev) => prev.map((e) => e.id === editingEvent.id ? { ...e, ...payload } : e));
         logActivity("event_updated", `Event: "${form.title.trim()}"`, profile?.email ?? undefined);
+        toast({
+          title: isAr ? "تم تحديث الحدث" : "Event Updated",
+          description: isAr
+            ? `تم حفظ التغييرات على "${form.title.trim()}"`
+            : `Changes to "${form.title.trim()}" saved.`,
+        });
       }
       setModalOpen(false);
     } catch (err: unknown) {
       const msg = err instanceof Error ? err.message : (modalMode === "add" ? t.failedAddEvent : t.failedUpdateEvent);
-      // Friendly hint for missing price column
-      const friendly = msg.includes("price") && msg.includes("column")
-        ? (isAr ? 'عمود "price" غير موجود في الجدول. شغّل SQL: ALTER TABLE public.events ADD COLUMN price numeric;'
-                : 'Column "price" missing. Run in Supabase SQL Editor: ALTER TABLE public.events ADD COLUMN price numeric;')
-        : msg;
+      // RLS / permission errors
+      const isRlsError =
+        msg.toLowerCase().includes("row-level security") ||
+        msg.toLowerCase().includes("policy") ||
+        msg.toLowerCase().includes("permission denied") ||
+        msg.toLowerCase().includes("violates row");
+      // Missing column hint
+      const isPriceColMissing = msg.includes("price") && msg.includes("column");
+      const friendly = isRlsError
+        ? (isAr
+            ? 'مرفوض بسبب سياسة الأمان (RLS). في Supabase → Table Editor → events → RLS، أضف سياسة INSERT تسمح للمستخدمين المسجلين بالإدراج.'
+            : 'Blocked by Row Level Security. In Supabase → Table Editor → events → RLS, add an INSERT policy that allows authenticated users.')
+        : isPriceColMissing
+          ? (isAr ? 'عمود "price" غير موجود. شغّل: ALTER TABLE public.events ADD COLUMN price numeric;'
+                  : 'Column "price" missing. Run in Supabase SQL Editor: ALTER TABLE public.events ADD COLUMN price numeric;')
+          : msg;
       setFormError(friendly);
     } finally {
       setSaving(false);
@@ -239,7 +264,19 @@ export default function EventsPage() {
       setEvents((prev) => prev.filter((e) => e.id !== deleteTarget.id));
       setDeleteTarget(null);
     } catch (err: unknown) {
-      alert(err instanceof Error ? err.message : t.failedDeleteEvent);
+      const msg = err instanceof Error ? err.message : t.failedDeleteEvent;
+      const isRls = msg.toLowerCase().includes("row-level security") ||
+        msg.toLowerCase().includes("policy") ||
+        msg.toLowerCase().includes("permission denied");
+      toast({
+        variant: "destructive",
+        title: isAr ? "فشل الحذف" : "Delete Failed",
+        description: isRls
+          ? (isAr
+              ? "مرفوض بسبب RLS. تحقق من سياسة DELETE في Supabase."
+              : "Blocked by Row Level Security. Check the DELETE policy in Supabase.")
+          : msg,
+      });
     } finally {
       setDeleting(false);
     }
@@ -431,8 +468,8 @@ export default function EventsPage() {
 
       {/* Add / Edit Modal */}
       <Dialog open={modalOpen} onOpenChange={setModalOpen}>
-        <DialogContent className="sm:max-w-md rounded-2xl">
-          <DialogHeader>
+        <DialogContent className="sm:max-w-md rounded-2xl flex flex-col max-h-[90dvh] overflow-hidden">
+          <DialogHeader className="shrink-0">
             <DialogTitle className="text-lg font-bold">
               {modalMode === "add" ? t.addNewEvent : t.editEventTitle}
             </DialogTitle>
@@ -443,7 +480,7 @@ export default function EventsPage() {
             </DialogDescription>
           </DialogHeader>
 
-          <div className="space-y-4 py-2">
+          <div className="space-y-4 py-2 overflow-y-auto flex-1 px-0.5">
             {/* Event Image */}
             <div className="space-y-1.5">
               <Label className="font-semibold text-sm flex items-center gap-1.5">
@@ -560,7 +597,7 @@ export default function EventsPage() {
             )}
           </div>
 
-          <DialogFooter className="gap-2">
+          <DialogFooter className="gap-2 shrink-0 pt-2">
             <Button variant="outline" onClick={() => setModalOpen(false)} className="rounded-xl">
               <X className="w-4 h-4" />
               {t.cancel}
@@ -572,7 +609,11 @@ export default function EventsPage() {
             >
               {saving ? (
                 <><Loader2 className="w-4 h-4 animate-spin" />{imageUploading ? (isAr ? "جاري رفع الصورة…" : "Uploading image…") : t.saving}</>
-              ) : modalMode === "add" ? t.addEvent : t.saveSettings}
+              ) : modalMode === "add" ? (
+                <><CheckCircle2 className="w-4 h-4" />{t.addEvent}</>
+              ) : (
+                <><CheckCircle2 className="w-4 h-4" />{t.saveSettings}</>
+              )}
             </Button>
           </DialogFooter>
         </DialogContent>
