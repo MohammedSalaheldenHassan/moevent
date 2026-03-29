@@ -22,6 +22,7 @@ interface Event {
   event_date: string | null;
   location: string | null;
   price: number | null;
+  image_url: string | null;
 }
 
 interface TicketRow {
@@ -118,7 +119,7 @@ export default function EventDetailPage() {
     const load = async () => {
       try {
         const [eventRes, ticketsRes] = await Promise.all([
-          supabase.from("events").select("id, title, event_date, location, price").eq("id", id).single(),
+          supabase.from("events").select("id, title, event_date, location, price, image_url").eq("id", id).single(),
           supabase.from("tickets").select("*").eq("event_id", id).order("created_at", { ascending: false }),
         ]);
         if (eventRes.error) throw eventRes.error;
@@ -286,11 +287,24 @@ export default function EventDetailPage() {
         <>
           {/* Event Header */}
           <div className="bg-gradient-to-br from-violet-600 via-purple-600 to-purple-800 rounded-2xl p-6 text-white shadow-xl shadow-violet-500/25 overflow-hidden relative">
-            {/* Background decoration */}
-            <div className="absolute inset-0 opacity-10">
-              <div className="absolute -top-6 -end-6 w-40 h-40 rounded-full bg-white blur-3xl" />
-              <div className="absolute -bottom-6 -start-6 w-32 h-32 rounded-full bg-white blur-2xl" />
-            </div>
+            {/* Event image as background */}
+            {event.image_url && (
+              <div className="absolute inset-0 rounded-2xl overflow-hidden">
+                <img
+                  src={event.image_url}
+                  alt={event.title}
+                  className="w-full h-full object-cover opacity-25"
+                />
+                <div className="absolute inset-0 bg-gradient-to-br from-violet-700/80 via-purple-700/70 to-purple-900/80" />
+              </div>
+            )}
+            {/* Background decoration (shown when no image) */}
+            {!event.image_url && (
+              <div className="absolute inset-0 opacity-10">
+                <div className="absolute -top-6 -end-6 w-40 h-40 rounded-full bg-white blur-3xl" />
+                <div className="absolute -bottom-6 -start-6 w-32 h-32 rounded-full bg-white blur-2xl" />
+              </div>
+            )}
             <div className="relative">
               <div className="flex items-start justify-between gap-4 mb-4">
                 <h1 className="text-2xl font-black leading-tight">{event.title}</h1>

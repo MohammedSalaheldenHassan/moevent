@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { useLocation } from "wouter";
 import { supabase } from "@/lib/supabase";
 import { useLocale } from "@/contexts/LocaleContext";
@@ -11,7 +11,7 @@ import { logActivity } from "@/lib/activityLogger";
 import {
   Plus, CalendarDays, MapPin, Loader2, AlertCircle,
   Pencil, Trash2, Ticket, ChevronRight, ChevronLeft,
-  RefreshCw, DollarSign, Clock, X,
+  RefreshCw, DollarSign, Clock, X, ImageIcon, Upload,
 } from "lucide-react";
 import { format } from "date-fns";
 import { cn } from "@/lib/utils";
@@ -22,6 +22,7 @@ interface Event {
   event_date?: string | null;
   location?: string | null;
   price?: number | null;
+  image_url?: string | null;
   created_at: string;
   [key: string]: unknown;
 }
@@ -61,6 +62,46 @@ export default function EventsPage() {
 
   const [deleteTarget, setDeleteTarget] = useState<Event | null>(null);
   const [deleting, setDeleting] = useState(false);
+
+  // ── Image upload ─────────────────────────────────────────────
+  const imgInputRef = useRef<HTMLInputElement>(null);
+  const [imagePreview, setImagePreview] = useState<string | null>(null);
+  const [imageFile, setImageFile] = useState<File | null>(null);
+  const [imageUploading, setImageUploading] = useState(false);
+  const [currentImageUrl, setCurrentImageUrl] = useState<string | null>(null);
+
+  const handleImageChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    if (!file.type.startsWith("image/")) {
+      setFormError(isAr ? "يرجى اختيار ملف صورة صالح" : "Please select a valid image file");
+      return;
+    }
+    if (file.size > 5 * 1024 * 1024) {
+      setFormError(isAr ? "حجم الصورة أكبر من 5 ميغابايت" : "Image exceeds 5 MB");
+      return;
+    }
+    setImageFile(file);
+    const reader = new FileReader();
+    reader.onload = (ev) => setImagePreview(ev.target?.result as string);
+    reader.readAsDataURL(file);
+    e.target.value = "";
+  };
+
+  const uploadImageFile = async (file: File): Promise<string> => {
+    const ext = file.name.split(".").pop() ?? "jpg";
+    const path = `events/${Date.now()}-${Math.random().toString(36).slice(2)}.${ext}`;
+    const { data, error } = await supabase.storage.from("event-images").upload(path, file, { contentType: file.type, upsert: true });
+    if (error) throw new Error(
+      error.message.includes("bucket") || error.message.includes("not found")
+        ? (isAr
+          ? 'يرجى إنشاء bucket اسمه "event-images" في Supabase Storage وتفعيل الوصول العام.'
+          : 'Please create a public bucket named "event-images" in Supabase Storage first.')
+        : error.message
+    );
+    const { data: { publicUrl } } = supabase.storage.from("event-images").getPublicUrl(data.path);
+    return publicUrl;
+  };
 
   const isAdmin = !profile || profile.role === "admin";
 
@@ -104,6 +145,9 @@ export default function EventsPage() {
     setEditingEvent(null);
     setForm({ title: "", date: "", location: "", price: "" });
     setFormError(null);
+    setImageFile(null);
+    setImagePreview(null);
+    setCurrentImageUrl(null);
     setModalOpen(true);
   };
 
@@ -117,6 +161,9 @@ export default function EventsPage() {
       price: event.price != null ? String(event.price) : "",
     });
     setFormError(null);
+    setImageFile(null);
+    setImagePreview(null);
+    setCurrentImageUrl((event.image_url as string | null) ?? null);
     setModalOpen(true);
   };
 
@@ -133,11 +180,18 @@ export default function EventsPage() {
     setSaving(true);
     setFormError(null);
     try {
+      let resolvedImageUrl = currentImageUrl;
+      if (imageFile) {
+        setImageUploading(true);
+        resolvedImageUrl = await uploadImageFile(imageFile);
+        setImageUploading(false);
+      }
       const payload = {
         title: form.title.trim(),
         event_date: form.date || null,
         location: form.location.trim() || null,
         price: priceVal,
+        image_url: resolvedImageUrl,
       };
 
       if (modalMode === "add") {
@@ -272,8 +326,19 @@ export default function EventsPage() {
                 className="group bg-card border border-card-border rounded-2xl overflow-hidden hover:shadow-xl hover:shadow-black/8 hover:-translate-y-0.5 hover:border-primary/20 transition-all duration-200 cursor-pointer"
                 onClick={() => navigate(`/events/${event.id}`)}
               >
-                {/* Gradient top bar */}
-                <div className={`h-1.5 bg-gradient-to-r ${accent}`} />
+                {/* Image banner or gradient accent bar */}
+                {event.image_url ? (
+                  <div className="h-36 overflow-hidden relative">
+                    <img
+                      src={event.image_url as string}
+                      alt={event.title}
+                      className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-300"
+                    />
+                    <div className={`absolute bottom-0 start-0 end-0 h-1 bg-gradient-to-r ${accent}`} />
+                  </div>
+                ) : (
+                  <div className={`h-1.5 bg-gradient-to-r ${accent}`} />
+                )}
 
                 <div className="p-5">
                   {/* Status + Price row */}
@@ -379,6 +444,53 @@ export default function EventsPage() {
           </DialogHeader>
 
           <div className="space-y-4 py-2">
+            {/* Event Image */}
+            <div className="space-y-1.5">
+              <Label className="font-semibold text-sm flex items-center gap-1.5">
+                <ImageIcon className="w-3.5 h-3.5 text-primary" />
+                {isAr ? "صورة الفعالية" : "Event Image"}
+                <span className="text-xs text-muted-foreground font-normal">({isAr ? "اختياري" : "optional"})</span>
+              </Label>
+              <input ref={imgInputRef} type="file" accept="image/*" className="hidden" onChange={handleImageChange} />
+              {(imagePreview || currentImageUrl) ? (
+                <div className="relative rounded-xl overflow-hidden border border-border h-36">
+                  <img
+                    src={imagePreview ?? currentImageUrl!}
+                    alt="Event preview"
+                    className="w-full h-full object-cover"
+                  />
+                  <div className="absolute inset-0 bg-black/30 opacity-0 hover:opacity-100 transition-opacity flex items-center justify-center gap-2">
+                    <button
+                      type="button"
+                      onClick={() => imgInputRef.current?.click()}
+                      className="bg-white/90 text-foreground px-3 py-1.5 rounded-lg text-xs font-semibold flex items-center gap-1.5"
+                    >
+                      <Upload className="w-3.5 h-3.5" />
+                      {isAr ? "تغيير" : "Change"}
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => { setImageFile(null); setImagePreview(null); setCurrentImageUrl(null); }}
+                      className="bg-destructive/90 text-white px-3 py-1.5 rounded-lg text-xs font-semibold flex items-center gap-1.5"
+                    >
+                      <X className="w-3.5 h-3.5" />
+                      {isAr ? "حذف" : "Remove"}
+                    </button>
+                  </div>
+                </div>
+              ) : (
+                <button
+                  type="button"
+                  onClick={() => imgInputRef.current?.click()}
+                  className="w-full h-24 border-2 border-dashed border-border rounded-xl flex flex-col items-center justify-center gap-2 text-muted-foreground hover:border-primary/50 hover:text-primary/70 hover:bg-primary/5 transition-all"
+                >
+                  <ImageIcon className="w-7 h-7 opacity-50" />
+                  <span className="text-xs font-medium">{isAr ? "اضغط لإضافة صورة" : "Click to add an image"}</span>
+                  <span className="text-[10px] opacity-60">PNG, JPG, WebP · max 5 MB</span>
+                </button>
+              )}
+            </div>
+
             {/* Title */}
             <div className="space-y-1.5">
               <Label className="font-semibold text-sm">{t.eventTitle} *</Label>
@@ -458,7 +570,9 @@ export default function EventsPage() {
               disabled={saving}
               className="rounded-xl bg-gradient-to-r from-violet-600 to-purple-600 hover:from-violet-700 hover:to-purple-700 border-0 shadow-md shadow-violet-500/20"
             >
-              {saving ? <><Loader2 className="w-4 h-4 animate-spin" />{t.saving}</> : modalMode === "add" ? t.addEvent : t.saveSettings}
+              {saving ? (
+                <><Loader2 className="w-4 h-4 animate-spin" />{imageUploading ? (isAr ? "جاري رفع الصورة…" : "Uploading image…") : t.saving}</>
+              ) : modalMode === "add" ? t.addEvent : t.saveSettings}
             </Button>
           </DialogFooter>
         </DialogContent>
