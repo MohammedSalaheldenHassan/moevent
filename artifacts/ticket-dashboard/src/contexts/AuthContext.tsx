@@ -9,15 +9,12 @@ import { AuthContext, type Profile } from "./authContextObject";
 // This three-file split lets Vite Fast Refresh each piece independently,
 // eliminating the "Invalid hook call" HMR crash.
 
-function fetchProfileFromSupabase(userId: string): Promise<Profile | null> {
-  // 3-second hard timeout — prevents slow DB (cold start / paused project)
-  // from blocking the auth resolution. If it times out, user gets in without
-  // a profile row (data pages will show Supabase errors explaining why).
+function fetchProfileFromSupabase(userId: string, timeoutMs = 3000): Promise<Profile | null> {
   const timeout = new Promise<null>((resolve) =>
     setTimeout(() => {
       console.warn("[AuthContext] profile fetch timed out — allowing access without profile");
       resolve(null);
-    }, 3000)
+    }, timeoutMs)
   );
 
   const fetch = supabase
@@ -48,7 +45,6 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     mountedRef.current = true;
 
     // Safety net: never stay loading more than 5 seconds
-    // (profile fetch itself has a 3s timeout, so this is a true last resort)
     const safetyTimer = setTimeout(() => {
       if (mountedRef.current) {
         console.warn("[AuthContext] Safety timer fired — forcing loading=false");
@@ -56,8 +52,6 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       }
     }, 5000);
 
-    // Supabase v2: onAuthStateChange fires immediately with INITIAL_SESSION.
-    // This is the canonical init pattern — no getSession() race condition.
     const { data: { subscription } } = supabase.auth.onAuthStateChange(
       async (event, sess) => {
         if (!mountedRef.current) return;
@@ -78,13 +72,14 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         const p = await fetchProfileFromSupabase(sess.user.id);
         if (!mountedRef.current) return;
 
-        if (p) {
-          setProfile(p);
-        } else {
-          // Profile row not found — allow through (tables may not exist yet)
-          setProfile(null);
+        // Block staff from accessing the dashboard on session restore
+        if (p?.role === "staff") {
+          console.warn("[AuthContext] Staff user detected on session restore — signing out");
+          await supabase.auth.signOut();
+          return;
         }
 
+        setProfile(p);
         if (mountedRef.current) setLoading(false);
         clearTimeout(safetyTimer);
       }
@@ -103,18 +98,29 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       if (error) return { error: error.message };
 
       if (data.user && data.session) {
-        // Set user + session immediately so the UI doesn't wait for onAuthStateChange
+        // Use a longer timeout for the login flow to reliably detect staff roles
+        const p = await fetchProfileFromSupabase(data.user.id, 7000);
+
+        if (p === null) {
+          // DB timed out — sign them out and ask to retry so we can verify role
+          await supabase.auth.signOut();
+          return {
+            error:
+              "The server is starting up — please wait a few seconds and try again.",
+          };
+        }
+
+        // Block staff from logging in
+        if (p.role === "staff") {
+          await supabase.auth.signOut();
+          return {
+            error:
+              "Access denied. Staff accounts cannot access this dashboard.",
+          };
+        }
+
         setUser(data.user);
         setSession(data.session);
-
-        const p = await fetchProfileFromSupabase(data.user.id);
-        if (!p) {
-          console.warn("[AuthContext] No profile row found — allowing access");
-          setProfile(null);
-          setLoading(false);
-          logActivity("user_login", `Signed in as ${email} (no profile row)`, email);
-          return { error: null };
-        }
         setProfile(p);
         setLoading(false);
         logActivity("user_login", `Signed in as ${email}`, email);
@@ -128,13 +134,11 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
   const signOut = async () => {
     const email = profile?.email ?? user?.email;
-    // Clear local state immediately — don't wait for Supabase round-trip
     if (email) logActivity("user_logout", "Signed out", email);
     setUser(null);
     setSession(null);
     setProfile(null);
     setLoading(false);
-    // Then tell Supabase to invalidate the session server-side
     try {
       await supabase.auth.signOut();
     } catch (err) {

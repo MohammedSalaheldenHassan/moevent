@@ -110,7 +110,7 @@ export default function SettingsPage() {
       // Compress & resize via canvas so it fits comfortably in localStorage
       const img = new Image();
       img.onload = () => {
-        const MAX_DIM = 256;
+        const MAX_DIM = 128;
         let { width, height } = img;
         if (width > MAX_DIM || height > MAX_DIM) {
           const ratio = Math.min(MAX_DIM / width, MAX_DIM / height);
@@ -121,7 +121,7 @@ export default function SettingsPage() {
         canvas.width = width;
         canvas.height = height;
         canvas.getContext("2d")!.drawImage(img, 0, 0, width, height);
-        const compressed = canvas.toDataURL("image/jpeg", 0.85);
+        const compressed = canvas.toDataURL("image/jpeg", 0.75);
         try {
           setSystemLogo(compressed);
           logActivity("settings_changed", "System logo updated", profile?.email ?? undefined);

@@ -12,30 +12,49 @@ interface BrandingContextType {
 
 const BrandingContext = createContext<BrandingContextType | undefined>(undefined);
 
+function readStorage(key: string): string {
+  try {
+    return localStorage.getItem(key) ?? "";
+  } catch {
+    return "";
+  }
+}
+
 export function BrandingProvider({ children }: { children: React.ReactNode }) {
   const [systemName, setSystemNameState] = useState<string>(
-    () => localStorage.getItem(NAME_KEY) || ""
+    () => readStorage(NAME_KEY)
   );
   const [systemLogo, setSystemLogoState] = useState<string>(
-    () => localStorage.getItem(LOGO_KEY) || ""
+    () => readStorage(LOGO_KEY)
   );
 
   const setSystemName = (name: string) => {
-    try { localStorage.setItem(NAME_KEY, name); } catch { /* quota exceeded */ }
     setSystemNameState(name);
+    try {
+      if (name) {
+        localStorage.setItem(NAME_KEY, name);
+      } else {
+        localStorage.removeItem(NAME_KEY);
+      }
+    } catch {
+      // quota exceeded — state still updated for this session
+    }
   };
 
   const setSystemLogo = (logo: string) => {
     if (!logo) {
-      localStorage.removeItem(LOGO_KEY);
       setSystemLogoState("");
+      try { localStorage.removeItem(LOGO_KEY); } catch { /* ignore */ }
       return;
     }
+    // Always remove old logo first to free quota before writing the new one
+    try { localStorage.removeItem(LOGO_KEY); } catch { /* ignore */ }
     try {
       localStorage.setItem(LOGO_KEY, logo);
       setSystemLogoState(logo);
     } catch {
-      // QuotaExceededError — surface it so the upload handler can show an error
+      // Still update in-memory state so the current session sees the logo
+      setSystemLogoState(logo);
       throw new Error("storage_full");
     }
   };
