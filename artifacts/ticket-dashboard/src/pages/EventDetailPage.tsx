@@ -10,7 +10,7 @@ import { Dialog, DialogContent, DialogTitle, DialogDescription } from "@/compone
 import {
   ArrowLeft, ArrowRight, CalendarDays, MapPin, Ticket,
   Search, CheckCircle2, Clock, AlertCircle, Loader2,
-  Eye, Printer, X, User, Phone, Hash, DollarSign, Users, UserPlus, Trash2, ShieldCheck,
+  Eye, Printer, X, User, Phone, Hash, DollarSign, Users, UserPlus, Trash2, ShieldCheck, MessageCircle,
 } from "lucide-react";
 import { format } from "date-fns";
 import { cn } from "@/lib/utils";
@@ -69,6 +69,57 @@ export default function EventDetailPage() {
   const [qrDataUrl, setQrDataUrl] = useState<string | null>(null);
   const [qrLoading, setQrLoading] = useState(false);
   const printRef = useRef<HTMLDivElement>(null);
+
+  // ── WhatsApp Send ─────────────────────────────────────────────
+  const [waTicket, setWaTicket] = useState<TicketRow | null>(null);
+  const [waPhone, setWaPhone] = useState("");
+
+  const openWhatsApp = (tk: TicketRow, e: React.MouseEvent) => {
+    e.stopPropagation();
+    setWaTicket(tk);
+    setWaPhone(tk.customer_phone ?? "");
+  };
+
+  const sendWhatsApp = () => {
+    if (!waTicket || !event) return;
+    const raw = waPhone.replace(/[\s\-().+]/g, "");
+    if (!raw) return;
+    const dateStr = event.event_date
+      ? new Date(event.event_date).toLocaleDateString(isAr ? "ar-SA" : "en-US", { year: "numeric", month: "long", day: "numeric" })
+      : "";
+    const priceStr = event.price != null
+      ? (event.price === 0 ? (isAr ? "مجاني" : "Free") : `RWF ${event.price.toLocaleString()}`)
+      : "";
+    const msg = isAr
+      ? [
+          `🎫 *تذكرتك جاهزة!*`,
+          ``,
+          `📅 الفعالية: *${event.title}*`,
+          dateStr ? `🗓️ التاريخ: ${dateStr}` : "",
+          event.location ? `📍 الموقع: ${event.location}` : "",
+          priceStr ? `💰 السعر: ${priceStr}` : "",
+          ``,
+          `👤 الاسم: ${waTicket.customer_name}`,
+          `🔖 رقم التذكرة: #${waTicket.id.slice(0, 8).toUpperCase()}`,
+          ``,
+          `نتمنى لك وقتاً ممتعاً! 🎉`,
+        ].filter(Boolean).join("\n")
+      : [
+          `🎫 *Your Ticket is Ready!*`,
+          ``,
+          `📅 Event: *${event.title}*`,
+          dateStr ? `🗓️ Date: ${dateStr}` : "",
+          event.location ? `📍 Location: ${event.location}` : "",
+          priceStr ? `💰 Price: ${priceStr}` : "",
+          ``,
+          `👤 Name: ${waTicket.customer_name}`,
+          `🔖 Ticket #: ${waTicket.id.slice(0, 8).toUpperCase()}`,
+          ``,
+          `Enjoy the event! 🎉`,
+        ].filter(Boolean).join("\n");
+    window.open(`https://wa.me/${raw}?text=${encodeURIComponent(msg)}`, "_blank");
+    setWaTicket(null);
+  };
 
   // ── Assigned Staff ────────────────────────────────────────────
   const [staffAccess, setStaffAccess] = useState<AccessRow[]>([]);
@@ -442,6 +493,13 @@ export default function EventDetailPage() {
                           </span>
                           <p className="text-[10px] text-muted-foreground mt-0.5">{timeAgo(tk.created_at)}</p>
                         </div>
+                        <button
+                          onClick={(e) => openWhatsApp(tk, e)}
+                          title={isAr ? "إرسال عبر واتساب" : "Send via WhatsApp"}
+                          className="w-7 h-7 rounded-lg bg-green-100 dark:bg-green-900/30 hover:bg-green-200 dark:hover:bg-green-800/50 flex items-center justify-center transition-colors shrink-0"
+                        >
+                          <MessageCircle className="w-3.5 h-3.5 text-green-600 dark:text-green-400" />
+                        </button>
                         <div className="w-7 h-7 rounded-lg bg-muted/60 group-hover:bg-primary/10 group-hover:text-primary flex items-center justify-center transition-colors">
                           <Eye className="w-3.5 h-3.5 text-muted-foreground group-hover:text-primary" />
                         </div>
@@ -665,10 +723,18 @@ export default function EventDetailPage() {
                 </div>
               </div>
 
-              <div className="bg-card px-6 pb-6 pt-1">
+              <div className="bg-card px-6 pb-6 pt-1 flex gap-2">
+                <Button
+                  onClick={() => { if (selectedTicket) openWhatsApp(selectedTicket, { stopPropagation: () => {} } as React.MouseEvent); }}
+                  variant="outline"
+                  className="flex-1 h-11 rounded-xl border-green-300 dark:border-green-700 text-green-700 dark:text-green-400 hover:bg-green-50 dark:hover:bg-green-900/20 font-semibold text-sm"
+                >
+                  <MessageCircle className="w-4 h-4" />
+                  {isAr ? "واتساب" : "WhatsApp"}
+                </Button>
                 <Button
                   onClick={handlePrint}
-                  className="w-full h-11 rounded-xl bg-gradient-to-r from-violet-600 to-purple-600 hover:from-violet-700 hover:to-purple-700 border-0 shadow-md shadow-violet-500/20 font-semibold text-sm"
+                  className="flex-1 h-11 rounded-xl bg-gradient-to-r from-violet-600 to-purple-600 hover:from-violet-700 hover:to-purple-700 border-0 shadow-md shadow-violet-500/20 font-semibold text-sm"
                 >
                   <Printer className="w-4 h-4" />
                   {t.printTicket}
@@ -676,6 +742,68 @@ export default function EventDetailPage() {
               </div>
             </>
           )}
+        </DialogContent>
+      </Dialog>
+
+      {/* WhatsApp Send Modal */}
+      <Dialog open={!!waTicket} onOpenChange={(o) => !o && setWaTicket(null)}>
+        <DialogContent className="sm:max-w-xs p-0 rounded-2xl overflow-hidden border-0 shadow-2xl">
+          <DialogTitle className="sr-only">{isAr ? "إرسال عبر واتساب" : "Send via WhatsApp"}</DialogTitle>
+          <DialogDescription className="sr-only">{isAr ? "أدخل رقم الواتساب" : "Enter WhatsApp number"}</DialogDescription>
+
+          {/* Header */}
+          <div className="bg-gradient-to-br from-green-500 to-emerald-600 px-6 py-5 text-center">
+            <div className="w-12 h-12 bg-white/20 rounded-2xl flex items-center justify-center mx-auto mb-3">
+              <MessageCircle className="w-6 h-6 text-white" />
+            </div>
+            <h3 className="text-white font-bold text-base">
+              {isAr ? "إرسال التذكرة عبر واتساب" : "Send Ticket via WhatsApp"}
+            </h3>
+            {waTicket && (
+              <p className="text-white/75 text-xs mt-1 truncate">{waTicket.customer_name}</p>
+            )}
+          </div>
+
+          <div className="px-6 py-5 space-y-4">
+            <div className="space-y-1.5">
+              <label className="text-xs font-semibold text-muted-foreground uppercase tracking-wider flex items-center gap-1.5">
+                <Phone className="w-3.5 h-3.5" />
+                {isAr ? "رقم واتساب المستقبل" : "Recipient WhatsApp Number"}
+              </label>
+              <Input
+                value={waPhone}
+                onChange={(e) => setWaPhone(e.target.value)}
+                placeholder={isAr ? "مثال: 250788123456" : "e.g. 250788123456"}
+                className="h-11 rounded-xl text-sm font-mono"
+                dir="ltr"
+                type="tel"
+                onKeyDown={(e) => e.key === "Enter" && sendWhatsApp()}
+              />
+              <p className="text-[11px] text-muted-foreground">
+                {isAr
+                  ? "أدخل الرقم بدون رمز + (مثال: 250788123456)"
+                  : "Enter without the + sign (e.g. 250788123456)"}
+              </p>
+            </div>
+
+            <div className="flex gap-2">
+              <Button
+                variant="outline"
+                className="flex-1 h-10 rounded-xl text-sm"
+                onClick={() => setWaTicket(null)}
+              >
+                {isAr ? "إلغاء" : "Cancel"}
+              </Button>
+              <Button
+                disabled={!waPhone.trim()}
+                onClick={sendWhatsApp}
+                className="flex-1 h-10 rounded-xl bg-gradient-to-r from-green-500 to-emerald-600 hover:from-green-600 hover:to-emerald-700 border-0 text-white font-semibold text-sm"
+              >
+                <MessageCircle className="w-4 h-4" />
+                {isAr ? "فتح واتساب" : "Open WhatsApp"}
+              </Button>
+            </div>
+          </div>
         </DialogContent>
       </Dialog>
     </div>
