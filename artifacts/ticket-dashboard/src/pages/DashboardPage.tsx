@@ -3,12 +3,14 @@ import { supabase } from "@/lib/supabase";
 import { useLocale } from "@/contexts/LocaleContext";
 import { useAuth } from "@/contexts/useAuth";
 import { useBranding } from "@/contexts/BrandingContext";
-import { CalendarDays, Ticket, ScanLine, TrendingUp, AlertCircle, RefreshCw, Users, ArrowRight, ArrowLeft, DollarSign } from "lucide-react";
+import { CalendarDays, Ticket, ScanLine, TrendingUp, AlertCircle, RefreshCw, Users, ArrowRight, ArrowLeft, DollarSign, CalendarCheck2, CalendarX2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { useLocation } from "wouter";
 
 interface Stats {
   totalEvents: number;
+  availableEvents: number;
+  expiredEvents: number;
   totalTickets: number;
   scannedTickets: number;
   totalRevenue: number;
@@ -65,7 +67,7 @@ export default function DashboardPage() {
   const [, navigate] = useLocation();
   const isAr = lang === "ar";
 
-  const [stats, setStats] = useState<Stats>({ totalEvents: 0, totalTickets: 0, scannedTickets: 0, totalRevenue: 0 });
+  const [stats, setStats] = useState<Stats>({ totalEvents: 0, availableEvents: 0, expiredEvents: 0, totalTickets: 0, scannedTickets: 0, totalRevenue: 0 });
   const [recentEvents, setRecentEvents] = useState<RecentEvent[]>([]);
   const [loading, setLoading] = useState(true);
   const [errors, setErrors] = useState<string[]>([]);
@@ -77,7 +79,8 @@ export default function DashboardPage() {
   const fetchStats = async () => {
     setLoading(true);
     const errs: string[] = [];
-    let totalEvents = 0, totalTickets = 0, scannedTickets = 0, totalRevenue = 0;
+    let totalEvents = 0, availableEvents = 0, expiredEvents = 0;
+    let totalTickets = 0, scannedTickets = 0, totalRevenue = 0;
 
     // For staff: get their accessible event IDs first
     let allowedEventIds: string[] | null = null;
@@ -89,7 +92,7 @@ export default function DashboardPage() {
       allowedEventIds = (accessData ?? []).map((a: { event_id: string }) => a.event_id);
     }
 
-    const eventsQuery = supabase.from("events").select("id, price", { count: "exact" });
+    const eventsQuery = supabase.from("events").select("id, price, event_date", { count: "exact" });
     const recentQuery = supabase.from("events").select("id, title, event_date, price").order("created_at", { ascending: false }).limit(5);
 
     const safeIds = allowedEventIds && allowedEventIds.length === 0 ? ["__none__"] : (allowedEventIds ?? null);
@@ -107,10 +110,25 @@ export default function DashboardPage() {
 
     if (eventsRes.error) errs.push(`Events: ${eventsRes.error.message}`);
     else {
+      const now = new Date();
+      now.setHours(0, 0, 0, 0);
+
       totalEvents = eventsRes.count ?? 0;
+
+      if (eventsRes.data) {
+        // Available = future date OR no date set (undated events are treated as ongoing)
+        availableEvents = eventsRes.data.filter((ev) => {
+          if (!ev.event_date) return true;
+          return new Date(ev.event_date) >= now;
+        }).length;
+        expiredEvents = eventsRes.data.filter((ev) => {
+          if (!ev.event_date) return false;
+          return new Date(ev.event_date) < now;
+        }).length;
+      }
+
       // Revenue = sum of (event.price × ticket_count_for_that_event)
       if (!allTicketsRes.error && allTicketsRes.data && eventsRes.data) {
-        // Count tickets per event
         const ticketCountByEvent: Record<string, number> = {};
         for (const tk of allTicketsRes.data) {
           ticketCountByEvent[tk.event_id] = (ticketCountByEvent[tk.event_id] ?? 0) + 1;
@@ -131,7 +149,7 @@ export default function DashboardPage() {
       setRecentEvents(recentRes.data as RecentEvent[]);
     }
 
-    setStats({ totalEvents, totalTickets, scannedTickets, totalRevenue });
+    setStats({ totalEvents, availableEvents, expiredEvents, totalTickets, scannedTickets, totalRevenue });
     setErrors(errs);
     setLoading(false);
   };
@@ -182,11 +200,21 @@ export default function DashboardPage() {
         </div>
       )}
 
-      {/* Stats grid */}
-      <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
+      {/* Stats grid — 2 cols on mobile, 3 on desktop */}
+      <div className="grid grid-cols-2 lg:grid-cols-3 gap-4">
         <StatCard
           label={t.totalEvents} value={stats.totalEvents} icon={CalendarDays}
           gradient="bg-gradient-to-br from-blue-500 via-blue-600 to-cyan-600 shadow-blue-500/25"
+          loading={loading}
+        />
+        <StatCard
+          label={isAr ? "فعاليات متاحة" : "Available Events"} value={stats.availableEvents} icon={CalendarCheck2}
+          gradient="bg-gradient-to-br from-teal-500 via-emerald-500 to-green-600 shadow-teal-500/25"
+          loading={loading}
+        />
+        <StatCard
+          label={isAr ? "فعاليات منتهية" : "Expired Events"} value={stats.expiredEvents} icon={CalendarX2}
+          gradient="bg-gradient-to-br from-slate-500 via-slate-600 to-zinc-700 shadow-slate-500/25"
           loading={loading}
         />
         <StatCard
@@ -237,15 +265,16 @@ export default function DashboardPage() {
           </div>
 
           {/* Mini stat row */}
-          <div className="grid grid-cols-3 gap-3 mt-6 pt-5 border-t border-border">
+          <div className="grid grid-cols-4 gap-2 mt-6 pt-5 border-t border-border">
             {[
-              { label: isAr ? "الفعاليات" : "Events", value: stats.totalEvents, color: "text-blue-600" },
-              { label: isAr ? "التذاكر" : "Tickets", value: stats.totalTickets, color: "text-violet-600" },
+              { label: isAr ? "الكل" : "Total", value: stats.totalEvents, color: "text-blue-600" },
+              { label: isAr ? "متاحة" : "Available", value: stats.availableEvents, color: "text-teal-600" },
+              { label: isAr ? "منتهية" : "Expired", value: stats.expiredEvents, color: "text-slate-500" },
               { label: isAr ? "الحضور" : "Attended", value: stats.scannedTickets, color: "text-emerald-600" },
             ].map((s) => (
               <div key={s.label} className="text-center">
                 <p className={`text-xl font-black ${s.color}`}>{s.value}</p>
-                <p className="text-xs text-muted-foreground mt-0.5">{s.label}</p>
+                <p className="text-[10px] text-muted-foreground mt-0.5 leading-tight">{s.label}</p>
               </div>
             ))}
           </div>
