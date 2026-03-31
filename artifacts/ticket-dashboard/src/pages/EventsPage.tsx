@@ -171,7 +171,15 @@ export default function EventsPage() {
 
   const handleSave = async () => {
     if (!form.title.trim()) {
-      setFormError(t.allFieldsRequired);
+      setFormError(isAr ? "عنوان الفعالية مطلوب" : "Event title is required");
+      return;
+    }
+    if (!form.date) {
+      setFormError(isAr ? "تاريخ الفعالية مطلوب" : "Event date is required");
+      return;
+    }
+    if (!form.location.trim()) {
+      setFormError(isAr ? "موقع الفعالية مطلوب" : "Event location is required");
       return;
     }
     const priceVal = form.price.trim() ? parseFloat(form.price) : null;
@@ -179,13 +187,11 @@ export default function EventsPage() {
       setFormError(isAr ? "السعر يجب أن يكون رقماً صحيحاً" : "Price must be a valid number");
       return;
     }
-    if (form.date) {
-      const today = new Date();
-      today.setHours(0, 0, 0, 0);
-      if (new Date(form.date) < today) {
-        setFormError(isAr ? "لا يمكن اختيار تاريخ في الماضي" : "Event date cannot be in the past");
-        return;
-      }
+    const today = new Date();
+    today.setHours(0, 0, 0, 0);
+    if (new Date(form.date) < today) {
+      setFormError(isAr ? "لا يمكن اختيار تاريخ في الماضي" : "Event date cannot be in the past");
+      return;
     }
     setSaving(true);
     setFormError(null);
@@ -538,7 +544,7 @@ export default function EventsPage() {
 
             {/* Title */}
             <div className="space-y-1.5">
-              <Label className="font-semibold text-sm">{t.eventTitle} *</Label>
+              <Label className="font-semibold text-sm">{t.eventTitle} <span className="text-destructive">*</span></Label>
               <Input
                 placeholder={t.eventTitlePlaceholder}
                 value={form.title}
@@ -573,8 +579,7 @@ export default function EventsPage() {
             <div className="grid grid-cols-2 gap-3">
               <div className="space-y-1.5">
                 <Label className="font-semibold text-sm">
-                  {t.date}
-                  <span className="text-muted-foreground font-normal text-xs ms-1">({isAr ? "اختياري" : "opt."})</span>
+                  {t.date} <span className="text-destructive">*</span>
                 </Label>
                 <Input
                   type="date"
@@ -586,8 +591,7 @@ export default function EventsPage() {
               </div>
               <div className="space-y-1.5">
                 <Label className="font-semibold text-sm">
-                  {t.location}
-                  <span className="text-muted-foreground font-normal text-xs ms-1">({isAr ? "اختياري" : "opt."})</span>
+                  {t.location} <span className="text-destructive">*</span>
                 </Label>
                 <Input
                   placeholder={t.locationPlaceholder}
