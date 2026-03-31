@@ -79,11 +79,21 @@ export default function SettingsPage() {
   // ── Branding ────────────────────────────────────────────────
   const [nameInputBrand, setNameInputBrand] = useState(systemName);
   const [brandSaved, setBrandSaved] = useState(false);
+  const [brandSaving, setBrandSaving] = useState(false);
+  const [brandNameError, setBrandNameError] = useState<string | null>(null);
   const [logoError, setLogoError] = useState<string | null>(null);
+  const [logoSaving, setLogoSaving] = useState(false);
   const logoInputRef = useRef<HTMLInputElement>(null);
 
-  const handleSaveBranding = () => {
-    setSystemName(nameInputBrand.trim());
+  const handleSaveBranding = async () => {
+    setBrandSaving(true);
+    setBrandNameError(null);
+    const { error } = await setSystemName(nameInputBrand.trim());
+    setBrandSaving(false);
+    if (error) {
+      setBrandNameError(error);
+      return;
+    }
     if (nameInputBrand.trim()) {
       logActivity("settings_changed", `System name changed to: ${nameInputBrand.trim()}`, profile?.email ?? undefined);
     }
@@ -99,7 +109,7 @@ export default function SettingsPage() {
       setLogoError(isAr ? "يرجى اختيار ملف صورة صالح" : "Please select a valid image file");
       return;
     }
-    const MAX_BYTES = 5 * 1024 * 1024; // 5 MB raw file limit
+    const MAX_BYTES = 5 * 1024 * 1024;
     if (file.size > MAX_BYTES) {
       setLogoError(isAr ? "حجم الصورة أكبر من 5 ميغابايت." : "Image is larger than 5 MB.");
       return;
@@ -107,9 +117,8 @@ export default function SettingsPage() {
     const reader = new FileReader();
     reader.onload = (ev) => {
       const rawDataUrl = ev.target?.result as string;
-      // Compress & resize via canvas so it fits comfortably in localStorage
       const img = new Image();
-      img.onload = () => {
+      img.onload = async () => {
         const MAX_DIM = 128;
         let { width, height } = img;
         if (width > MAX_DIM || height > MAX_DIM) {
@@ -122,17 +131,18 @@ export default function SettingsPage() {
         canvas.height = height;
         canvas.getContext("2d")!.drawImage(img, 0, 0, width, height);
         const compressed = canvas.toDataURL("image/jpeg", 0.75);
-        try {
-          setSystemLogo(compressed);
-          logActivity("settings_changed", "System logo updated", profile?.email ?? undefined);
-        } catch {
-          setLogoError(isAr ? "فشل حفظ الشعار. مساحة التخزين ممتلئة." : "Failed to save logo — storage is full.");
+        setLogoSaving(true);
+        const { error } = await setSystemLogo(compressed);
+        setLogoSaving(false);
+        if (error) {
+          setLogoError(isAr ? `فشل حفظ الشعار: ${error}` : `Failed to save logo: ${error}`);
+          return;
         }
+        logActivity("settings_changed", "System logo updated", profile?.email ?? undefined);
       };
       img.src = rawDataUrl;
     };
     reader.readAsDataURL(file);
-    // Reset so the same file can be re-selected
     e.target.value = "";
   };
 
@@ -262,19 +272,22 @@ export default function SettingsPage() {
                   <Button
                     type="button"
                     variant="outline"
+                    disabled={logoSaving}
                     className="w-full h-10 rounded-xl border-dashed border-2 hover:border-primary/50 hover:bg-primary/5 transition-all font-medium"
                     onClick={() => { setLogoError(null); logoInputRef.current?.click(); }}
                   >
-                    <Upload className="w-4 h-4" />
-                    {isAr ? "رفع شعار" : "Upload Logo"}
+                    {logoSaving
+                      ? <><Loader2 className="w-4 h-4 animate-spin" />{isAr ? "جارٍ الحفظ..." : "Saving..."}</>
+                      : <><Upload className="w-4 h-4" />{isAr ? "رفع شعار" : "Upload Logo"}</>}
                   </Button>
-                  {systemLogo && systemLogo.startsWith("data:") && (
+                  {systemLogo && (
                     <Button
                       type="button"
                       variant="outline"
                       size="sm"
+                      disabled={logoSaving}
                       className="w-full h-8 rounded-xl text-destructive hover:text-destructive hover:bg-destructive/10 border-destructive/30 font-medium text-xs"
-                      onClick={() => { setSystemLogo(""); setLogoError(null); }}
+                      onClick={async () => { setLogoError(null); await setSystemLogo(""); }}
                     >
                       <X className="w-3.5 h-3.5" />
                       {isAr ? "إزالة الشعار" : "Remove Logo"}
@@ -313,11 +326,22 @@ export default function SettingsPage() {
                 />
                 <Button
                   onClick={handleSaveBranding}
+                  disabled={brandSaving}
                   className="h-11 px-4 rounded-xl bg-gradient-to-r from-violet-600 to-purple-600 border-0 shrink-0"
                 >
-                  {brandSaved ? <><Check className="w-4 h-4 text-white" />{isAr ? "تم" : "Saved"}</> : (isAr ? "حفظ" : "Save")}
+                  {brandSaving
+                    ? <><Loader2 className="w-4 h-4 animate-spin" />{isAr ? "جارٍ الحفظ..." : "Saving..."}</>
+                    : brandSaved
+                      ? <><Check className="w-4 h-4 text-white" />{isAr ? "تم الحفظ" : "Saved!"}</>
+                      : (isAr ? "حفظ" : "Save")}
                 </Button>
               </div>
+              {brandNameError && (
+                <div className="flex items-center gap-2 text-sm text-destructive bg-destructive/10 rounded-xl px-3 py-2">
+                  <AlertTriangle className="w-4 h-4 shrink-0" />
+                  {brandNameError}
+                </div>
+              )}
               <p className="text-xs text-muted-foreground">
                 {isAr ? "يظهر في الشريط الجانبي وشريط العنوان." : "Shown in the sidebar and browser tab title."}
               </p>

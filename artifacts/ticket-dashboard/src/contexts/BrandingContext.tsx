@@ -1,4 +1,5 @@
-import { createContext, useContext, useState } from "react";
+import { createContext, useContext, useState, useEffect } from "react";
+import { supabase } from "@/lib/supabase";
 
 const NAME_KEY = "system_name";
 const LOGO_KEY = "system_logo";
@@ -6,61 +7,79 @@ const LOGO_KEY = "system_logo";
 interface BrandingContextType {
   systemName: string;
   systemLogo: string;
-  setSystemName: (name: string) => void;
-  setSystemLogo: (logo: string) => void;
+  brandingLoaded: boolean;
+  setSystemName: (name: string) => Promise<{ error: string | null }>;
+  setSystemLogo: (logo: string) => Promise<{ error: string | null }>;
 }
 
 const BrandingContext = createContext<BrandingContextType | undefined>(undefined);
 
-function readStorage(key: string): string {
+function readCache(key: string): string {
+  try { return localStorage.getItem(key) ?? ""; } catch { return ""; }
+}
+
+function writeCache(key: string, value: string) {
   try {
-    return localStorage.getItem(key) ?? "";
-  } catch {
-    return "";
-  }
+    if (value) { localStorage.removeItem(key); localStorage.setItem(key, value); }
+    else { localStorage.removeItem(key); }
+  } catch { /* quota — skip */ }
 }
 
 export function BrandingProvider({ children }: { children: React.ReactNode }) {
-  const [systemName, setSystemNameState] = useState<string>(
-    () => readStorage(NAME_KEY)
-  );
-  const [systemLogo, setSystemLogoState] = useState<string>(
-    () => readStorage(LOGO_KEY)
-  );
+  const [systemName, setSystemNameState] = useState<string>(() => readCache(NAME_KEY));
+  const [systemLogo, setSystemLogoState] = useState<string>(() => readCache(LOGO_KEY));
+  const [brandingLoaded, setBrandingLoaded] = useState(false);
 
-  const setSystemName = (name: string) => {
-    setSystemNameState(name);
-    try {
-      if (name) {
-        localStorage.setItem(NAME_KEY, name);
-      } else {
-        localStorage.removeItem(NAME_KEY);
+  // Fetch from DB on mount — localStorage gives instant render, DB corrects it
+  useEffect(() => {
+    let cancelled = false;
+    (async () => {
+      const { data, error } = await supabase
+        .from("system_settings")
+        .select("key, value")
+        .in("key", [NAME_KEY, LOGO_KEY]);
+
+      if (cancelled || error) {
+        setBrandingLoaded(true);
+        return;
       }
-    } catch {
-      // quota exceeded — state still updated for this session
-    }
+
+      const map: Record<string, string> = {};
+      for (const row of data ?? []) map[row.key] = row.value ?? "";
+
+      if (NAME_KEY in map) {
+        setSystemNameState(map[NAME_KEY]);
+        writeCache(NAME_KEY, map[NAME_KEY]);
+      }
+      if (LOGO_KEY in map) {
+        setSystemLogoState(map[LOGO_KEY]);
+        writeCache(LOGO_KEY, map[LOGO_KEY]);
+      }
+      setBrandingLoaded(true);
+    })();
+    return () => { cancelled = true; };
+  }, []);
+
+  const setSystemName = async (name: string): Promise<{ error: string | null }> => {
+    setSystemNameState(name);
+    writeCache(NAME_KEY, name);
+    const { error } = await supabase
+      .from("system_settings")
+      .upsert({ key: NAME_KEY, value: name }, { onConflict: "key" });
+    return { error: error?.message ?? null };
   };
 
-  const setSystemLogo = (logo: string) => {
-    if (!logo) {
-      setSystemLogoState("");
-      try { localStorage.removeItem(LOGO_KEY); } catch { /* ignore */ }
-      return;
-    }
-    // Always remove old logo first to free quota before writing the new one
-    try { localStorage.removeItem(LOGO_KEY); } catch { /* ignore */ }
-    try {
-      localStorage.setItem(LOGO_KEY, logo);
-      setSystemLogoState(logo);
-    } catch {
-      // Still update in-memory state so the current session sees the logo
-      setSystemLogoState(logo);
-      throw new Error("storage_full");
-    }
+  const setSystemLogo = async (logo: string): Promise<{ error: string | null }> => {
+    setSystemLogoState(logo);
+    writeCache(LOGO_KEY, logo);
+    const { error } = await supabase
+      .from("system_settings")
+      .upsert({ key: LOGO_KEY, value: logo }, { onConflict: "key" });
+    return { error: error?.message ?? null };
   };
 
   return (
-    <BrandingContext.Provider value={{ systemName, systemLogo, setSystemName, setSystemLogo }}>
+    <BrandingContext.Provider value={{ systemName, systemLogo, brandingLoaded, setSystemName, setSystemLogo }}>
       {children}
     </BrandingContext.Provider>
   );
