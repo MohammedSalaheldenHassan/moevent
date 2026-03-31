@@ -1,5 +1,6 @@
 import jsPDF from "jspdf";
 import html2canvas from "html2canvas";
+import DOMPurify from "dompurify";
 
 export interface TicketPdfOptions {
   ticketId: string;
@@ -166,7 +167,7 @@ export async function generateTicketPdf(opts: TicketPdfOptions): Promise<Blob> {
   // 1. Build a hidden DOM element with the ticket HTML
   const wrapper = document.createElement("div");
   wrapper.style.cssText = "position:fixed;left:-9999px;top:-9999px;z-index:-1;";
-  wrapper.innerHTML = buildTicketHTML(opts);
+  wrapper.innerHTML = DOMPurify.sanitize(buildTicketHTML(opts));
   document.body.appendChild(wrapper);
 
   try {
