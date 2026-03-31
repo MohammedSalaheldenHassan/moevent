@@ -179,6 +179,14 @@ export default function EventsPage() {
       setFormError(isAr ? "السعر يجب أن يكون رقماً صحيحاً" : "Price must be a valid number");
       return;
     }
+    if (form.date) {
+      const today = new Date();
+      today.setHours(0, 0, 0, 0);
+      if (new Date(form.date) < today) {
+        setFormError(isAr ? "لا يمكن اختيار تاريخ في الماضي" : "Event date cannot be in the past");
+        return;
+      }
+    }
     setSaving(true);
     setFormError(null);
     try {
@@ -571,6 +579,7 @@ export default function EventsPage() {
                 <Input
                   type="date"
                   value={form.date}
+                  min={new Date().toISOString().split("T")[0]}
                   onChange={(e) => setForm((f) => ({ ...f, date: e.target.value }))}
                   className="h-11 rounded-xl"
                 />
