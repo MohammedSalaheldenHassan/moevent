@@ -1,6 +1,7 @@
 import jsPDF from "jspdf";
+import html2canvas from "html2canvas";
 
-interface TicketPdfOptions {
+export interface TicketPdfOptions {
   ticketId: string;
   customerName: string;
   customerPhone: string | null;
@@ -11,157 +12,191 @@ interface TicketPdfOptions {
   eventPrice: number | null;
   qrDataUrl: string | null;
   systemName: string;
+  systemLogo?: string;
+  isAr?: boolean;
 }
 
-function addWrappedText(doc: jsPDF, text: string, x: number, y: number, maxWidth: number, lineHeight: number): number {
-  const lines = doc.splitTextToSize(text, maxWidth);
-  doc.text(lines, x, y);
-  return y + lines.length * lineHeight;
-}
-
-export async function generateTicketPdf(opts: TicketPdfOptions): Promise<Blob> {
+function buildTicketHTML(opts: TicketPdfOptions): string {
   const {
     ticketId, customerName, customerPhone, isScanned,
     eventTitle, eventDate, eventLocation, eventPrice,
-    qrDataUrl, systemName,
+    qrDataUrl, systemName, systemLogo, isAr,
   } = opts;
 
-  // A6 portrait: 105 × 148 mm
-  const doc = new jsPDF({ orientation: "portrait", unit: "mm", format: "a6" });
-  const W = 105;
-  const margin = 8;
-  const contentW = W - margin * 2;
+  const dateStr = eventDate
+    ? new Date(eventDate).toLocaleDateString(isAr ? "ar-SA" : "en-US", {
+        year: "numeric", month: "long", day: "numeric",
+      })
+    : "";
 
-  // ── Header ──────────────────────────────────────────────────
-  doc.setFillColor(109, 40, 217); // violet-700
-  doc.rect(0, 0, W, 40, "F");
+  const priceStr = eventPrice != null
+    ? (eventPrice === 0
+        ? (isAr ? "مجاني" : "Free")
+        : `RWF ${eventPrice.toLocaleString()}`)
+    : "";
 
-  // System name (top)
-  doc.setTextColor(255, 255, 255);
-  doc.setFontSize(8);
-  doc.setFont("helvetica", "normal");
-  doc.text((systemName || "TicketHub").toUpperCase(), W / 2, 9, { align: "center" });
+  const logoHtml = systemLogo && systemLogo.startsWith("data:")
+    ? `<img src="${systemLogo}" style="width:44px;height:44px;border-radius:12px;object-fit:cover;margin-bottom:6px;display:block;margin-left:auto;margin-right:auto;" />`
+    : `<div style="font-size:36px;margin-bottom:4px;text-align:center;">🎫</div>`;
 
-  // Thin white rule
-  doc.setDrawColor(255, 255, 255);
-  doc.setLineWidth(0.2);
-  doc.line(margin, 11, W - margin, 11);
+  const statusColor = isScanned ? "#059669" : "#d97706";
+  const statusBg   = isScanned ? "#d1fae5" : "#fef3c7";
+  const statusText = isScanned
+    ? (isAr ? "✓ تم الفحص" : "✓ Scanned")
+    : (isAr ? "⏳ لم يُفحص" : "⏳ Not Scanned");
 
-  // Event title
-  doc.setFontSize(13);
-  doc.setFont("helvetica", "bold");
-  const titleLines: string[] = doc.splitTextToSize(eventTitle, contentW - 4);
-  const titleStartY = titleLines.length === 1 ? 22 : 18;
-  doc.text(titleLines.slice(0, 2), W / 2, titleStartY, { align: "center" });
+  const dir = isAr ? "rtl" : "ltr";
 
-  // Date / location
-  doc.setFontSize(7.5);
-  doc.setFont("helvetica", "normal");
-  doc.setTextColor(210, 180, 255);
-  let metaY = titleLines.length === 1 ? 29 : 32;
-  const metaParts: string[] = [];
-  if (eventDate) {
-    const d = new Date(eventDate);
-    metaParts.push(d.toLocaleDateString("en-US", { year: "numeric", month: "short", day: "numeric" }));
+  return `
+    <div style="
+      width: 380px;
+      font-family: 'Segoe UI', 'Helvetica Neue', Arial, 'Noto Sans Arabic', sans-serif;
+      background: #fff;
+      border-radius: 20px;
+      overflow: hidden;
+      box-shadow: 0 8px 32px rgba(0,0,0,0.12);
+      direction: ${dir};
+    ">
+      <!-- Header -->
+      <div style="
+        background: linear-gradient(135deg, #7c3aed, #6d28d9);
+        padding: 28px 24px 22px;
+        text-align: center;
+      ">
+        ${logoHtml}
+        <div style="color:rgba(255,255,255,0.75);font-size:11px;font-weight:600;letter-spacing:1.5px;text-transform:uppercase;margin-bottom:8px;">
+          ${systemName || "TicketHub"}
+        </div>
+        <div style="color:#fff;font-size:18px;font-weight:700;line-height:1.35;margin-bottom:10px;">
+          ${eventTitle}
+        </div>
+        ${dateStr || eventLocation ? `
+        <div style="color:rgba(255,255,255,0.70);font-size:12px;display:flex;gap:12px;justify-content:center;flex-wrap:wrap;margin-bottom:8px;">
+          ${dateStr ? `<span>📅 ${dateStr}</span>` : ""}
+          ${eventLocation ? `<span>📍 ${eventLocation}</span>` : ""}
+        </div>` : ""}
+        ${priceStr ? `
+        <div style="
+          display:inline-block;
+          background:rgba(255,255,255,0.18);
+          border:1px solid rgba(255,255,255,0.25);
+          border-radius:999px;
+          padding:4px 14px;
+          color:#fff;
+          font-size:12px;
+          font-weight:700;
+        ">💰 ${priceStr}</div>` : ""}
+      </div>
+
+      <!-- Dashed separator -->
+      <div style="
+        border-top: 2px dashed #e5e7eb;
+        margin: 0 20px;
+        position: relative;
+      "></div>
+
+      <!-- Body -->
+      <div style="padding: 20px 24px 0;">
+        <!-- Customer name -->
+        <div style="margin-bottom:14px;">
+          <div style="font-size:10px;font-weight:700;color:#9ca3af;letter-spacing:1px;text-transform:uppercase;margin-bottom:4px;">
+            ${isAr ? "اسم العميل" : "Customer"}
+          </div>
+          <div style="font-size:17px;font-weight:700;color:#111827;">
+            ${customerName}
+          </div>
+        </div>
+
+        ${customerPhone ? `
+        <div style="margin-bottom:14px;">
+          <div style="font-size:10px;font-weight:700;color:#9ca3af;letter-spacing:1px;text-transform:uppercase;margin-bottom:4px;">
+            ${isAr ? "رقم الهاتف" : "Phone"}
+          </div>
+          <div style="font-size:14px;color:#374151;direction:ltr;text-align:${isAr ? "right" : "left"};">
+            ${customerPhone}
+          </div>
+        </div>` : ""}
+
+        <!-- Ticket ID -->
+        <div style="margin-bottom:14px;">
+          <div style="font-size:10px;font-weight:700;color:#9ca3af;letter-spacing:1px;text-transform:uppercase;margin-bottom:4px;">
+            ${isAr ? "رقم التذكرة" : "Ticket ID"}
+          </div>
+          <div style="font-size:11px;font-family:monospace;color:#6b7280;word-break:break-all;direction:ltr;text-align:${isAr ? "right" : "left"};">
+            ${ticketId}
+          </div>
+        </div>
+
+        <!-- Status -->
+        <div style="margin-bottom:18px;">
+          <span style="
+            display:inline-block;
+            background:${statusBg};
+            color:${statusColor};
+            font-size:12px;
+            font-weight:700;
+            padding:5px 14px;
+            border-radius:999px;
+          ">${statusText}</span>
+        </div>
+      </div>
+
+      <!-- QR Code -->
+      ${qrDataUrl ? `
+      <div style="display:flex;justify-content:center;padding:0 0 12px;">
+        <div style="background:#fff;border:1px solid #e5e7eb;border-radius:16px;padding:10px;">
+          <img src="${qrDataUrl}" style="width:150px;height:150px;display:block;" />
+        </div>
+      </div>` : ""}
+
+      <!-- Footer -->
+      <div style="
+        text-align:center;
+        padding:10px 24px 20px;
+        font-size:10px;
+        color:#d1d5db;
+      ">
+        ${isAr ? "امسح رمز QR للتحقق من التذكرة" : "Scan QR code to verify this ticket"}
+      </div>
+    </div>
+  `;
+}
+
+export async function generateTicketPdf(opts: TicketPdfOptions): Promise<Blob> {
+  // 1. Build a hidden DOM element with the ticket HTML
+  const wrapper = document.createElement("div");
+  wrapper.style.cssText = "position:fixed;left:-9999px;top:-9999px;z-index:-1;";
+  wrapper.innerHTML = buildTicketHTML(opts);
+  document.body.appendChild(wrapper);
+
+  try {
+    // 2. Capture with html2canvas
+    const canvas = await html2canvas(wrapper.firstElementChild as HTMLElement, {
+      scale: 2,            // 2× for crisp output
+      useCORS: true,
+      backgroundColor: "#ffffff",
+      logging: false,
+    });
+
+    // 3. Build jsPDF (A5 — good match for the 380px card)
+    const imgData = canvas.toDataURL("image/jpeg", 0.92);
+    const pxW = canvas.width;
+    const pxH = canvas.height;
+
+    // Convert to mm keeping the aspect ratio, max width 130mm
+    const maxW = 130;
+    const mmW  = maxW;
+    const mmH  = (pxH / pxW) * mmW;
+
+    const doc = new jsPDF({
+      orientation: mmH > mmW ? "portrait" : "landscape",
+      unit: "mm",
+      format: [mmW, mmH],
+    });
+
+    doc.addImage(imgData, "JPEG", 0, 0, mmW, mmH);
+    return doc.output("blob");
+  } finally {
+    document.body.removeChild(wrapper);
   }
-  if (eventLocation) metaParts.push(eventLocation);
-  if (metaParts.length) {
-    doc.text(metaParts.join("  |  "), W / 2, metaY, { align: "center" });
-    metaY += 5;
-  }
-
-  // Price badge
-  if (eventPrice != null) {
-    const priceStr = eventPrice === 0 ? "FREE" : `RWF ${eventPrice.toLocaleString()}`;
-    const badgeW = doc.getTextWidth(priceStr) + 6;
-    doc.setFillColor(255, 255, 255);
-    doc.setFillColor(139, 92, 246); // violet-500
-    doc.roundedRect(W / 2 - badgeW / 2, metaY - 4, badgeW, 6, 1.5, 1.5, "F");
-    doc.setTextColor(255, 255, 255);
-    doc.setFontSize(7);
-    doc.text(priceStr, W / 2, metaY, { align: "center" });
-  }
-
-  // ── Dashed separator ────────────────────────────────────────
-  const sepY = 42;
-  doc.setLineDashPattern([1.5, 1.5], 0);
-  doc.setDrawColor(200, 200, 200);
-  doc.setLineWidth(0.3);
-  doc.line(margin, sepY, W - margin, sepY);
-  doc.setLineDashPattern([], 0);
-
-  // ── Body ─────────────────────────────────────────────────────
-  let y = 49;
-  doc.setTextColor(130, 130, 130);
-  doc.setFont("helvetica", "normal");
-  doc.setFontSize(7);
-  doc.text("CUSTOMER", margin, y);
-
-  y += 4;
-  doc.setTextColor(20, 20, 20);
-  doc.setFont("helvetica", "bold");
-  doc.setFontSize(11);
-  y = addWrappedText(doc, customerName, margin, y, contentW, 5.5);
-
-  if (customerPhone) {
-    y += 1;
-    doc.setTextColor(130, 130, 130);
-    doc.setFont("helvetica", "normal");
-    doc.setFontSize(7);
-    doc.text("PHONE", margin, y);
-    y += 4;
-    doc.setTextColor(20, 20, 20);
-    doc.setFont("helvetica", "normal");
-    doc.setFontSize(9);
-    doc.text(customerPhone, margin, y);
-    y += 6;
-  }
-
-  // Ticket ID
-  y += 1;
-  doc.setTextColor(130, 130, 130);
-  doc.setFont("helvetica", "normal");
-  doc.setFontSize(7);
-  doc.text("TICKET ID", margin, y);
-  y += 4;
-  doc.setTextColor(80, 80, 80);
-  doc.setFont("courier", "normal");
-  doc.setFontSize(7.5);
-  doc.text(ticketId, margin, y);
-  y += 6;
-
-  // Status chip
-  const scanned = isScanned;
-  const chipColor: [number, number, number] = scanned ? [5, 150, 105] : [217, 119, 6];
-  doc.setFillColor(...chipColor);
-  const chipText = scanned ? "SCANNED" : "NOT SCANNED";
-  const chipW = doc.getTextWidth(chipText) + 6;
-  doc.roundedRect(margin, y - 3.5, chipW, 6, 1.5, 1.5, "F");
-  doc.setTextColor(255, 255, 255);
-  doc.setFont("helvetica", "bold");
-  doc.setFontSize(7);
-  doc.text(chipText, margin + 3, y + 0.5);
-  y += 7;
-
-  // ── QR Code ──────────────────────────────────────────────────
-  if (qrDataUrl) {
-    const remaining = 148 - y - 12; // space left before footer
-    const qrSize = Math.min(50, remaining - 8);
-    if (qrSize > 20) {
-      const qrX = (W - qrSize) / 2;
-      // White background square for QR
-      doc.setFillColor(255, 255, 255);
-      doc.roundedRect(qrX - 2, y, qrSize + 4, qrSize + 4, 2, 2, "F");
-      doc.addImage(qrDataUrl, "PNG", qrX, y + 2, qrSize, qrSize);
-      y += qrSize + 8;
-    }
-  }
-
-  // ── Footer ───────────────────────────────────────────────────
-  doc.setTextColor(180, 180, 180);
-  doc.setFont("helvetica", "normal");
-  doc.setFontSize(6.5);
-  doc.text("Scan QR code to verify this ticket", W / 2, 143, { align: "center" });
-
-  return doc.output("blob");
 }

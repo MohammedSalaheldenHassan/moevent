@@ -270,7 +270,7 @@ export default function EventDetailPage() {
       const qrContent = JSON.stringify({ ticketId: waTicket.id, event: event.title, customer: waTicket.customer_name });
       const ticketQr = await QRCode.toDataURL(qrContent, { width: 300, margin: 2, color: { dark: "#1e1b4b", light: "#ffffff" } });
 
-      // 2. Generate PDF blob
+      // 2. Generate PDF blob (html2canvas renders Arabic correctly)
       const pdfBlob = await generateTicketPdf({
         ticketId: waTicket.id,
         customerName: waTicket.customer_name,
@@ -282,19 +282,13 @@ export default function EventDetailPage() {
         eventPrice: event.price,
         qrDataUrl: ticketQr,
         systemName: systemName || "TicketHub",
+        systemLogo: systemLogo || "",
+        isAr,
       });
 
-      // 3. Auto-download the PDF to the device
-      const blobUrl = URL.createObjectURL(pdfBlob);
-      const a = document.createElement("a");
-      a.href = blobUrl;
-      a.download = `ticket-${waTicket.id.slice(0, 8).toUpperCase()}.pdf`;
-      document.body.appendChild(a);
-      a.click();
-      document.body.removeChild(a);
-      setTimeout(() => URL.revokeObjectURL(blobUrl), 5000);
+      const fileName = `ticket-${waTicket.id.slice(0, 8).toUpperCase()}.pdf`;
 
-      // 4. Build WhatsApp text message
+      // 3. Build WhatsApp text message
       const msg = isAr
         ? [
             `🎫 *تذكرتك جاهزة!*`,
@@ -306,8 +300,6 @@ export default function EventDetailPage() {
             ``,
             `👤 الاسم: ${waTicket.customer_name}`,
             `🔖 رقم التذكرة: #${waTicket.id.slice(0, 8).toUpperCase()}`,
-            ``,
-            `📄 تم إرسال ملف PDF للتذكرة — يُرجى إرفاقه في المحادثة`,
             ``,
             `نتمنى لك وقتاً ممتعاً! 🎉`,
           ].filter(Boolean).join("\n")
@@ -322,15 +314,31 @@ export default function EventDetailPage() {
             `👤 Name: ${waTicket.customer_name}`,
             `🔖 Ticket #: ${waTicket.id.slice(0, 8).toUpperCase()}`,
             ``,
-            `📄 Your ticket PDF has been downloaded — please attach it to this chat`,
-            ``,
             `Enjoy the event! 🎉`,
           ].filter(Boolean).join("\n");
 
-      // 5. Open WhatsApp — small delay so browser processes the download first
-      setTimeout(() => {
-        window.open(`https://wa.me/${full}?text=${encodeURIComponent(msg)}`, "_blank");
-      }, 400);
+      // 4. Try Web Share API first (mobile — opens native share sheet → pick WhatsApp)
+      const pdfFile = new File([pdfBlob], fileName, { type: "application/pdf" });
+      const canShare = typeof navigator.share === "function"
+        && typeof navigator.canShare === "function"
+        && navigator.canShare({ files: [pdfFile] });
+
+      if (canShare) {
+        await navigator.share({ files: [pdfFile], text: msg, title: fileName });
+      } else {
+        // Desktop fallback: download PDF + open WhatsApp
+        const blobUrl = URL.createObjectURL(pdfBlob);
+        const a = document.createElement("a");
+        a.href = blobUrl;
+        a.download = fileName;
+        document.body.appendChild(a);
+        a.click();
+        document.body.removeChild(a);
+        setTimeout(() => URL.revokeObjectURL(blobUrl), 5000);
+        setTimeout(() => {
+          window.open(`https://wa.me/${full}?text=${encodeURIComponent(msg)}`, "_blank");
+        }, 400);
+      }
 
       setWaTicket(null);
     } catch (err: unknown) {
