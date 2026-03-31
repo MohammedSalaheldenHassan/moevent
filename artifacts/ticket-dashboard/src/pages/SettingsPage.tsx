@@ -1,4 +1,4 @@
-import { useRef, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { supabase } from "@/lib/supabase";
 import { useLocale } from "@/contexts/LocaleContext";
 import { useAuth } from "@/contexts/useAuth";
@@ -24,6 +24,9 @@ import {
   X,
   Upload,
   ImageIcon,
+  CalendarX2,
+  RefreshCw,
+  Clock,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { type Theme } from "@/contexts/ThemeContext";
@@ -144,6 +147,43 @@ export default function SettingsPage() {
     };
     reader.readAsDataURL(file);
     e.target.value = "";
+  };
+
+  // ── Auto-Cleanup ─────────────────────────────────────────────
+  const [cleanupStatus, setCleanupStatus] = useState<{ pendingDeletionCount: number; expiredCount: number } | null>(null);
+  const [cleanupLoading, setCleanupLoading] = useState(false);
+  const [cleanupRunning, setCleanupRunning] = useState(false);
+  const [cleanupMsg, setCleanupMsg] = useState<{ type: "ok" | "error"; text: string } | null>(null);
+  const API_BASE = import.meta.env.BASE_URL.replace(/\/$/, "").replace(/^\/[^/]+/, "") || "";
+  const cleanupApiBase = `${window.location.origin}${API_BASE}/api`;
+
+  useEffect(() => {
+    setCleanupLoading(true);
+    fetch(`${cleanupApiBase}/cleanup/status`)
+      .then((r) => r.json())
+      .then((d) => setCleanupStatus(d))
+      .catch(() => setCleanupStatus(null))
+      .finally(() => setCleanupLoading(false));
+  }, []);
+
+  const handleManualCleanup = async () => {
+    setCleanupRunning(true);
+    setCleanupMsg(null);
+    try {
+      const res = await fetch(`${cleanupApiBase}/cleanup/run`, { method: "POST" });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error || "Failed");
+      setCleanupMsg({ type: "ok", text: isAr ? "تم تنفيذ عملية التنظيف بنجاح" : "Cleanup sweep completed successfully" });
+      logActivity("settings_changed", "Manual cleanup sweep triggered", profile?.email ?? undefined);
+      // Refresh status
+      const statusRes = await fetch(`${cleanupApiBase}/cleanup/status`);
+      if (statusRes.ok) setCleanupStatus(await statusRes.json());
+    } catch (err: unknown) {
+      setCleanupMsg({ type: "error", text: err instanceof Error ? err.message : "Cleanup failed" });
+    } finally {
+      setCleanupRunning(false);
+      setTimeout(() => setCleanupMsg(null), 4000);
+    }
   };
 
   // ── Activity Logs ───────────────────────────────────────────
@@ -412,6 +452,98 @@ export default function SettingsPage() {
               </button>
             ))}
           </div>
+        </SectionCard>
+
+        {/* ── Auto Event Cleanup ─────────────────────────────── */}
+        <SectionCard title={isAr ? "حذف الفعاليات المنتهية تلقائياً" : "Auto-Delete Expired Events"} icon={CalendarX2}>
+          {/* Policy info row */}
+          <div className="flex flex-wrap gap-3">
+            <div className="flex items-center gap-2.5 flex-1 min-w-[140px] bg-amber-50 dark:bg-amber-900/20 border border-amber-200 dark:border-amber-800/40 rounded-xl px-3 py-2.5">
+              <Clock className="w-4 h-4 text-amber-600 dark:text-amber-400 shrink-0" />
+              <div>
+                <p className="text-xs font-semibold text-amber-700 dark:text-amber-300">
+                  {isAr ? "فترة السماح" : "Grace Period"}
+                </p>
+                <p className="text-sm font-bold text-amber-800 dark:text-amber-200">
+                  {isAr ? "٣ أيام" : "3 days"}
+                </p>
+              </div>
+            </div>
+            <div className="flex items-center gap-2.5 flex-1 min-w-[140px] bg-muted/50 border border-border rounded-xl px-3 py-2.5">
+              <RefreshCw className="w-4 h-4 text-muted-foreground shrink-0" />
+              <div>
+                <p className="text-xs font-semibold text-muted-foreground">
+                  {isAr ? "التشغيل التلقائي" : "Auto Sweep"}
+                </p>
+                <p className="text-sm font-bold text-foreground">
+                  {isAr ? "كل ٢٤ ساعة" : "Every 24 hours"}
+                </p>
+              </div>
+            </div>
+            <div className={cn(
+              "flex items-center gap-2.5 flex-1 min-w-[140px] border rounded-xl px-3 py-2.5",
+              cleanupLoading
+                ? "bg-muted/50 border-border"
+                : (cleanupStatus?.pendingDeletionCount ?? 0) > 0
+                  ? "bg-red-50 dark:bg-red-900/20 border-red-200 dark:border-red-800/40"
+                  : "bg-emerald-50 dark:bg-emerald-900/20 border-emerald-200 dark:border-emerald-800/40"
+            )}>
+              {cleanupLoading
+                ? <Loader2 className="w-4 h-4 animate-spin text-muted-foreground shrink-0" />
+                : (cleanupStatus?.pendingDeletionCount ?? 0) > 0
+                  ? <AlertTriangle className="w-4 h-4 text-red-600 dark:text-red-400 shrink-0" />
+                  : <CheckCircle2 className="w-4 h-4 text-emerald-600 dark:text-emerald-400 shrink-0" />}
+              <div>
+                <p className={cn("text-xs font-semibold",
+                  cleanupLoading ? "text-muted-foreground"
+                  : (cleanupStatus?.pendingDeletionCount ?? 0) > 0
+                    ? "text-red-700 dark:text-red-300"
+                    : "text-emerald-700 dark:text-emerald-300"
+                )}>
+                  {isAr ? "في انتظار الحذف" : "Pending Deletion"}
+                </p>
+                <p className={cn("text-sm font-bold",
+                  cleanupLoading ? "text-foreground"
+                  : (cleanupStatus?.pendingDeletionCount ?? 0) > 0
+                    ? "text-red-800 dark:text-red-200"
+                    : "text-emerald-800 dark:text-emerald-200"
+                )}>
+                  {cleanupLoading ? "…" : `${cleanupStatus?.pendingDeletionCount ?? 0} ${isAr ? "فعاليات" : "events"}`}
+                </p>
+              </div>
+            </div>
+          </div>
+
+          <p className="text-xs text-muted-foreground">
+            {isAr
+              ? "يتم حذف الفعاليات المنتهية تلقائياً بعد ٣ أيام من تاريخ انتهائها، بما في ذلك جميع تذاكرها وبيانات الكوادر المرتبطة بها."
+              : "Expired events are automatically deleted 3 days after their event date, including all associated tickets and staff assignments."}
+          </p>
+
+          {cleanupMsg && (
+            <div className={cn(
+              "flex items-center gap-2 text-sm rounded-xl px-3 py-2",
+              cleanupMsg.type === "ok"
+                ? "text-emerald-700 bg-emerald-50 dark:bg-emerald-900/20 dark:text-emerald-300"
+                : "text-destructive bg-destructive/10"
+            )}>
+              {cleanupMsg.type === "ok"
+                ? <CheckCircle2 className="w-4 h-4 shrink-0" />
+                : <AlertTriangle className="w-4 h-4 shrink-0" />}
+              {cleanupMsg.text}
+            </div>
+          )}
+
+          <Button
+            onClick={handleManualCleanup}
+            disabled={cleanupRunning}
+            variant="outline"
+            className="w-full h-10 rounded-xl border-amber-300 dark:border-amber-700 text-amber-700 dark:text-amber-400 hover:bg-amber-50 dark:hover:bg-amber-900/20 font-medium text-sm"
+          >
+            {cleanupRunning
+              ? <><Loader2 className="w-4 h-4 animate-spin" />{isAr ? "جارٍ التنظيف…" : "Running sweep…"}</>
+              : <><RefreshCw className="w-4 h-4" />{isAr ? "تشغيل التنظيف الآن" : "Run Cleanup Now"}</>}
+          </Button>
         </SectionCard>
 
         {/* ── Activity Logs ──────────────────────────────────── */}

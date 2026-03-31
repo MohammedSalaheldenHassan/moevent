@@ -1,5 +1,6 @@
 import app from "./app";
 import { logger } from "./lib/logger";
+import { deleteExpiredEvents } from "./lib/cleanup";
 
 const rawPort = process.env["PORT"];
 
@@ -22,4 +23,18 @@ app.listen(port, (err) => {
   }
 
   logger.info({ port }, "Server listening");
+
+  // Run once immediately on startup, then every 24 hours
+  deleteExpiredEvents().catch((e) =>
+    logger.error({ err: e instanceof Error ? e.message : String(e) }, "[cleanup] startup sweep failed")
+  );
+
+  const INTERVAL_MS = 24 * 60 * 60 * 1000; // 24 hours
+  setInterval(() => {
+    deleteExpiredEvents().catch((e) =>
+      logger.error({ err: e instanceof Error ? e.message : String(e) }, "[cleanup] scheduled sweep failed")
+    );
+  }, INTERVAL_MS);
+
+  logger.info({ intervalHours: 24 }, "[cleanup] Scheduler started");
 });
