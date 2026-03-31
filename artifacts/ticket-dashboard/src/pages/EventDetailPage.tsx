@@ -270,7 +270,7 @@ export default function EventDetailPage() {
       const qrContent = JSON.stringify({ ticketId: waTicket.id, event: event.title, customer: waTicket.customer_name });
       const ticketQr = await QRCode.toDataURL(qrContent, { width: 300, margin: 2, color: { dark: "#1e1b4b", light: "#ffffff" } });
 
-      // 2. Generate PDF
+      // 2. Generate PDF blob
       const pdfBlob = await generateTicketPdf({
         ticketId: waTicket.id,
         customerName: waTicket.customer_name,
@@ -284,24 +284,17 @@ export default function EventDetailPage() {
         systemName: systemName || "TicketHub",
       });
 
-      // 3. Upload PDF to Supabase Storage
-      const fileName = `ticket-pdfs/ticket-${waTicket.id}.pdf`;
-      const { error: uploadErr } = await supabase.storage
-        .from("event-images")
-        .upload(fileName, pdfBlob, { contentType: "application/pdf", upsert: true });
+      // 3. Auto-download the PDF to the device
+      const blobUrl = URL.createObjectURL(pdfBlob);
+      const a = document.createElement("a");
+      a.href = blobUrl;
+      a.download = `ticket-${waTicket.id.slice(0, 8).toUpperCase()}.pdf`;
+      document.body.appendChild(a);
+      a.click();
+      document.body.removeChild(a);
+      setTimeout(() => URL.revokeObjectURL(blobUrl), 5000);
 
-      let pdfUrl: string | null = null;
-      if (uploadErr) {
-        console.warn("[WhatsApp] PDF upload failed:", uploadErr.message);
-        setWaPdfError(isAr
-          ? "تعذّر رفع ملف PDF — سيتم الإرسال بدونه"
-          : "PDF upload failed — sending without PDF link");
-      } else {
-        const { data: urlData } = supabase.storage.from("event-images").getPublicUrl(fileName);
-        pdfUrl = urlData.publicUrl;
-      }
-
-      // 4. Build WhatsApp message
+      // 4. Build WhatsApp text message
       const msg = isAr
         ? [
             `🎫 *تذكرتك جاهزة!*`,
@@ -313,9 +306,8 @@ export default function EventDetailPage() {
             ``,
             `👤 الاسم: ${waTicket.customer_name}`,
             `🔖 رقم التذكرة: #${waTicket.id.slice(0, 8).toUpperCase()}`,
-            pdfUrl ? `` : "",
-            pdfUrl ? `📄 تحميل التذكرة PDF:` : "",
-            pdfUrl ? pdfUrl : "",
+            ``,
+            `📄 تم إرسال ملف PDF للتذكرة — يُرجى إرفاقه في المحادثة`,
             ``,
             `نتمنى لك وقتاً ممتعاً! 🎉`,
           ].filter(Boolean).join("\n")
@@ -329,14 +321,17 @@ export default function EventDetailPage() {
             ``,
             `👤 Name: ${waTicket.customer_name}`,
             `🔖 Ticket #: ${waTicket.id.slice(0, 8).toUpperCase()}`,
-            pdfUrl ? `` : "",
-            pdfUrl ? `📄 Download your ticket PDF:` : "",
-            pdfUrl ? pdfUrl : "",
+            ``,
+            `📄 Your ticket PDF has been downloaded — please attach it to this chat`,
             ``,
             `Enjoy the event! 🎉`,
           ].filter(Boolean).join("\n");
 
-      window.open(`https://wa.me/${full}?text=${encodeURIComponent(msg)}`, "_blank");
+      // 5. Open WhatsApp — small delay so browser processes the download first
+      setTimeout(() => {
+        window.open(`https://wa.me/${full}?text=${encodeURIComponent(msg)}`, "_blank");
+      }, 400);
+
       setWaTicket(null);
     } catch (err: unknown) {
       setWaPdfError(err instanceof Error ? err.message : "Something went wrong");
@@ -1045,7 +1040,7 @@ export default function EventDetailPage() {
               <div className="flex items-center gap-2.5 text-sm text-muted-foreground bg-muted/50 rounded-xl px-3 py-2.5">
                 <Loader2 className="w-4 h-4 animate-spin shrink-0 text-green-600" />
                 <span className="text-xs">
-                  {isAr ? "جارٍ إنشاء ملف PDF ورفعه…" : "Generating & uploading PDF ticket…"}
+                  {isAr ? "جارٍ إنشاء ملف PDF للتنزيل…" : "Generating PDF ticket for download…"}
                 </span>
               </div>
             )}
