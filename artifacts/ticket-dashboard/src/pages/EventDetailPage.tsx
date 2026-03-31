@@ -15,6 +15,7 @@ import {
 import { format } from "date-fns";
 import { cn } from "@/lib/utils";
 import QRCode from "qrcode";
+import { generateTicketPdf } from "@/lib/ticketPdf";
 
 interface Event {
   id: string;
@@ -236,57 +237,112 @@ export default function EventDetailPage() {
   const [waTicket, setWaTicket] = useState<TicketRow | null>(null);
   const [waPhone, setWaPhone] = useState("");
   const [waDialCode, setWaDialCode] = useState("+250");
+  const [waPdfLoading, setWaPdfLoading] = useState(false);
+  const [waPdfError, setWaPdfError] = useState<string | null>(null);
 
   const openWhatsApp = (tk: TicketRow, e: React.MouseEvent) => {
     e.stopPropagation();
     setWaTicket(tk);
-    // Pre-fill phone but strip any leading country code / + sign
+    setWaPdfError(null);
     const raw = (tk.customer_phone ?? "").replace(/^\+?\d{1,4}[\s-]?/, "").replace(/\D/g, "");
     setWaPhone(raw || (tk.customer_phone ?? "").replace(/\D/g, ""));
   };
 
-  const sendWhatsApp = () => {
+  const sendWhatsApp = async () => {
     if (!waTicket || !event) return;
-    // Strip all non-digits, remove leading zero
     const digits = waPhone.replace(/\D/g, "").replace(/^0+/, "");
     if (!digits) return;
     const dialDigits = waDialCode.replace(/\D/g, "");
     const full = dialDigits + digits;
+
+    setWaPdfLoading(true);
+    setWaPdfError(null);
+
     const dateStr = event.event_date
-      ? new Date(event.event_date).toLocaleDateString(isAr ? "ar-SA" : "en-US", { year: "numeric", month: "long", day: "numeric" })
+      ? new Date(event.event_date).toLocaleDateString("en-US", { year: "numeric", month: "long", day: "numeric" })
       : "";
     const priceStr = event.price != null
-      ? (event.price === 0 ? (isAr ? "مجاني" : "Free") : `RWF ${event.price.toLocaleString()}`)
+      ? (event.price === 0 ? "Free" : `RWF ${event.price.toLocaleString()}`)
       : "";
-    const msg = isAr
-      ? [
-          `🎫 *تذكرتك جاهزة!*`,
-          ``,
-          `📅 الفعالية: *${event.title}*`,
-          dateStr ? `🗓️ التاريخ: ${dateStr}` : "",
-          event.location ? `📍 الموقع: ${event.location}` : "",
-          priceStr ? `💰 السعر: ${priceStr}` : "",
-          ``,
-          `👤 الاسم: ${waTicket.customer_name}`,
-          `🔖 رقم التذكرة: #${waTicket.id.slice(0, 8).toUpperCase()}`,
-          ``,
-          `نتمنى لك وقتاً ممتعاً! 🎉`,
-        ].filter(Boolean).join("\n")
-      : [
-          `🎫 *Your Ticket is Ready!*`,
-          ``,
-          `📅 Event: *${event.title}*`,
-          dateStr ? `🗓️ Date: ${dateStr}` : "",
-          event.location ? `📍 Location: ${event.location}` : "",
-          priceStr ? `💰 Price: ${priceStr}` : "",
-          ``,
-          `👤 Name: ${waTicket.customer_name}`,
-          `🔖 Ticket #: ${waTicket.id.slice(0, 8).toUpperCase()}`,
-          ``,
-          `Enjoy the event! 🎉`,
-        ].filter(Boolean).join("\n");
-    window.open(`https://wa.me/${full}?text=${encodeURIComponent(msg)}`, "_blank");
-    setWaTicket(null);
+
+    try {
+      // 1. Generate QR code for this ticket
+      const qrContent = JSON.stringify({ ticketId: waTicket.id, event: event.title, customer: waTicket.customer_name });
+      const ticketQr = await QRCode.toDataURL(qrContent, { width: 300, margin: 2, color: { dark: "#1e1b4b", light: "#ffffff" } });
+
+      // 2. Generate PDF
+      const pdfBlob = await generateTicketPdf({
+        ticketId: waTicket.id,
+        customerName: waTicket.customer_name,
+        customerPhone: waTicket.customer_phone,
+        isScanned: waTicket.is_scanned,
+        eventTitle: event.title,
+        eventDate: event.event_date,
+        eventLocation: event.location,
+        eventPrice: event.price,
+        qrDataUrl: ticketQr,
+        systemName: systemName || "TicketHub",
+      });
+
+      // 3. Upload PDF to Supabase Storage
+      const fileName = `ticket-pdfs/ticket-${waTicket.id}.pdf`;
+      const { error: uploadErr } = await supabase.storage
+        .from("event-images")
+        .upload(fileName, pdfBlob, { contentType: "application/pdf", upsert: true });
+
+      let pdfUrl: string | null = null;
+      if (uploadErr) {
+        console.warn("[WhatsApp] PDF upload failed:", uploadErr.message);
+        setWaPdfError(isAr
+          ? "تعذّر رفع ملف PDF — سيتم الإرسال بدونه"
+          : "PDF upload failed — sending without PDF link");
+      } else {
+        const { data: urlData } = supabase.storage.from("event-images").getPublicUrl(fileName);
+        pdfUrl = urlData.publicUrl;
+      }
+
+      // 4. Build WhatsApp message
+      const msg = isAr
+        ? [
+            `🎫 *تذكرتك جاهزة!*`,
+            ``,
+            `📅 الفعالية: *${event.title}*`,
+            dateStr ? `🗓️ التاريخ: ${dateStr}` : "",
+            event.location ? `📍 الموقع: ${event.location}` : "",
+            priceStr ? `💰 السعر: ${priceStr}` : "",
+            ``,
+            `👤 الاسم: ${waTicket.customer_name}`,
+            `🔖 رقم التذكرة: #${waTicket.id.slice(0, 8).toUpperCase()}`,
+            pdfUrl ? `` : "",
+            pdfUrl ? `📄 تحميل التذكرة PDF:` : "",
+            pdfUrl ? pdfUrl : "",
+            ``,
+            `نتمنى لك وقتاً ممتعاً! 🎉`,
+          ].filter(Boolean).join("\n")
+        : [
+            `🎫 *Your Ticket is Ready!*`,
+            ``,
+            `📅 Event: *${event.title}*`,
+            dateStr ? `🗓️ Date: ${dateStr}` : "",
+            event.location ? `📍 Location: ${event.location}` : "",
+            priceStr ? `💰 Price: ${priceStr}` : "",
+            ``,
+            `👤 Name: ${waTicket.customer_name}`,
+            `🔖 Ticket #: ${waTicket.id.slice(0, 8).toUpperCase()}`,
+            pdfUrl ? `` : "",
+            pdfUrl ? `📄 Download your ticket PDF:` : "",
+            pdfUrl ? pdfUrl : "",
+            ``,
+            `Enjoy the event! 🎉`,
+          ].filter(Boolean).join("\n");
+
+      window.open(`https://wa.me/${full}?text=${encodeURIComponent(msg)}`, "_blank");
+      setWaTicket(null);
+    } catch (err: unknown) {
+      setWaPdfError(err instanceof Error ? err.message : "Something went wrong");
+    } finally {
+      setWaPdfLoading(false);
+    }
   };
 
   // ── Assigned Staff ────────────────────────────────────────────
@@ -984,21 +1040,41 @@ export default function EventDetailPage() {
               </p>
             </div>
 
+            {/* PDF loading info */}
+            {waPdfLoading && (
+              <div className="flex items-center gap-2.5 text-sm text-muted-foreground bg-muted/50 rounded-xl px-3 py-2.5">
+                <Loader2 className="w-4 h-4 animate-spin shrink-0 text-green-600" />
+                <span className="text-xs">
+                  {isAr ? "جارٍ إنشاء ملف PDF ورفعه…" : "Generating & uploading PDF ticket…"}
+                </span>
+              </div>
+            )}
+
+            {/* PDF error (non-blocking) */}
+            {waPdfError && !waPdfLoading && (
+              <div className="flex items-start gap-2 text-xs text-amber-700 dark:text-amber-300 bg-amber-50 dark:bg-amber-900/20 rounded-xl px-3 py-2">
+                <AlertCircle className="w-3.5 h-3.5 shrink-0 mt-0.5" />
+                {waPdfError}
+              </div>
+            )}
+
             <div className="flex gap-2">
               <Button
                 variant="outline"
+                disabled={waPdfLoading}
                 className="flex-1 h-10 rounded-xl text-sm"
                 onClick={() => setWaTicket(null)}
               >
                 {isAr ? "إلغاء" : "Cancel"}
               </Button>
               <Button
-                disabled={!waPhone.replace(/\D/g, "").replace(/^0+/, "")}
+                disabled={!waPhone.replace(/\D/g, "").replace(/^0+/, "") || waPdfLoading}
                 onClick={sendWhatsApp}
                 className="flex-1 h-10 rounded-xl bg-gradient-to-r from-green-500 to-emerald-600 hover:from-green-600 hover:to-emerald-700 border-0 text-white font-semibold text-sm"
               >
-                <MessageCircle className="w-4 h-4" />
-                {isAr ? "فتح واتساب" : "Open WhatsApp"}
+                {waPdfLoading
+                  ? <><Loader2 className="w-4 h-4 animate-spin" />{isAr ? "جارٍ التحضير…" : "Preparing…"}</>
+                  : <><MessageCircle className="w-4 h-4" />{isAr ? "إرسال مع PDF" : "Send with PDF"}</>}
               </Button>
             </div>
           </div>
