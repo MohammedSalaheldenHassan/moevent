@@ -48,6 +48,168 @@ interface AccessRow {
 
 type Filter = "all" | "scanned" | "not_scanned";
 
+const DIAL_CODES = [
+  { code: "+93",  flag: "🇦🇫", name: "Afghanistan" },
+  { code: "+355", flag: "🇦🇱", name: "Albania" },
+  { code: "+213", flag: "🇩🇿", name: "Algeria" },
+  { code: "+376", flag: "🇦🇩", name: "Andorra" },
+  { code: "+244", flag: "🇦🇴", name: "Angola" },
+  { code: "+54",  flag: "🇦🇷", name: "Argentina" },
+  { code: "+374", flag: "🇦🇲", name: "Armenia" },
+  { code: "+61",  flag: "🇦🇺", name: "Australia" },
+  { code: "+43",  flag: "🇦🇹", name: "Austria" },
+  { code: "+994", flag: "🇦🇿", name: "Azerbaijan" },
+  { code: "+973", flag: "🇧🇭", name: "Bahrain" },
+  { code: "+880", flag: "🇧🇩", name: "Bangladesh" },
+  { code: "+32",  flag: "🇧🇪", name: "Belgium" },
+  { code: "+229", flag: "🇧🇯", name: "Benin" },
+  { code: "+975", flag: "🇧🇹", name: "Bhutan" },
+  { code: "+591", flag: "🇧🇴", name: "Bolivia" },
+  { code: "+387", flag: "🇧🇦", name: "Bosnia" },
+  { code: "+267", flag: "🇧🇼", name: "Botswana" },
+  { code: "+55",  flag: "🇧🇷", name: "Brazil" },
+  { code: "+226", flag: "🇧🇫", name: "Burkina Faso" },
+  { code: "+257", flag: "🇧🇮", name: "Burundi" },
+  { code: "+855", flag: "🇰🇭", name: "Cambodia" },
+  { code: "+237", flag: "🇨🇲", name: "Cameroon" },
+  { code: "+1",   flag: "🇨🇦", name: "Canada" },
+  { code: "+236", flag: "🇨🇫", name: "Central African Rep." },
+  { code: "+235", flag: "🇹🇩", name: "Chad" },
+  { code: "+56",  flag: "🇨🇱", name: "Chile" },
+  { code: "+86",  flag: "🇨🇳", name: "China" },
+  { code: "+57",  flag: "🇨🇴", name: "Colombia" },
+  { code: "+269", flag: "🇰🇲", name: "Comoros" },
+  { code: "+242", flag: "🇨🇬", name: "Congo" },
+  { code: "+243", flag: "🇨🇩", name: "Congo (DRC)" },
+  { code: "+506", flag: "🇨🇷", name: "Costa Rica" },
+  { code: "+225", flag: "🇨🇮", name: "Côte d'Ivoire" },
+  { code: "+385", flag: "🇭🇷", name: "Croatia" },
+  { code: "+53",  flag: "🇨🇺", name: "Cuba" },
+  { code: "+357", flag: "🇨🇾", name: "Cyprus" },
+  { code: "+420", flag: "🇨🇿", name: "Czech Republic" },
+  { code: "+45",  flag: "🇩🇰", name: "Denmark" },
+  { code: "+253", flag: "🇩🇯", name: "Djibouti" },
+  { code: "+593", flag: "🇪🇨", name: "Ecuador" },
+  { code: "+20",  flag: "🇪🇬", name: "Egypt" },
+  { code: "+503", flag: "🇸🇻", name: "El Salvador" },
+  { code: "+240", flag: "🇬🇶", name: "Equatorial Guinea" },
+  { code: "+291", flag: "🇪🇷", name: "Eritrea" },
+  { code: "+372", flag: "🇪🇪", name: "Estonia" },
+  { code: "+268", flag: "🇸🇿", name: "Eswatini" },
+  { code: "+251", flag: "🇪🇹", name: "Ethiopia" },
+  { code: "+679", flag: "🇫🇯", name: "Fiji" },
+  { code: "+358", flag: "🇫🇮", name: "Finland" },
+  { code: "+33",  flag: "🇫🇷", name: "France" },
+  { code: "+241", flag: "🇬🇦", name: "Gabon" },
+  { code: "+220", flag: "🇬🇲", name: "Gambia" },
+  { code: "+995", flag: "🇬🇪", name: "Georgia" },
+  { code: "+49",  flag: "🇩🇪", name: "Germany" },
+  { code: "+233", flag: "🇬🇭", name: "Ghana" },
+  { code: "+30",  flag: "🇬🇷", name: "Greece" },
+  { code: "+502", flag: "🇬🇹", name: "Guatemala" },
+  { code: "+224", flag: "🇬🇳", name: "Guinea" },
+  { code: "+245", flag: "🇬🇼", name: "Guinea-Bissau" },
+  { code: "+592", flag: "🇬🇾", name: "Guyana" },
+  { code: "+509", flag: "🇭🇹", name: "Haiti" },
+  { code: "+504", flag: "🇭🇳", name: "Honduras" },
+  { code: "+36",  flag: "🇭🇺", name: "Hungary" },
+  { code: "+354", flag: "🇮🇸", name: "Iceland" },
+  { code: "+91",  flag: "🇮🇳", name: "India" },
+  { code: "+62",  flag: "🇮🇩", name: "Indonesia" },
+  { code: "+98",  flag: "🇮🇷", name: "Iran" },
+  { code: "+964", flag: "🇮🇶", name: "Iraq" },
+  { code: "+353", flag: "🇮🇪", name: "Ireland" },
+  { code: "+972", flag: "🇮🇱", name: "Israel" },
+  { code: "+39",  flag: "🇮🇹", name: "Italy" },
+  { code: "+1876",flag: "🇯🇲", name: "Jamaica" },
+  { code: "+81",  flag: "🇯🇵", name: "Japan" },
+  { code: "+962", flag: "🇯🇴", name: "Jordan" },
+  { code: "+7",   flag: "🇰🇿", name: "Kazakhstan" },
+  { code: "+254", flag: "🇰🇪", name: "Kenya" },
+  { code: "+965", flag: "🇰🇼", name: "Kuwait" },
+  { code: "+996", flag: "🇰🇬", name: "Kyrgyzstan" },
+  { code: "+856", flag: "🇱🇦", name: "Laos" },
+  { code: "+371", flag: "🇱🇻", name: "Latvia" },
+  { code: "+961", flag: "🇱🇧", name: "Lebanon" },
+  { code: "+266", flag: "🇱🇸", name: "Lesotho" },
+  { code: "+231", flag: "🇱🇷", name: "Liberia" },
+  { code: "+218", flag: "🇱🇾", name: "Libya" },
+  { code: "+370", flag: "🇱🇹", name: "Lithuania" },
+  { code: "+352", flag: "🇱🇺", name: "Luxembourg" },
+  { code: "+261", flag: "🇲🇬", name: "Madagascar" },
+  { code: "+265", flag: "🇲🇼", name: "Malawi" },
+  { code: "+60",  flag: "🇲🇾", name: "Malaysia" },
+  { code: "+960", flag: "🇲🇻", name: "Maldives" },
+  { code: "+223", flag: "🇲🇱", name: "Mali" },
+  { code: "+356", flag: "🇲🇹", name: "Malta" },
+  { code: "+222", flag: "🇲🇷", name: "Mauritania" },
+  { code: "+230", flag: "🇲🇺", name: "Mauritius" },
+  { code: "+52",  flag: "🇲🇽", name: "Mexico" },
+  { code: "+373", flag: "🇲🇩", name: "Moldova" },
+  { code: "+976", flag: "🇲🇳", name: "Mongolia" },
+  { code: "+382", flag: "🇲🇪", name: "Montenegro" },
+  { code: "+212", flag: "🇲🇦", name: "Morocco" },
+  { code: "+258", flag: "🇲🇿", name: "Mozambique" },
+  { code: "+264", flag: "🇳🇦", name: "Namibia" },
+  { code: "+977", flag: "🇳🇵", name: "Nepal" },
+  { code: "+31",  flag: "🇳🇱", name: "Netherlands" },
+  { code: "+64",  flag: "🇳🇿", name: "New Zealand" },
+  { code: "+505", flag: "🇳🇮", name: "Nicaragua" },
+  { code: "+227", flag: "🇳🇪", name: "Niger" },
+  { code: "+234", flag: "🇳🇬", name: "Nigeria" },
+  { code: "+47",  flag: "🇳🇴", name: "Norway" },
+  { code: "+968", flag: "🇴🇲", name: "Oman" },
+  { code: "+92",  flag: "🇵🇰", name: "Pakistan" },
+  { code: "+507", flag: "🇵🇦", name: "Panama" },
+  { code: "+675", flag: "🇵🇬", name: "Papua New Guinea" },
+  { code: "+595", flag: "🇵🇾", name: "Paraguay" },
+  { code: "+51",  flag: "🇵🇪", name: "Peru" },
+  { code: "+63",  flag: "🇵🇭", name: "Philippines" },
+  { code: "+48",  flag: "🇵🇱", name: "Poland" },
+  { code: "+351", flag: "🇵🇹", name: "Portugal" },
+  { code: "+974", flag: "🇶🇦", name: "Qatar" },
+  { code: "+40",  flag: "🇷🇴", name: "Romania" },
+  { code: "+7",   flag: "🇷🇺", name: "Russia" },
+  { code: "+250", flag: "🇷🇼", name: "Rwanda" },
+  { code: "+966", flag: "🇸🇦", name: "Saudi Arabia" },
+  { code: "+221", flag: "🇸🇳", name: "Senegal" },
+  { code: "+381", flag: "🇷🇸", name: "Serbia" },
+  { code: "+232", flag: "🇸🇱", name: "Sierra Leone" },
+  { code: "+65",  flag: "🇸🇬", name: "Singapore" },
+  { code: "+421", flag: "🇸🇰", name: "Slovakia" },
+  { code: "+386", flag: "🇸🇮", name: "Slovenia" },
+  { code: "+252", flag: "🇸🇴", name: "Somalia" },
+  { code: "+27",  flag: "🇿🇦", name: "South Africa" },
+  { code: "+211", flag: "🇸🇸", name: "South Sudan" },
+  { code: "+34",  flag: "🇪🇸", name: "Spain" },
+  { code: "+94",  flag: "🇱🇰", name: "Sri Lanka" },
+  { code: "+249", flag: "🇸🇩", name: "Sudan" },
+  { code: "+597", flag: "🇸🇷", name: "Suriname" },
+  { code: "+46",  flag: "🇸🇪", name: "Sweden" },
+  { code: "+41",  flag: "🇨🇭", name: "Switzerland" },
+  { code: "+963", flag: "🇸🇾", name: "Syria" },
+  { code: "+886", flag: "🇹🇼", name: "Taiwan" },
+  { code: "+992", flag: "🇹🇯", name: "Tajikistan" },
+  { code: "+255", flag: "🇹🇿", name: "Tanzania" },
+  { code: "+66",  flag: "🇹🇭", name: "Thailand" },
+  { code: "+228", flag: "🇹🇬", name: "Togo" },
+  { code: "+216", flag: "🇹🇳", name: "Tunisia" },
+  { code: "+90",  flag: "🇹🇷", name: "Turkey" },
+  { code: "+993", flag: "🇹🇲", name: "Turkmenistan" },
+  { code: "+256", flag: "🇺🇬", name: "Uganda" },
+  { code: "+380", flag: "🇺🇦", name: "Ukraine" },
+  { code: "+971", flag: "🇦🇪", name: "UAE" },
+  { code: "+44",  flag: "🇬🇧", name: "United Kingdom" },
+  { code: "+1",   flag: "🇺🇸", name: "United States" },
+  { code: "+598", flag: "🇺🇾", name: "Uruguay" },
+  { code: "+998", flag: "🇺🇿", name: "Uzbekistan" },
+  { code: "+58",  flag: "🇻🇪", name: "Venezuela" },
+  { code: "+84",  flag: "🇻🇳", name: "Vietnam" },
+  { code: "+967", flag: "🇾🇪", name: "Yemen" },
+  { code: "+260", flag: "🇿🇲", name: "Zambia" },
+  { code: "+263", flag: "🇿🇼", name: "Zimbabwe" },
+];
+
 export default function EventDetailPage() {
   const params = useParams<{ id: string }>();
   const id = params?.id;
@@ -73,17 +235,23 @@ export default function EventDetailPage() {
   // ── WhatsApp Send ─────────────────────────────────────────────
   const [waTicket, setWaTicket] = useState<TicketRow | null>(null);
   const [waPhone, setWaPhone] = useState("");
+  const [waDialCode, setWaDialCode] = useState("+250");
 
   const openWhatsApp = (tk: TicketRow, e: React.MouseEvent) => {
     e.stopPropagation();
     setWaTicket(tk);
-    setWaPhone(tk.customer_phone ?? "");
+    // Pre-fill phone but strip any leading country code / + sign
+    const raw = (tk.customer_phone ?? "").replace(/^\+?\d{1,4}[\s-]?/, "").replace(/\D/g, "");
+    setWaPhone(raw || (tk.customer_phone ?? "").replace(/\D/g, ""));
   };
 
   const sendWhatsApp = () => {
     if (!waTicket || !event) return;
-    const raw = waPhone.replace(/[\s\-().+]/g, "");
-    if (!raw) return;
+    // Strip all non-digits, remove leading zero
+    const digits = waPhone.replace(/\D/g, "").replace(/^0+/, "");
+    if (!digits) return;
+    const dialDigits = waDialCode.replace(/\D/g, "");
+    const full = dialDigits + digits;
     const dateStr = event.event_date
       ? new Date(event.event_date).toLocaleDateString(isAr ? "ar-SA" : "en-US", { year: "numeric", month: "long", day: "numeric" })
       : "";
@@ -117,7 +285,7 @@ export default function EventDetailPage() {
           ``,
           `Enjoy the event! 🎉`,
         ].filter(Boolean).join("\n");
-    window.open(`https://wa.me/${raw}?text=${encodeURIComponent(msg)}`, "_blank");
+    window.open(`https://wa.me/${full}?text=${encodeURIComponent(msg)}`, "_blank");
     setWaTicket(null);
   };
 
@@ -770,19 +938,49 @@ export default function EventDetailPage() {
                 <Phone className="w-3.5 h-3.5" />
                 {isAr ? "رقم واتساب المستقبل" : "Recipient WhatsApp Number"}
               </label>
-              <Input
-                value={waPhone}
-                onChange={(e) => setWaPhone(e.target.value)}
-                placeholder={isAr ? "مثال: 250788123456" : "e.g. 250788123456"}
-                className="h-11 rounded-xl text-sm font-mono"
-                dir="ltr"
-                type="tel"
-                onKeyDown={(e) => e.key === "Enter" && sendWhatsApp()}
-              />
+
+              {/* Country code + phone input row */}
+              <div className="flex gap-2" dir="ltr">
+                <select
+                  value={waDialCode}
+                  onChange={(e) => setWaDialCode(e.target.value)}
+                  className="h-11 rounded-xl border border-border bg-background text-sm px-2 text-foreground focus:outline-none focus:ring-2 focus:ring-green-500/30 shrink-0 w-[110px] font-mono"
+                >
+                  {DIAL_CODES.map((c, i) => (
+                    <option key={`${c.code}-${c.name}-${i}`} value={c.code}>
+                      {c.flag} {c.code}
+                    </option>
+                  ))}
+                </select>
+                <Input
+                  value={waPhone}
+                  onChange={(e) => setWaPhone(e.target.value)}
+                  placeholder={isAr ? "788 123 456" : "788 123 456"}
+                  className="h-11 rounded-xl text-sm font-mono flex-1"
+                  dir="ltr"
+                  type="tel"
+                  onKeyDown={(e) => e.key === "Enter" && sendWhatsApp()}
+                />
+              </div>
+
+              {/* Live preview of full number */}
+              {(waPhone.replace(/\D/g, "").replace(/^0+/, "")) && (
+                <p className="text-[11px] text-muted-foreground font-mono flex items-center gap-1.5">
+                  <span className="text-green-600 dark:text-green-400 font-semibold">wa.me/</span>
+                  {waDialCode.replace(/\D/g, "")}{waPhone.replace(/\D/g, "").replace(/^0+/, "")}
+                </p>
+              )}
+
+              {/* Country name hint */}
               <p className="text-[11px] text-muted-foreground">
-                {isAr
-                  ? "أدخل الرقم بدون رمز + (مثال: 250788123456)"
-                  : "Enter without the + sign (e.g. 250788123456)"}
+                {(() => {
+                  const found = DIAL_CODES.find((c) => c.code === waDialCode);
+                  return found
+                    ? `${found.flag} ${found.name} (${found.code})`
+                    : waDialCode;
+                })()}
+                {" · "}
+                {isAr ? "أدخل الرقم بدون الصفر الأول" : "Enter number without leading zero"}
               </p>
             </div>
 
@@ -795,7 +993,7 @@ export default function EventDetailPage() {
                 {isAr ? "إلغاء" : "Cancel"}
               </Button>
               <Button
-                disabled={!waPhone.trim()}
+                disabled={!waPhone.replace(/\D/g, "").replace(/^0+/, "")}
                 onClick={sendWhatsApp}
                 className="flex-1 h-10 rounded-xl bg-gradient-to-r from-green-500 to-emerald-600 hover:from-green-600 hover:to-emerald-700 border-0 text-white font-semibold text-sm"
               >
