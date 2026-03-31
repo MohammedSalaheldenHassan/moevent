@@ -170,6 +170,10 @@ export default function EventsPage() {
   };
 
   const handleSave = async () => {
+    if (!imageFile && !currentImageUrl) {
+      setFormError(isAr ? "صورة الفعالية مطلوبة" : "Event image is required");
+      return;
+    }
     if (!form.title.trim()) {
       setFormError(isAr ? "عنوان الفعالية مطلوب" : "Event title is required");
       return;
@@ -500,7 +504,7 @@ export default function EventsPage() {
               <Label className="font-semibold text-sm flex items-center gap-1.5">
                 <ImageIcon className="w-3.5 h-3.5 text-primary" />
                 {isAr ? "صورة الفعالية" : "Event Image"}
-                <span className="text-xs text-muted-foreground font-normal">({isAr ? "اختياري" : "optional"})</span>
+                <span className="text-destructive">*</span>
               </Label>
               <input ref={imgInputRef} type="file" accept="image/*" className="hidden" onChange={handleImageChange} />
               {(imagePreview || currentImageUrl) ? (
