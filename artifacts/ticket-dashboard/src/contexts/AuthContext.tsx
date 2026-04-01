@@ -72,9 +72,9 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         const p = await fetchProfileFromSupabase(sess.user.id);
         if (!mountedRef.current) return;
 
-        // Block staff from accessing the dashboard on session restore
-        if (p?.role === "staff") {
-          console.warn("[AuthContext] Staff user detected on session restore — signing out");
+        // Only admins can access the dashboard — sign out everyone else
+        if (!p || p.role !== "admin") {
+          console.warn("[AuthContext] Non-admin user detected on session restore — signing out");
           await supabase.auth.signOut();
           return;
         }
@@ -110,12 +110,12 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
           };
         }
 
-        // Block staff from logging in
-        if (p.role === "staff") {
+        // Only admins can log in
+        if (p.role !== "admin") {
           await supabase.auth.signOut();
           return {
             error:
-              "Access denied. Staff accounts cannot access this dashboard.",
+              "Access denied. Only admin accounts can access this dashboard.",
           };
         }
 
