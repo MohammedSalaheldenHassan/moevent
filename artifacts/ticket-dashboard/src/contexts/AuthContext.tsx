@@ -62,11 +62,16 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         console.log("[AuthContext] auth event:", event, "user:", sess?.user?.email ?? "none");
 
         if (event === "SIGNED_OUT" || !sess?.user) {
-          setUser(null);
-          setSession(null);
-          setProfile(null);
-          setLoading(false);
-          clearTimeout(safetyTimer);
+          // If signIn() triggered this sign-out internally (to reject a non-admin),
+          // don't touch React state here — signIn() owns the flow and the LoginPage
+          // must not be remounted (which would wipe the error message).
+          if (!signingInRef.current) {
+            setUser(null);
+            setSession(null);
+            setProfile(null);
+            setLoading(false);
+            clearTimeout(safetyTimer);
+          }
           return;
         }
 
