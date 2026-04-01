@@ -12,7 +12,7 @@ import { AuthContext, type Profile } from "./authContextObject";
 function fetchProfileFromSupabase(userId: string, timeoutMs = 3000): Promise<Profile | null> {
   const timeout = new Promise<null>((resolve) =>
     setTimeout(() => {
-      console.warn("[AuthContext] profile fetch timed out — allowing access without profile");
+      console.warn("[AuthContext] profile fetch timed out — denying access (cannot verify admin role)");
       resolve(null);
     }, timeoutMs)
   );
@@ -66,9 +66,6 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
           return;
         }
 
-        setSession(sess);
-        setUser(sess.user);
-
         const p = await fetchProfileFromSupabase(sess.user.id);
         if (!mountedRef.current) return;
 
@@ -79,6 +76,9 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
           return;
         }
 
+        // Only set state after confirming admin role
+        setSession(sess);
+        setUser(sess.user);
         setProfile(p);
         if (mountedRef.current) setLoading(false);
         clearTimeout(safetyTimer);
