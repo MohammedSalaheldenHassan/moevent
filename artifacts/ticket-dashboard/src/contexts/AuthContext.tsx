@@ -9,29 +9,27 @@ import { AuthContext, type Profile } from "./authContextObject";
 // This three-file split lets Vite Fast Refresh each piece independently,
 // eliminating the "Invalid hook call" HMR crash.
 
-function fetchProfileFromSupabase(userId: string, timeoutMs = 5000): Promise<Profile | null> {
-  const timeout = new Promise<null>((resolve) =>
-    setTimeout(() => {
-      console.warn("[AuthContext] profile fetch timed out — cannot verify admin role");
-      resolve(null);
-    }, timeoutMs)
-  );
-
-  const fetch = supabase
-    .from("profiles")
-    .select("id, role, full_name, email")
-    .eq("id", userId)
-    .single()
-    .then(({ data, error }) => {
-      if (error) {
-        console.warn("[AuthContext] profile fetch error:", error.message);
-        return null;
-      }
-      return data as Profile;
-    })
-    .catch(() => null);
-
-  return Promise.race([fetch, timeout]);
+// Fetch the user's profile from the API server using their access token.
+// Using the API server (with the service-role key) avoids browser-to-Supabase
+// connectivity issues that cause timeouts when querying the profiles table directly.
+async function fetchProfileFromApi(accessToken: string): Promise<Profile | null> {
+  try {
+    const apiBase = `${window.location.origin}/api`;
+    const res = await fetch(`${apiBase}/auth/role`, {
+      headers: { Authorization: `Bearer ${accessToken}` },
+      cache: "no-store",
+      signal: AbortSignal.timeout(8000),
+    });
+    if (!res.ok) {
+      console.warn("[AuthContext] role API returned", res.status);
+      return null;
+    }
+    const data = await res.json() as Profile;
+    return data;
+  } catch (err) {
+    console.warn("[AuthContext] role API error:", err);
+    return null;
+  }
 }
 
 export function AuthProvider({ children }: { children: React.ReactNode }) {
@@ -48,13 +46,13 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   useEffect(() => {
     mountedRef.current = true;
 
-    // Safety net: never stay loading more than 8 seconds
+    // Safety net: never stay loading more than 12 seconds
     const safetyTimer = setTimeout(() => {
       if (mountedRef.current) {
         console.warn("[AuthContext] Safety timer fired — forcing loading=false");
         setLoading(false);
       }
-    }, 8000);
+    }, 12000);
 
     const { data: { subscription } } = supabase.auth.onAuthStateChange(
       async (event, sess) => {
@@ -76,8 +74,6 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         }
 
         // signIn() is actively handling this login — don't interfere.
-        // It performs its own role check and sets state on success, or
-        // signs out and returns an error on failure.
         if (signingInRef.current) return;
 
         // TOKEN_REFRESHED: user is already authenticated as admin, just update session.
@@ -86,8 +82,8 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
           return;
         }
 
-        // INITIAL_SESSION (page restore / refresh): verify admin role before allowing in.
-        const p = await fetchProfileFromSupabase(sess.user.id);
+        // INITIAL_SESSION / SIGNED_IN (page restore): verify admin role before allowing in.
+        const p = await fetchProfileFromApi(sess.access_token);
         if (!mountedRef.current) return;
 
         if (!p || p.role !== "admin") {
@@ -118,12 +114,12 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       if (error) return { error: error.message };
 
       if (data.user && data.session) {
-        const p = await fetchProfileFromSupabase(data.user.id, 7000);
+        const p = await fetchProfileFromApi(data.session.access_token);
 
         if (p === null) {
           await supabase.auth.signOut();
           return {
-            error: "The server is starting up — please wait a few seconds and try again.",
+            error: "Unable to verify account — please try again.",
           };
         }
 
