@@ -514,6 +514,13 @@ export default function EventDetailPage() {
 
   const scannedCount = tickets.filter((tk) => tk.is_scanned).length;
   const attendanceRate = tickets.length > 0 ? Math.round((scannedCount / tickets.length) * 100) : 0;
+  const totalRevenue = event?.price != null ? tickets.length * event.price : null;
+  const totalRevenueStr =
+    totalRevenue === null
+      ? "—"
+      : totalRevenue === 0
+        ? (isAr ? "مجاني" : "Free")
+        : `RWF ${totalRevenue.toLocaleString()}`;
 
   const timeAgo = (iso: string) => {
     const diff = Date.now() - new Date(iso).getTime();
@@ -610,15 +617,16 @@ export default function EventDetailPage() {
               </div>
 
               {/* Quick stats */}
-              <div className="grid grid-cols-3 gap-3">
+              <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
                 {[
-                  { label: t.totalTickets, value: tickets.length, icon: Ticket },
-                  { label: t.scanned, value: scannedCount, icon: CheckCircle2 },
-                  { label: isAr ? "نسبة الحضور" : "Attendance", value: `${attendanceRate}%`, icon: Users },
-                ].map(({ label, value, icon: Icon }) => (
+                  { label: t.totalTickets, value: tickets.length, icon: Ticket, iconColor: "text-white/60" },
+                  { label: t.scanned, value: scannedCount, icon: CheckCircle2, iconColor: "text-white/60" },
+                  { label: isAr ? "نسبة الحضور" : "Attendance", value: `${attendanceRate}%`, icon: Users, iconColor: "text-white/60" },
+                  { label: isAr ? "إجمالي الإيرادات" : "Total Revenue", value: totalRevenueStr, icon: DollarSign, iconColor: "text-yellow-300" },
+                ].map(({ label, value, icon: Icon, iconColor }) => (
                   <div key={label} className="bg-white/10 backdrop-blur-sm rounded-xl px-3 py-2.5 text-center border border-white/10">
-                    <Icon className="w-4 h-4 text-white/60 mx-auto mb-1" />
-                    <p className="text-xl font-black text-white">{value}</p>
+                    <Icon className={`w-4 h-4 mx-auto mb-1 ${iconColor}`} />
+                    <p className="text-xl font-black text-white leading-tight">{value}</p>
                     <p className="text-[10px] font-medium text-white/60 mt-0.5">{label}</p>
                   </div>
                 ))}
