@@ -13,7 +13,8 @@ export default function LoginPage() {
   const { t, lang, setLang } = useLocale();
   const { systemName, systemLogo } = useBranding();
   const displayName = systemName || t.appName;
-  const isImageLogo = systemLogo && (systemLogo.startsWith("data:") || systemLogo.startsWith("http"));
+  const displayLogo = systemLogo || "/logo.png";
+  const isImageLogo = displayLogo.startsWith("data:") || displayLogo.startsWith("http") || displayLogo.startsWith("/");
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [error, setError] = useState<string | null>(null);
@@ -62,7 +63,7 @@ export default function LoginPage() {
           <div className="text-center mb-8">
             <div className="inline-flex items-center justify-center w-16 h-16 rounded-2xl mb-5 shadow-lg shadow-violet-500/25 overflow-hidden">
               {isImageLogo ? (
-                <img src={systemLogo!} alt="Logo" className="w-full h-full object-cover" />
+                <img src={displayLogo} alt="Logo" className="w-full h-full object-cover" />
               ) : (
                 <div className="w-full h-full bg-gradient-to-br from-violet-500 to-purple-700 flex items-center justify-center">
                   <Ticket className="w-8 h-8 text-white" />

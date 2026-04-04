@@ -25,8 +25,8 @@ export function Sidebar() {
   const [mobileOpen, setMobileOpen] = useState(false);
 
   const displayName = systemName || t.appName;
-  const displayLogo = systemLogo || "";
-  const isImageLogo = displayLogo.startsWith("data:") || displayLogo.startsWith("http");
+  const displayLogo = systemLogo || "/logo.png";
+  const isImageLogo = displayLogo.startsWith("data:") || displayLogo.startsWith("http") || displayLogo.startsWith("/");
 
   const isAdmin = !profile || profile.role === "admin";
 
