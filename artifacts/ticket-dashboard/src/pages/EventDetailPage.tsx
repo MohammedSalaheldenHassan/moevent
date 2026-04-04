@@ -10,7 +10,7 @@ import { Dialog, DialogContent, DialogTitle, DialogDescription } from "@/compone
 import {
   ArrowLeft, ArrowRight, CalendarDays, MapPin, Ticket,
   Search, CheckCircle2, Clock, AlertCircle, Loader2,
-  Eye, Printer, X, User, Phone, Hash, DollarSign, Users, UserPlus, Trash2, ShieldCheck, MessageCircle,
+  Eye, Printer, X, User, Phone, Hash, DollarSign, Users, UserPlus, Trash2, ShieldCheck, MessageCircle, Mail,
 } from "lucide-react";
 import { format } from "date-fns";
 import { cn } from "@/lib/utils";
@@ -345,6 +345,44 @@ export default function EventDetailPage() {
       setWaPdfError(err instanceof Error ? err.message : "Something went wrong");
     } finally {
       setWaPdfLoading(false);
+    }
+  };
+
+  // ── Email Ticket ───────────────────────────────────────────────
+  const [emailTicket, setEmailTicket] = useState<TicketRow | null>(null);
+  const [emailAddress, setEmailAddress] = useState("");
+  const [emailSending, setEmailSending] = useState(false);
+  const [emailError, setEmailError] = useState<string | null>(null);
+  const [emailSuccess, setEmailSuccess] = useState(false);
+
+  const sendTicketEmail = async () => {
+    if (!emailTicket || !event || !emailAddress.trim()) return;
+    setEmailSending(true);
+    setEmailError(null);
+    setEmailSuccess(false);
+    try {
+      const apiBase = `${window.location.origin}/api`;
+      const res = await fetch(`${apiBase}/issue-ticket`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          customerEmail: emailAddress.trim(),
+          customerName: emailTicket.customer_name,
+          ticketId: emailTicket.id,
+          eventName: event.title,
+        }),
+      });
+      const data = await res.json();
+      if (!res.ok) {
+        setEmailError(data?.details?.message ?? data?.error ?? "Failed to send email");
+      } else {
+        setEmailSuccess(true);
+        setTimeout(() => { setEmailTicket(null); setEmailAddress(""); setEmailSuccess(false); }, 1800);
+      }
+    } catch (err) {
+      setEmailError(err instanceof Error ? err.message : "Network error");
+    } finally {
+      setEmailSending(false);
     }
   };
 
@@ -968,6 +1006,21 @@ export default function EventDetailPage() {
                   {isAr ? "واتساب" : "WhatsApp"}
                 </Button>
                 <Button
+                  onClick={() => {
+                    if (!selectedTicket) return;
+                    setEmailTicket(selectedTicket);
+                    setEmailAddress("");
+                    setEmailError(null);
+                    setEmailSuccess(false);
+                    setSelectedTicket(null);
+                  }}
+                  variant="outline"
+                  className="flex-1 h-11 rounded-xl border-blue-300 dark:border-blue-700 text-blue-700 dark:text-blue-400 hover:bg-blue-50 dark:hover:bg-blue-900/20 font-semibold text-sm"
+                >
+                  <Mail className="w-4 h-4" />
+                  {isAr ? "بريد" : "Email"}
+                </Button>
+                <Button
                   onClick={handlePrint}
                   className="flex-1 h-11 rounded-xl bg-gradient-to-r from-violet-600 to-purple-600 hover:from-violet-700 hover:to-purple-700 border-0 shadow-md shadow-violet-500/20 font-semibold text-sm"
                 >
@@ -1088,6 +1141,85 @@ export default function EventDetailPage() {
                   : <><MessageCircle className="w-4 h-4" />{isAr ? "إرسال مع PDF" : "Send with PDF"}</>}
               </Button>
             </div>
+          </div>
+        </DialogContent>
+      </Dialog>
+
+      {/* Email Ticket Modal */}
+      <Dialog open={!!emailTicket} onOpenChange={(o) => !o && setEmailTicket(null)}>
+        <DialogContent className="sm:max-w-xs p-0 rounded-2xl overflow-hidden border-0 shadow-2xl">
+          <DialogTitle className="sr-only">{isAr ? "إرسال التذكرة بالبريد" : "Send Ticket by Email"}</DialogTitle>
+          <DialogDescription className="sr-only">{isAr ? "أدخل البريد الإلكتروني" : "Enter recipient email"}</DialogDescription>
+
+          {/* Header */}
+          <div className="bg-gradient-to-br from-blue-600 to-indigo-600 px-6 py-5 text-center">
+            <div className="w-12 h-12 bg-white/20 rounded-2xl flex items-center justify-center mx-auto mb-3">
+              <Mail className="w-6 h-6 text-white" />
+            </div>
+            <h3 className="text-white font-bold text-base">
+              {isAr ? "إرسال التذكرة بالبريد" : "Send Ticket by Email"}
+            </h3>
+            {emailTicket && (
+              <p className="text-white/75 text-xs mt-1 truncate">{emailTicket.customer_name}</p>
+            )}
+          </div>
+
+          <div className="px-6 py-5 space-y-4">
+            {emailSuccess ? (
+              <div className="flex flex-col items-center gap-2 py-3">
+                <CheckCircle2 className="w-10 h-10 text-emerald-500" />
+                <p className="font-semibold text-foreground">{isAr ? "تم الإرسال!" : "Sent!"}</p>
+                <p className="text-xs text-muted-foreground text-center">
+                  {isAr ? `تم إرسال التذكرة إلى ${emailAddress}` : `Ticket sent to ${emailAddress}`}
+                </p>
+              </div>
+            ) : (
+              <>
+                <div className="space-y-1.5">
+                  <label className="text-xs font-semibold text-muted-foreground uppercase tracking-wider flex items-center gap-1.5">
+                    <Mail className="w-3.5 h-3.5" />
+                    {isAr ? "البريد الإلكتروني للمستقبل" : "Recipient Email Address"}
+                  </label>
+                  <Input
+                    type="email"
+                    placeholder={isAr ? "example@email.com" : "customer@example.com"}
+                    value={emailAddress}
+                    onChange={(e) => setEmailAddress(e.target.value)}
+                    onKeyDown={(e) => e.key === "Enter" && sendTicketEmail()}
+                    className="h-11 rounded-xl"
+                    dir="ltr"
+                    disabled={emailSending}
+                  />
+                </div>
+
+                {emailError && (
+                  <div className="flex items-start gap-2 text-xs text-red-700 dark:text-red-400 bg-red-50 dark:bg-red-900/20 rounded-xl px-3 py-2">
+                    <AlertCircle className="w-3.5 h-3.5 shrink-0 mt-0.5" />
+                    {emailError}
+                  </div>
+                )}
+
+                <div className="flex gap-2">
+                  <Button
+                    variant="outline"
+                    disabled={emailSending}
+                    className="flex-1 h-10 rounded-xl text-sm"
+                    onClick={() => setEmailTicket(null)}
+                  >
+                    {isAr ? "إلغاء" : "Cancel"}
+                  </Button>
+                  <Button
+                    disabled={!emailAddress.trim() || emailSending}
+                    onClick={sendTicketEmail}
+                    className="flex-1 h-10 rounded-xl bg-gradient-to-r from-blue-600 to-indigo-600 hover:from-blue-700 hover:to-indigo-700 border-0 text-white font-semibold text-sm"
+                  >
+                    {emailSending
+                      ? <><Loader2 className="w-4 h-4 animate-spin" />{isAr ? "جارٍ الإرسال…" : "Sending…"}</>
+                      : <><Mail className="w-4 h-4" />{isAr ? "إرسال PDF" : "Send PDF"}</>}
+                  </Button>
+                </div>
+              </>
+            )}
           </div>
         </DialogContent>
       </Dialog>

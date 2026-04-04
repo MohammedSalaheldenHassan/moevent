@@ -282,7 +282,7 @@ router.post("/issue-ticket", async (req, res) => {
     const shortId = ticketId.slice(0, 8).toUpperCase();
 
     const { error: emailError } = await resend.emails.send({
-      from: "MO Event System <onboarding@resend.dev>",
+      from: "MO Event System <tickets@moevent.com>",
       to: customerEmail,
       subject: `🎫 Your Ticket for ${eventName} – #${shortId}`,
       html: buildEmailHtml({ customerName, eventName, ticketId }),
