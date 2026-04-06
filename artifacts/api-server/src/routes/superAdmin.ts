@@ -124,6 +124,34 @@ router.get("/super-admin/organizations", requireSuperAdmin, async (_req, res) =>
   }
 });
 
+// POST /api/super-admin/upload-logo
+// Accepts { base64, mimeType } and uploads to Supabase Storage, returns { url }
+router.post("/super-admin/upload-logo", requireSuperAdmin, async (req, res) => {
+  try {
+    const { base64, mimeType } = req.body as { base64?: string; mimeType?: string };
+    if (!base64 || !mimeType) { res.status(400).json({ error: "base64 and mimeType are required" }); return; }
+
+    const adminClient = getAdminClient();
+    // Ensure public bucket exists (no-op if already exists)
+    await adminClient.storage.createBucket("org-logos", { public: true }).catch(() => {});
+
+    const ext = mimeType.split("/")[1]?.split("+")[0] ?? "png";
+    const fileName = `${Date.now()}-${Math.random().toString(36).slice(2)}.${ext}`;
+    const buffer = Buffer.from(base64, "base64");
+
+    const { error: uploadError } = await adminClient.storage
+      .from("org-logos")
+      .upload(fileName, buffer, { contentType: mimeType, upsert: true });
+
+    if (uploadError) { res.status(500).json({ error: uploadError.message }); return; }
+
+    const { data: { publicUrl } } = adminClient.storage.from("org-logos").getPublicUrl(fileName);
+    res.json({ url: publicUrl });
+  } catch (err) {
+    res.status(500).json({ error: err instanceof Error ? err.message : "Upload failed" });
+  }
+});
+
 // POST /api/super-admin/organizations
 // Creates the org, then creates a Supabase auth user + profile linked to it.
 router.post("/super-admin/organizations", requireSuperAdmin, async (req, res) => {
@@ -132,13 +160,20 @@ router.post("/super-admin/organizations", requireSuperAdmin, async (req, res) =>
   let authUserId: string | null = null;
 
   try {
-    const { name, logo_url, primary_color, admin_email, admin_password, admin_name } = req.body as Record<string, string>;
+    const { name, logo_url, primary_color, slug, admin_email, admin_password, admin_name } = req.body as Record<string, string>;
     if (!name?.trim()) { res.status(400).json({ error: "Organization name is required" }); return; }
 
     // 1. Create the organization
+    const orgInsert: Record<string, string | null> = {
+      name: name.trim(),
+      logo_url: logo_url || null,
+      primary_color: primary_color || null,
+    };
+    if (slug?.trim()) orgInsert["slug"] = slug.trim().toLowerCase().replace(/[^a-z0-9-]/g, "-").replace(/-+/g, "-").replace(/^-|-$/g, "");
+
     const { data: org, error: orgError } = await adminClient
       .from("organizations")
-      .insert({ name: name.trim(), logo_url: logo_url || null, primary_color: primary_color || null })
+      .insert(orgInsert)
       .select()
       .single();
     if (orgError || !org) { res.status(500).json({ error: orgError?.message ?? "Failed to create organization" }); return; }
@@ -190,12 +225,13 @@ router.post("/super-admin/organizations", requireSuperAdmin, async (req, res) =>
 router.patch("/super-admin/organizations/:id", requireSuperAdmin, async (req, res) => {
   try {
     const { id } = req.params;
-    const { name, logo_url, primary_color } = req.body as Record<string, string>;
+    const { name, logo_url, primary_color, slug } = req.body as Record<string, string>;
     const adminClient = getAdminClient();
     const updates: Record<string, string | null> = {};
     if (name !== undefined) updates.name = name.trim();
     if (logo_url !== undefined) updates.logo_url = logo_url || null;
     if (primary_color !== undefined) updates.primary_color = primary_color || null;
+    if (slug !== undefined) updates["slug"] = slug ? slug.trim().toLowerCase().replace(/[^a-z0-9-]/g, "-").replace(/-+/g, "-").replace(/^-|-$/g, "") : null;
     const { data, error } = await adminClient
       .from("organizations").update(updates).eq("id", id).select().single();
     if (error) { res.status(500).json({ error: error.message }); return; }

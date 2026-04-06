@@ -28,6 +28,7 @@ interface PlatformStats {
 interface Org {
   id: string;
   name: string;
+  slug: string | null;
   logo_url: string | null;
   primary_color: string | null;
   created_at: string;
@@ -73,7 +74,10 @@ export default function SuperAdminPage() {
 
   // Org modal
   const [orgModal, setOrgModal] = useState<{ open: boolean; editing: Org | null }>({ open: false, editing: null });
-  const [orgForm, setOrgForm] = useState({ name: "", logo_url: "", primary_color: "#7c3aed", admin_name: "", admin_email: "", admin_password: "" });
+  const [orgForm, setOrgForm] = useState({ name: "", slug: "", logo_url: "", primary_color: "#7c3aed", admin_name: "", admin_email: "", admin_password: "" });
+  const [logoFile, setLogoFile] = useState<File | null>(null);
+  const [logoPreview, setLogoPreview] = useState<string | null>(null);
+  const [logoUploading, setLogoUploading] = useState(false);
   const [showPassword, setShowPassword] = useState(false);
   const [orgSaving, setOrgSaving] = useState(false);
   const [orgError, setOrgError] = useState<string | null>(null);
@@ -121,18 +125,34 @@ export default function SuperAdminPage() {
 
   // ─── Org CRUD ──────────────────────────────────────────────────────────────
 
+  const toSlug = (name: string) =>
+    name.toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/^-|-$/g, "");
+
   const openAddOrg = () => {
-    setOrgForm({ name: "", logo_url: "", primary_color: "#7c3aed", admin_name: "", admin_email: "", admin_password: "" });
+    setOrgForm({ name: "", slug: "", logo_url: "", primary_color: "#7c3aed", admin_name: "", admin_email: "", admin_password: "" });
+    setLogoFile(null);
+    setLogoPreview(null);
     setShowPassword(false);
     setOrgError(null);
     setOrgModal({ open: true, editing: null });
   };
 
   const openEditOrg = (org: Org) => {
-    setOrgForm({ name: org.name, logo_url: org.logo_url ?? "", primary_color: org.primary_color ?? "#7c3aed", admin_name: "", admin_email: "", admin_password: "" });
+    setOrgForm({ name: org.name, slug: org.slug ?? "", logo_url: org.logo_url ?? "", primary_color: org.primary_color ?? "#7c3aed", admin_name: "", admin_email: "", admin_password: "" });
+    setLogoFile(null);
+    setLogoPreview(org.logo_url ?? null);
     setShowPassword(false);
     setOrgError(null);
     setOrgModal({ open: true, editing: org });
+  };
+
+  const handleLogoChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    setLogoFile(file);
+    const reader = new FileReader();
+    reader.onload = (ev) => setLogoPreview(ev.target?.result as string);
+    reader.readAsDataURL(file);
   };
 
   const saveOrg = async () => {
@@ -146,18 +166,41 @@ export default function SuperAdminPage() {
     setOrgSaving(true);
     setOrgError(null);
     try {
+      // Upload logo file first if one was selected
+      let finalLogoUrl = orgForm.logo_url;
+      if (logoFile) {
+        setLogoUploading(true);
+        const base64 = await new Promise<string>((resolve, reject) => {
+          const reader = new FileReader();
+          reader.onload = (e) => resolve((e.target?.result as string).split(",")[1]);
+          reader.onerror = reject;
+          reader.readAsDataURL(logoFile);
+        });
+        const uploadRes = await apiFetch("/super-admin/upload-logo", {
+          method: "POST",
+          body: JSON.stringify({ base64, mimeType: logoFile.type }),
+        });
+        finalLogoUrl = (uploadRes as { url: string }).url;
+        setLogoUploading(false);
+      }
+
+      const finalSlug = orgForm.slug.trim() || toSlug(orgForm.name);
+
       if (orgModal.editing) {
         await apiFetch(`/super-admin/organizations/${orgModal.editing.id}`, {
-          method: "PATCH", body: JSON.stringify({ name: orgForm.name, logo_url: orgForm.logo_url, primary_color: orgForm.primary_color }),
+          method: "PATCH",
+          body: JSON.stringify({ name: orgForm.name, slug: finalSlug, logo_url: finalLogoUrl, primary_color: orgForm.primary_color }),
         });
       } else {
         await apiFetch("/super-admin/organizations", {
-          method: "POST", body: JSON.stringify(orgForm),
+          method: "POST",
+          body: JSON.stringify({ ...orgForm, slug: finalSlug, logo_url: finalLogoUrl }),
         });
       }
       setOrgModal({ open: false, editing: null });
       await loadAll();
     } catch (err) {
+      setLogoUploading(false);
       setOrgError(err instanceof Error ? err.message : "Save failed");
     } finally {
       setOrgSaving(false);
@@ -405,7 +448,11 @@ export default function SuperAdminPage() {
                               )}
                               <div>
                                 <p className="font-semibold text-foreground">{org.name}</p>
-                                <p className="text-xs text-muted-foreground font-mono">{org.id.slice(0, 8)}…</p>
+                                {org.slug ? (
+                                  <p className="text-xs text-violet-400 font-mono">moevents.online/{org.slug}</p>
+                                ) : (
+                                  <p className="text-xs text-muted-foreground font-mono">{org.id.slice(0, 8)}…</p>
+                                )}
                               </div>
                             </div>
                           </td>
@@ -539,20 +586,75 @@ export default function SuperAdminPage() {
                   <AlertCircle className="w-4 h-4 shrink-0" />{orgError}
                 </div>
               )}
+              {/* Name */}
               <div>
                 <Label className="text-xs font-semibold text-muted-foreground mb-1.5 block">
                   {isAr ? "اسم المؤسسة *" : "Organization Name *"}
                 </Label>
-                <Input value={orgForm.name} onChange={(e) => setOrgForm((f) => ({ ...f, name: e.target.value }))}
+                <Input
+                  value={orgForm.name}
+                  onChange={(e) => {
+                    const name = e.target.value;
+                    setOrgForm((f) => ({ ...f, name, slug: f.slug || toSlug(name) }));
+                  }}
                   placeholder={isAr ? "مثال: شركة الإبداع" : "e.g. Creative Co."} className="rounded-xl" />
               </div>
+
+              {/* Slug / domain */}
               <div>
                 <Label className="text-xs font-semibold text-muted-foreground mb-1.5 block">
-                  {isAr ? "رابط الشعار (URL)" : "Logo URL"}
+                  {isAr ? "رابط المؤسسة" : "Organization URL"}
                 </Label>
-                <Input value={orgForm.logo_url} onChange={(e) => setOrgForm((f) => ({ ...f, logo_url: e.target.value }))}
-                  placeholder="https://example.com/logo.png" className="rounded-xl" />
+                <div className="flex items-center gap-0 border border-border rounded-xl overflow-hidden focus-within:ring-2 focus-within:ring-ring">
+                  <span className="px-3 py-2 text-xs text-muted-foreground bg-muted border-r border-border whitespace-nowrap select-none">
+                    moevents.online/
+                  </span>
+                  <input
+                    value={orgForm.slug}
+                    onChange={(e) => setOrgForm((f) => ({ ...f, slug: e.target.value.toLowerCase().replace(/[^a-z0-9-]/g, "") }))}
+                    placeholder={orgForm.name ? toSlug(orgForm.name) : "serava"}
+                    className="flex-1 px-3 py-2 text-sm bg-background outline-none font-mono"
+                  />
+                </div>
+                {(orgForm.slug || orgForm.name) && (
+                  <p className="text-[11px] text-muted-foreground mt-1.5 font-mono">
+                    moevents.online/{orgForm.slug || toSlug(orgForm.name)}
+                  </p>
+                )}
               </div>
+
+              {/* Logo upload */}
+              <div>
+                <Label className="text-xs font-semibold text-muted-foreground mb-1.5 block">
+                  {isAr ? "شعار المؤسسة" : "Organization Logo"}
+                </Label>
+                <div className="flex items-center gap-3">
+                  {logoPreview ? (
+                    <div className="relative shrink-0">
+                      <img src={logoPreview} alt="Logo preview" className="w-14 h-14 rounded-xl object-cover border border-border" />
+                      <button
+                        type="button"
+                        onClick={() => { setLogoFile(null); setLogoPreview(null); setOrgForm((f) => ({ ...f, logo_url: "" })); }}
+                        className="absolute -top-1.5 -right-1.5 w-4 h-4 rounded-full bg-destructive text-white flex items-center justify-center"
+                      >
+                        <X className="w-2.5 h-2.5" />
+                      </button>
+                    </div>
+                  ) : (
+                    <div className="w-14 h-14 rounded-xl border-2 border-dashed border-border flex items-center justify-center shrink-0">
+                      <Building2 className="w-5 h-5 text-muted-foreground" />
+                    </div>
+                  )}
+                  <label className="flex-1 cursor-pointer">
+                    <div className="px-3 py-2 rounded-xl border border-border text-sm text-muted-foreground hover:bg-muted transition-colors text-center">
+                      {logoFile ? logoFile.name : (isAr ? "اختر صورة" : "Choose image…")}
+                    </div>
+                    <input type="file" accept="image/*" className="hidden" onChange={handleLogoChange} />
+                  </label>
+                </div>
+              </div>
+
+              {/* Brand color */}
               <div>
                 <Label className="text-xs font-semibold text-muted-foreground mb-1.5 block">
                   {isAr ? "اللون الرئيسي" : "Brand Color"}
