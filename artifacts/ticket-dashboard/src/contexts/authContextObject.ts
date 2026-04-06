@@ -6,6 +6,7 @@ export interface Profile {
   role: string;
   full_name: string | null;
   email: string | null;
+  org_id: string | null;
 }
 
 export interface AuthContextType {

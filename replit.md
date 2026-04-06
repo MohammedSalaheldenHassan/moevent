@@ -9,19 +9,44 @@ pnpm workspace monorepo using TypeScript. Each package manages its own dependenc
 React + Vite frontend at `/`. Connected to Supabase for auth, events, tickets, and profiles.
 
 ### Features
-- Supabase Auth with admin role check (profiles table)
-- Dashboard with real-time stats (Supabase realtime)
-- Events management (grid + Add Event modal)
-- Ticket issuance with QR code + print
+- **Multi-tenant SaaS**: All queries filtered by `org_id` from the user's profile; each organization sees only its own data
+- **Dynamic org branding**: `OrgContext` fetches `logo_url` and `primary_color` from `organizations` table and applies theme
+- **Revenue split**: Dashboard shows Total Revenue, Net Revenue (95% org), Platform Fees (5%)
+- **Recharts charts**: Bar chart (tickets per event), Donut pie chart (revenue split), live attendance progress bar
+- Supabase Auth with admin role check (profiles table, `org_id` now included)
+- Dashboard with real-time stats (Supabase realtime), including org logo in header
+- Events management (grid + Add Event modal, org_id attached to new events)
+- Ticket issuance with QR code + print; events filtered by org_id
 - Staff listing
+- PDF ticket generation + email via Resend (`/api/issue-ticket`)
 - **Full Arabic/English localization** with RTL layout support
 - Language switcher (EN/عربي) on login page and sidebar
 - Cairo font for Arabic, Inter for English
 
 ### Key files
 - `src/contexts/LocaleContext.tsx` — i18n translations + RTL
-- `src/contexts/AuthContext.tsx` — Supabase auth + admin role guard
+- `src/contexts/AuthContext.tsx` — Supabase auth + admin role guard (returns org_id)
+- `src/contexts/OrgContext.tsx` — fetches org branding from `organizations` table
 - `src/lib/supabase.ts` — Supabase client
+
+### Supabase schema additions (multi-tenant)
+Run in Supabase SQL editor if not already done:
+```sql
+-- profiles: org_id column
+ALTER TABLE profiles ADD COLUMN IF NOT EXISTS org_id UUID REFERENCES organizations(id);
+-- events: org_id column
+ALTER TABLE events ADD COLUMN IF NOT EXISTS org_id UUID REFERENCES organizations(id);
+-- tickets: org_id column (optional, can filter via event)
+ALTER TABLE tickets ADD COLUMN IF NOT EXISTS org_id UUID REFERENCES organizations(id);
+-- organizations table
+CREATE TABLE IF NOT EXISTS organizations (
+  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  name TEXT,
+  logo_url TEXT,
+  primary_color TEXT,
+  created_at TIMESTAMPTZ DEFAULT now()
+);
+```
 
 ## Stack
 

@@ -3,6 +3,7 @@ import { useLocation } from "wouter";
 import { supabase } from "@/lib/supabase";
 import { useLocale } from "@/contexts/LocaleContext";
 import { useAuth } from "@/contexts/useAuth";
+import { useOrg } from "@/contexts/OrgContext";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -47,6 +48,7 @@ function getAccent(id: string) {
 export default function EventsPage() {
   const { t, isRTL, lang } = useLocale();
   const { profile } = useAuth();
+  const { org_id: orgId } = useOrg();
   const { toast } = useToast();
   const [, navigate] = useLocation();
   const isAr = lang === "ar";
@@ -127,6 +129,7 @@ export default function EventsPage() {
       }
 
       let query = supabase.from("events").select("*").order("created_at", { ascending: false });
+      if (orgId) query = query.eq("org_id", orgId) as typeof query;
       if (eventIds) query = query.in("id", eventIds);
       const { data, error } = await query;
       if (error) throw error;
@@ -140,7 +143,7 @@ export default function EventsPage() {
     }
   };
 
-  useEffect(() => { fetchEvents(); }, []);
+  useEffect(() => { fetchEvents(); }, [orgId]);
 
   const openAddModal = () => {
     setModalMode("add");
@@ -206,13 +209,14 @@ export default function EventsPage() {
         resolvedImageUrl = await uploadImageFile(imageFile);
         setImageUploading(false);
       }
-      const payload = {
+      const payload: Record<string, unknown> = {
         title: form.title.trim(),
         event_date: form.date || null,
         location: form.location.trim() || null,
         price: priceVal,
         image_url: resolvedImageUrl,
       };
+      if (orgId) payload.org_id = orgId;
 
       if (modalMode === "add") {
         const { data, error } = await supabase.from("events").insert(payload).select();

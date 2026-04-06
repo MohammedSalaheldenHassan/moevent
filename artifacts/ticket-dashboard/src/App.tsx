@@ -7,6 +7,7 @@ import { useAuth } from "@/contexts/useAuth";
 import { LocaleProvider, useLocale } from "@/contexts/LocaleContext";
 import { ThemeProvider } from "@/contexts/ThemeContext";
 import { BrandingProvider, useBranding } from "@/contexts/BrandingContext";
+import { OrgProvider } from "@/contexts/OrgContext";
 import { ErrorBoundary } from "@/components/ErrorBoundary";
 import { Sidebar } from "@/components/Sidebar";
 import LoginPage from "@/pages/LoginPage";
@@ -109,10 +110,12 @@ function App() {
             <QueryClientProvider client={queryClient}>
               <TooltipProvider>
                 <AuthProvider>
-                  <WouterRouter base={import.meta.env.BASE_URL.replace(/\/$/, "")}>
-                    <ProtectedRoutes />
-                  </WouterRouter>
-                  <Toaster />
+                  <OrgProvider>
+                    <WouterRouter base={import.meta.env.BASE_URL.replace(/\/$/, "")}>
+                      <ProtectedRoutes />
+                    </WouterRouter>
+                    <Toaster />
+                  </OrgProvider>
                 </AuthProvider>
               </TooltipProvider>
             </QueryClientProvider>

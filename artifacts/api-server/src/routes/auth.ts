@@ -35,7 +35,7 @@ router.get("/auth/role", async (req, res) => {
 
     const { data: profile, error: profileError } = await adminClient
       .from("profiles")
-      .select("id, role, full_name, email")
+      .select("id, role, full_name, email, org_id")
       .eq("id", user.id)
       .single();
 
@@ -50,6 +50,7 @@ router.get("/auth/role", async (req, res) => {
       role: profile.role as string,
       full_name: (profile.full_name ?? null) as string | null,
       email: (profile.email ?? null) as string | null,
+      org_id: (profile.org_id ?? null) as string | null,
     });
   } catch (err) {
     res.status(500).json({ error: "Internal server error" });
