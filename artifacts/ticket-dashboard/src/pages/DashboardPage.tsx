@@ -131,21 +131,31 @@ export default function DashboardPage() {
       recentQuery = recentQuery.eq("org_id", orgId) as typeof recentQuery;
     }
 
-    const safeIds = allowedEventIds && allowedEventIds.length === 0 ? ["__none__"] : (allowedEventIds ?? null);
+    // Step 1: fetch events (and recent events) — already org_id filtered above
+    const staffSafeIds = allowedEventIds && allowedEventIds.length === 0 ? ["__none__"] : (allowedEventIds ?? null);
 
-    const [eventsRes, allTicketsRes, scannedRes, recentRes] = await Promise.all([
-      safeIds ? eventsQuery.in("id", safeIds) : eventsQuery,
-      safeIds
-        ? supabase.from("tickets").select("event_id").in("event_id", safeIds)
-        : orgId
-          ? supabase.from("tickets").select("event_id").eq("org_id", orgId)
-          : supabase.from("tickets").select("event_id"),
-      safeIds
-        ? supabase.from("tickets").select("id", { count: "exact", head: true }).eq("is_scanned", true).in("event_id", safeIds)
-        : orgId
-          ? supabase.from("tickets").select("id", { count: "exact", head: true }).eq("is_scanned", true).eq("org_id", orgId)
-          : supabase.from("tickets").select("id", { count: "exact", head: true }).eq("is_scanned", true),
-      safeIds ? recentQuery.in("id", safeIds) : recentQuery,
+    const [eventsRes, recentRes] = await Promise.all([
+      staffSafeIds ? eventsQuery.in("id", staffSafeIds) : eventsQuery,
+      staffSafeIds ? recentQuery.in("id", staffSafeIds) : recentQuery,
+    ]);
+
+    // Step 2: build the event ID list to filter tickets — no org_id on tickets table
+    let ticketEventFilter: string[] | null = null;
+    if (staffSafeIds) {
+      ticketEventFilter = staffSafeIds;
+    } else if (orgId && eventsRes.data) {
+      ticketEventFilter = eventsRes.data.map((ev) => ev.id);
+    }
+    // If ticketEventFilter is an empty array, use a sentinel so queries return nothing
+    const safeTicketIds = ticketEventFilter && ticketEventFilter.length === 0 ? ["__none__"] : ticketEventFilter;
+
+    const [allTicketsRes, scannedRes] = await Promise.all([
+      safeTicketIds
+        ? supabase.from("tickets").select("event_id").in("event_id", safeTicketIds)
+        : supabase.from("tickets").select("event_id"),
+      safeTicketIds
+        ? supabase.from("tickets").select("id", { count: "exact", head: true }).eq("is_scanned", true).in("event_id", safeTicketIds)
+        : supabase.from("tickets").select("id", { count: "exact", head: true }).eq("is_scanned", true),
     ]);
 
     if (eventsRes.error) errs.push(`Events: ${eventsRes.error.message}`);
