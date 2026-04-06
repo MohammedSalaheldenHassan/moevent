@@ -132,31 +132,41 @@ export default function DashboardPage() {
     }
 
     // Step 1: fetch events (and recent events) — already org_id filtered above
-    const staffSafeIds = allowedEventIds && allowedEventIds.length === 0 ? ["__none__"] : (allowedEventIds ?? null);
+    // allowedEventIds: null = no staff restriction; [] = staff with zero access
+    const noEventsAccess = allowedEventIds !== null && allowedEventIds.length === 0;
+    const emptyResult0 = { data: [], error: null, count: 0 };
 
-    const [eventsRes, recentRes] = await Promise.all([
-      staffSafeIds ? eventsQuery.in("id", staffSafeIds) : eventsQuery,
-      staffSafeIds ? recentQuery.in("id", staffSafeIds) : recentQuery,
-    ]);
+    const [eventsRes, recentRes] = noEventsAccess
+      ? [emptyResult0, emptyResult0]
+      : await Promise.all([
+          allowedEventIds ? eventsQuery.in("id", allowedEventIds) : eventsQuery,
+          allowedEventIds ? recentQuery.in("id", allowedEventIds) : recentQuery,
+        ]);
 
     // Step 2: build the event ID list to filter tickets — no org_id on tickets table
-    let ticketEventFilter: string[] | null = null;
-    if (staffSafeIds) {
-      ticketEventFilter = staffSafeIds;
+    let ticketEventIds: string[] | null = null;
+    if (noEventsAccess) {
+      ticketEventIds = [];
+    } else if (allowedEventIds) {
+      ticketEventIds = allowedEventIds;
     } else if (orgId && eventsRes.data) {
-      ticketEventFilter = eventsRes.data.map((ev) => ev.id);
+      ticketEventIds = eventsRes.data.map((ev) => ev.id);
     }
-    // If ticketEventFilter is an empty array, use a sentinel so queries return nothing
-    const safeTicketIds = ticketEventFilter && ticketEventFilter.length === 0 ? ["__none__"] : ticketEventFilter;
 
-    const [allTicketsRes, scannedRes] = await Promise.all([
-      safeTicketIds
-        ? supabase.from("tickets").select("event_id").in("event_id", safeTicketIds)
-        : supabase.from("tickets").select("event_id"),
-      safeTicketIds
-        ? supabase.from("tickets").select("id", { count: "exact", head: true }).eq("is_scanned", true).in("event_id", safeTicketIds)
-        : supabase.from("tickets").select("id", { count: "exact", head: true }).eq("is_scanned", true),
-    ]);
+    // If we have an explicit empty list, skip DB calls entirely — nothing to query
+    const emptyTicketSet = ticketEventIds !== null && ticketEventIds.length === 0;
+    const emptyResult = { data: [], error: null, count: 0 };
+
+    const [allTicketsRes, scannedRes] = emptyTicketSet
+      ? [emptyResult, emptyResult]
+      : await Promise.all([
+          ticketEventIds
+            ? supabase.from("tickets").select("event_id").in("event_id", ticketEventIds)
+            : supabase.from("tickets").select("event_id"),
+          ticketEventIds
+            ? supabase.from("tickets").select("id", { count: "exact", head: true }).eq("is_scanned", true).in("event_id", ticketEventIds)
+            : supabase.from("tickets").select("id", { count: "exact", head: true }).eq("is_scanned", true),
+        ]);
 
     if (eventsRes.error) errs.push(`Events: ${eventsRes.error.message}`);
     else {
