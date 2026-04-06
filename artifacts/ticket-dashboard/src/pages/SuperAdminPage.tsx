@@ -1,6 +1,7 @@
 import { useEffect, useState } from "react";
 import { useAuth } from "@/contexts/useAuth";
 import { useLocale } from "@/contexts/LocaleContext";
+import { supabase } from "@/lib/supabase";
 import {
   Building2, Users, CalendarDays, Ticket, DollarSign, TrendingUp,
   RefreshCw, Plus, Pencil, Trash2, X, Check, AlertCircle, Loader2,
@@ -93,9 +94,12 @@ export default function SuperAdminPage() {
   const [deleting, setDeleting] = useState(false);
 
   const apiFetch = async (path: string, opts?: RequestInit) => {
+    // Always pull a fresh token — avoids stale closure if Supabase refreshed the session
+    const { data: { session: liveSession } } = await supabase.auth.getSession();
+    const liveToken = liveSession?.access_token ?? token;
     const res = await fetch(`${apiBase}${path}`, {
       ...opts,
-      headers: { Authorization: `Bearer ${token}`, "Content-Type": "application/json", ...(opts?.headers ?? {}) },
+      headers: { Authorization: `Bearer ${liveToken}`, "Content-Type": "application/json", ...(opts?.headers ?? {}) },
     });
     const json = await res.json();
     if (!res.ok) throw new Error(json.error ?? "Request failed");

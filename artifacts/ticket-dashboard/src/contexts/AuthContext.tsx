@@ -10,22 +10,47 @@ import { AuthContext, type Profile } from "./authContextObject";
 // eliminating the "Invalid hook call" HMR crash.
 
 // Fetch the user's profile from the API server using their access token.
-// Using the API server (with the service-role key) avoids browser-to-Supabase
-// connectivity issues that cause timeouts when querying the profiles table directly.
-async function fetchProfileFromApi(accessToken: string): Promise<Profile | null> {
+// Always gets the freshest token via getSession() so we don't use a stale
+// access_token from the onAuthStateChange callback (which can lag behind
+// Supabase's background token refresh).
+async function fetchProfileFromApi(fallbackToken: string): Promise<Profile | null> {
   try {
     const apiBase = `${window.location.origin}/api`;
+
+    // Prefer the live session token; fall back to the one passed in
+    const { data: { session: liveSession } } = await supabase.auth.getSession();
+    const token = liveSession?.access_token ?? fallbackToken;
+
     const res = await fetch(`${apiBase}/auth/role`, {
-      headers: { Authorization: `Bearer ${accessToken}` },
+      headers: { Authorization: `Bearer ${token}` },
       cache: "no-store",
       signal: AbortSignal.timeout(8000),
     });
+
+    // If still 401, try once more after forcing a token refresh
+    if (res.status === 401) {
+      console.warn("[AuthContext] role API returned 401, attempting token refresh…");
+      const { data: refreshed } = await supabase.auth.refreshSession();
+      const refreshedToken = refreshed.session?.access_token;
+      if (!refreshedToken) return null;
+
+      const retry = await fetch(`${apiBase}/auth/role`, {
+        headers: { Authorization: `Bearer ${refreshedToken}` },
+        cache: "no-store",
+        signal: AbortSignal.timeout(8000),
+      });
+      if (!retry.ok) {
+        console.warn("[AuthContext] role API returned", retry.status, "after refresh");
+        return null;
+      }
+      return await retry.json() as Profile;
+    }
+
     if (!res.ok) {
       console.warn("[AuthContext] role API returned", res.status);
       return null;
     }
-    const data = await res.json() as Profile;
-    return data;
+    return await res.json() as Profile;
   } catch (err) {
     console.warn("[AuthContext] role API error:", err);
     return null;
