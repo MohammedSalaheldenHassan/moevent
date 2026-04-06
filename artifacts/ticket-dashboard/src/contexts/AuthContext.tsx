@@ -86,7 +86,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         const p = await fetchProfileFromApi(sess.access_token);
         if (!mountedRef.current) return;
 
-        if (!p || p.role !== "admin") {
+        if (!p || (p.role !== "admin" && p.role !== "super_admin")) {
           console.warn("[AuthContext] Non-admin user on session restore — signing out");
           await supabase.auth.signOut();
           return;
@@ -123,7 +123,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
           };
         }
 
-        if (p.role !== "admin") {
+        if (p.role !== "admin" && p.role !== "super_admin") {
           await supabase.auth.signOut();
           return {
             error: "Access denied. Only admin accounts can access this dashboard.",

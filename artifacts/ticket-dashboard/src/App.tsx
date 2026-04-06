@@ -18,6 +18,7 @@ import IssueTicketPage from "@/pages/IssueTicketPage";
 import StaffPage from "@/pages/StaffPage";
 import SettingsPage from "@/pages/SettingsPage";
 import ActivityLogsPage from "@/pages/ActivityLogsPage";
+import SuperAdminPage from "@/pages/SuperAdminPage";
 import NotFound from "@/pages/not-found";
 import { Loader2 } from "lucide-react";
 import { useState, useEffect } from "react";
@@ -80,10 +81,22 @@ function LoadingScreen() {
 }
 
 function ProtectedRoutes() {
-  const { user, loading } = useAuth();
+  const { user, profile, loading } = useAuth();
 
   if (loading) return <LoadingScreen />;
   if (!user) return <LoginPage />;
+
+  // Super admin gets a fully separate layout
+  if (profile?.role === "super_admin") {
+    return (
+      <Switch>
+        <Route path="/super-admin" component={SuperAdminPage} />
+        <Route>
+          <SuperAdminPage />
+        </Route>
+      </Switch>
+    );
+  }
 
   return (
     <AppLayout>
