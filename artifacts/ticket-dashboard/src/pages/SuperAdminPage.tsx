@@ -43,7 +43,6 @@ interface UserProfile {
   role: string;
   org_id: string | null;
   org_name: string | null;
-  created_at: string;
 }
 
 type Tab = "overview" | "organizations" | "users";
@@ -471,7 +470,6 @@ export default function SuperAdminPage() {
                           isAr ? "المستخدم" : "User",
                           isAr ? "الدور" : "Role",
                           isAr ? "المؤسسة" : "Organization",
-                          isAr ? "تاريخ الإنشاء" : "Joined",
                           "",
                         ].map((h) => (
                           <th key={h} className="text-start px-4 py-3 text-xs font-semibold text-muted-foreground">{h}</th>
@@ -494,9 +492,6 @@ export default function SuperAdminPage() {
                           </td>
                           <td className="px-4 py-3.5">
                             <span className="text-sm text-foreground">{u.org_name ?? <span className="text-muted-foreground text-xs">—</span>}</span>
-                          </td>
-                          <td className="px-4 py-3.5 text-xs text-muted-foreground">
-                            {new Date(u.created_at).toLocaleDateString()}
                           </td>
                           <td className="px-4 py-3.5">
                             <button

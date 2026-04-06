@@ -179,7 +179,7 @@ router.get("/super-admin/users", requireSuperAdmin, async (_req, res) => {
   try {
     const adminClient = getAdminClient();
     const [profilesRes, orgsRes] = await Promise.all([
-      adminClient.from("profiles").select("id, full_name, email, role, org_id, created_at").order("created_at", { ascending: false }),
+      adminClient.from("profiles").select("id, full_name, email, role, org_id").order("email", { ascending: true }),
       adminClient.from("organizations").select("id, name"),
     ]);
     if (profilesRes.error) { res.status(500).json({ error: profilesRes.error.message }); return; }
