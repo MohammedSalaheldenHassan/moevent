@@ -125,20 +125,64 @@ router.get("/super-admin/organizations", requireSuperAdmin, async (_req, res) =>
 });
 
 // POST /api/super-admin/organizations
+// Creates the org, then creates a Supabase auth user + profile linked to it.
 router.post("/super-admin/organizations", requireSuperAdmin, async (req, res) => {
+  const adminClient = getAdminClient();
+  let orgId: string | null = null;
+  let authUserId: string | null = null;
+
   try {
-    const { name, logo_url, primary_color } = req.body as Record<string, string>;
-    if (!name?.trim()) { res.status(400).json({ error: "Name is required" }); return; }
-    const adminClient = getAdminClient();
-    const { data, error } = await adminClient
+    const { name, logo_url, primary_color, admin_email, admin_password, admin_name } = req.body as Record<string, string>;
+    if (!name?.trim()) { res.status(400).json({ error: "Organization name is required" }); return; }
+
+    // 1. Create the organization
+    const { data: org, error: orgError } = await adminClient
       .from("organizations")
       .insert({ name: name.trim(), logo_url: logo_url || null, primary_color: primary_color || null })
       .select()
       .single();
-    if (error) { res.status(500).json({ error: error.message }); return; }
-    res.json(data);
-  } catch {
-    res.status(500).json({ error: "Internal server error" });
+    if (orgError || !org) { res.status(500).json({ error: orgError?.message ?? "Failed to create organization" }); return; }
+    orgId = org.id;
+
+    // 2. If admin credentials provided, create the auth user + profile
+    if (admin_email?.trim() && admin_password?.trim()) {
+      const { data: authData, error: authError } = await adminClient.auth.admin.createUser({
+        email: admin_email.trim(),
+        password: admin_password.trim(),
+        email_confirm: true,
+      });
+      if (authError || !authData?.user) {
+        // Roll back org
+        await adminClient.from("organizations").delete().eq("id", orgId);
+        res.status(500).json({ error: authError?.message ?? "Failed to create admin user" });
+        return;
+      }
+      authUserId = authData.user.id;
+
+      // 3. Upsert the profile (may already exist via trigger)
+      const { error: profileError } = await adminClient.from("profiles").upsert({
+        id: authUserId,
+        email: admin_email.trim(),
+        full_name: admin_name?.trim() || null,
+        role: "admin",
+        org_id: orgId,
+      }, { onConflict: "id" });
+
+      if (profileError) {
+        // Clean up auth user and org
+        await adminClient.auth.admin.deleteUser(authUserId);
+        await adminClient.from("organizations").delete().eq("id", orgId);
+        res.status(500).json({ error: profileError.message });
+        return;
+      }
+    }
+
+    res.json({ ...org, admin_created: !!(admin_email?.trim() && admin_password?.trim()) });
+  } catch (err) {
+    // Best-effort cleanup
+    if (authUserId) await adminClient.auth.admin.deleteUser(authUserId).catch(() => {});
+    if (orgId) await adminClient.from("organizations").delete().eq("id", orgId).catch(() => {});
+    res.status(500).json({ error: err instanceof Error ? err.message : "Internal server error" });
   }
 });
 

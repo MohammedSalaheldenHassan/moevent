@@ -4,7 +4,7 @@ import { useLocale } from "@/contexts/LocaleContext";
 import {
   Building2, Users, CalendarDays, Ticket, DollarSign, TrendingUp,
   RefreshCw, Plus, Pencil, Trash2, X, Check, AlertCircle, Loader2,
-  ShieldCheck, LogOut, Percent, ChevronDown,
+  ShieldCheck, LogOut, Percent, ChevronDown, Eye, EyeOff, UserPlus,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -73,7 +73,8 @@ export default function SuperAdminPage() {
 
   // Org modal
   const [orgModal, setOrgModal] = useState<{ open: boolean; editing: Org | null }>({ open: false, editing: null });
-  const [orgForm, setOrgForm] = useState({ name: "", logo_url: "", primary_color: "#7c3aed" });
+  const [orgForm, setOrgForm] = useState({ name: "", logo_url: "", primary_color: "#7c3aed", admin_name: "", admin_email: "", admin_password: "" });
+  const [showPassword, setShowPassword] = useState(false);
   const [orgSaving, setOrgSaving] = useState(false);
   const [orgError, setOrgError] = useState<string | null>(null);
 
@@ -121,25 +122,33 @@ export default function SuperAdminPage() {
   // ─── Org CRUD ──────────────────────────────────────────────────────────────
 
   const openAddOrg = () => {
-    setOrgForm({ name: "", logo_url: "", primary_color: "#7c3aed" });
+    setOrgForm({ name: "", logo_url: "", primary_color: "#7c3aed", admin_name: "", admin_email: "", admin_password: "" });
+    setShowPassword(false);
     setOrgError(null);
     setOrgModal({ open: true, editing: null });
   };
 
   const openEditOrg = (org: Org) => {
-    setOrgForm({ name: org.name, logo_url: org.logo_url ?? "", primary_color: org.primary_color ?? "#7c3aed" });
+    setOrgForm({ name: org.name, logo_url: org.logo_url ?? "", primary_color: org.primary_color ?? "#7c3aed", admin_name: "", admin_email: "", admin_password: "" });
+    setShowPassword(false);
     setOrgError(null);
     setOrgModal({ open: true, editing: org });
   };
 
   const saveOrg = async () => {
-    if (!orgForm.name.trim()) { setOrgError("Organization name is required"); return; }
+    if (!orgForm.name.trim()) { setOrgError(isAr ? "اسم المؤسسة مطلوب" : "Organization name is required"); return; }
+    if (!orgModal.editing && orgForm.admin_email.trim() && !orgForm.admin_password.trim()) {
+      setOrgError(isAr ? "كلمة المرور مطلوبة مع البريد الإلكتروني" : "Password is required when providing an email"); return;
+    }
+    if (!orgModal.editing && orgForm.admin_password.trim() && orgForm.admin_password.trim().length < 8) {
+      setOrgError(isAr ? "كلمة المرور يجب أن تكون 8 أحرف على الأقل" : "Password must be at least 8 characters"); return;
+    }
     setOrgSaving(true);
     setOrgError(null);
     try {
       if (orgModal.editing) {
         await apiFetch(`/super-admin/organizations/${orgModal.editing.id}`, {
-          method: "PATCH", body: JSON.stringify(orgForm),
+          method: "PATCH", body: JSON.stringify({ name: orgForm.name, logo_url: orgForm.logo_url, primary_color: orgForm.primary_color }),
         });
       } else {
         await apiFetch("/super-admin/organizations", {
@@ -557,6 +566,58 @@ export default function SuperAdminPage() {
                     placeholder="#7c3aed" className="rounded-xl font-mono text-sm" />
                 </div>
               </div>
+
+              {/* Admin account — only shown when adding a new org */}
+              {!orgModal.editing && (
+                <div className="pt-3 border-t border-border space-y-3">
+                  <div className="flex items-center gap-2 text-xs font-semibold text-muted-foreground">
+                    <UserPlus className="w-3.5 h-3.5" />
+                    {isAr ? "حساب المدير (اختياري)" : "Admin Account (optional)"}
+                  </div>
+                  <div>
+                    <Label className="text-xs font-semibold text-muted-foreground mb-1.5 block">
+                      {isAr ? "الاسم الكامل" : "Full Name"}
+                    </Label>
+                    <Input value={orgForm.admin_name}
+                      onChange={(e) => setOrgForm((f) => ({ ...f, admin_name: e.target.value }))}
+                      placeholder={isAr ? "مثال: أحمد محمد" : "e.g. John Smith"}
+                      className="rounded-xl" />
+                  </div>
+                  <div>
+                    <Label className="text-xs font-semibold text-muted-foreground mb-1.5 block">
+                      {isAr ? "البريد الإلكتروني" : "Email Address"}
+                    </Label>
+                    <Input type="email" value={orgForm.admin_email}
+                      onChange={(e) => setOrgForm((f) => ({ ...f, admin_email: e.target.value }))}
+                      placeholder="admin@organization.com"
+                      className="rounded-xl" />
+                  </div>
+                  <div>
+                    <Label className="text-xs font-semibold text-muted-foreground mb-1.5 block">
+                      {isAr ? "كلمة المرور" : "Password"}
+                    </Label>
+                    <div className="relative">
+                      <Input
+                        type={showPassword ? "text" : "password"}
+                        value={orgForm.admin_password}
+                        onChange={(e) => setOrgForm((f) => ({ ...f, admin_password: e.target.value }))}
+                        placeholder={isAr ? "8 أحرف على الأقل" : "Min 8 characters"}
+                        className="rounded-xl pr-10"
+                      />
+                      <button
+                        type="button"
+                        onClick={() => setShowPassword((s) => !s)}
+                        className="absolute right-3 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground transition-colors"
+                      >
+                        {showPassword ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
+                      </button>
+                    </div>
+                    <p className="text-[11px] text-muted-foreground mt-1.5">
+                      {isAr ? "اترك فارغاً لإنشاء المؤسسة بدون حساب مدير الآن" : "Leave empty to create the org without an admin account for now"}
+                    </p>
+                  </div>
+                </div>
+              )}
             </div>
             <div className="px-6 pb-6 flex gap-3">
               <Button variant="outline" className="flex-1 rounded-xl" onClick={() => setOrgModal({ open: false, editing: null })}>
