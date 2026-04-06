@@ -72,10 +72,17 @@ export default function StaffPage() {
     setLoading(true);
     setError(null);
     try {
-      const { data, error } = await supabase
+      let query = supabase
         .from("profiles")
         .select("id, role, full_name, email")
         .order("role", { ascending: false });
+
+      // Multi-tenant isolation: only show staff within the same org
+      if (currentProfile?.org_id) {
+        query = query.eq("org_id", currentProfile.org_id) as typeof query;
+      }
+
+      const { data, error } = await query;
       if (error) throw error;
       setProfiles(data ?? []);
     } catch (err: unknown) {
@@ -94,7 +101,7 @@ export default function StaffPage() {
     }
   };
 
-  useEffect(() => { fetchProfiles(); }, []);
+  useEffect(() => { fetchProfiles(); }, [currentProfile?.org_id]);
 
   // ── Add Staff ──────────────────────────────────────────────
   const openAdd = () => {
@@ -124,6 +131,7 @@ export default function StaffPage() {
           password: addForm.password,
           full_name: addForm.full_name.trim() || null,
           role: addForm.role,
+          org_id: currentProfile?.org_id ?? null,
         }),
       });
       const json = await res.json() as { user?: Profile; error?: string; warning?: string };

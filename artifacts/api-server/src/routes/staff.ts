@@ -17,11 +17,12 @@ function getAdminClient() {
 // Body: { email, password, full_name, role }
 router.post("/staff/create", async (req, res) => {
   try {
-    const { email, password, full_name, role } = req.body as {
+    const { email, password, full_name, role, org_id } = req.body as {
       email?: string;
       password?: string;
       full_name?: string;
       role?: string;
+      org_id?: string | null;
     };
 
     if (!email || !email.includes("@")) {
@@ -53,15 +54,18 @@ router.post("/staff/create", async (req, res) => {
 
     const userId = userData.user.id;
 
-    // 2. Upsert their profile row with correct role
+    // 2. Upsert their profile row with correct role and org
+    const profileRow: Record<string, unknown> = {
+      id: userId,
+      email,
+      full_name: full_name?.trim() || null,
+      role: assignedRole,
+    };
+    if (org_id) profileRow["org_id"] = org_id;
+
     const { error: profileError } = await adminClient
       .from("profiles")
-      .upsert({
-        id: userId,
-        email,
-        full_name: full_name?.trim() || null,
-        role: assignedRole,
-      });
+      .upsert(profileRow);
 
     if (profileError) {
       console.error("[staff/create] profile upsert error:", profileError.message);
