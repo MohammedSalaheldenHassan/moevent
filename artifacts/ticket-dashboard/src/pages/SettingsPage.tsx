@@ -81,6 +81,10 @@ export default function SettingsPage() {
 
   // ── Branding ────────────────────────────────────────────────
   const [nameInputBrand, setNameInputBrand] = useState(systemName);
+  // Sync input once org data loads (systemName is "" on first render, then gets populated)
+  useEffect(() => {
+    setNameInputBrand((prev) => (prev === "" ? systemName : prev));
+  }, [systemName]);
   const [brandSaved, setBrandSaved] = useState(false);
   const [brandSaving, setBrandSaving] = useState(false);
   const [brandNameError, setBrandNameError] = useState<string | null>(null);
