@@ -24,7 +24,7 @@ async function fetchProfileFromApi(fallbackToken: string): Promise<Profile | nul
     const res = await fetch(`${apiBase}/auth/role`, {
       headers: { Authorization: `Bearer ${token}` },
       cache: "no-store",
-      signal: AbortSignal.timeout(8000),
+      signal: AbortSignal.timeout(5000),
     });
 
     // If still 401, try once more after forcing a token refresh
@@ -37,7 +37,7 @@ async function fetchProfileFromApi(fallbackToken: string): Promise<Profile | nul
       const retry = await fetch(`${apiBase}/auth/role`, {
         headers: { Authorization: `Bearer ${refreshedToken}` },
         cache: "no-store",
-        signal: AbortSignal.timeout(8000),
+        signal: AbortSignal.timeout(5000),
       });
       if (!retry.ok) {
         console.warn("[AuthContext] role API returned", retry.status, "after refresh");
@@ -71,13 +71,13 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   useEffect(() => {
     mountedRef.current = true;
 
-    // Safety net: never stay loading more than 12 seconds
+    // Safety net: never stay loading more than 6 seconds
     const safetyTimer = setTimeout(() => {
       if (mountedRef.current) {
         console.warn("[AuthContext] Safety timer fired — forcing loading=false");
         setLoading(false);
       }
-    }, 12000);
+    }, 6000);
 
     const { data: { subscription } } = supabase.auth.onAuthStateChange(
       async (event, sess) => {
@@ -112,8 +112,15 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         if (!mountedRef.current) return;
 
         if (!p || (p.role !== "admin" && p.role !== "super_admin")) {
-          console.warn("[AuthContext] Non-admin user on session restore — signing out");
-          await supabase.auth.signOut();
+          console.warn("[AuthContext] Non-admin user on session restore — clearing state and signing out");
+          // Clear state immediately so the login page shows right away
+          setUser(null);
+          setSession(null);
+          setProfile(null);
+          setLoading(false);
+          clearTimeout(safetyTimer);
+          // Sign out in the background — SIGNED_OUT event will be a no-op since state is already cleared
+          void supabase.auth.signOut().catch(() => {});
           return;
         }
 
