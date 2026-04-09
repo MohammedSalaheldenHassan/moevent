@@ -241,13 +241,53 @@ router.patch("/super-admin/organizations/:id", requireSuperAdmin, async (req, re
   }
 });
 
+// Helper: delete an org and all its dependent data in the correct FK order
+async function deleteOrgCascade(adminClient: ReturnType<typeof getAdminClient>, orgId: string): Promise<{ error: string } | null> {
+  // 1. Find all events for this org
+  const { data: events, error: eventsReadErr } = await adminClient
+    .from("events")
+    .select("id")
+    .eq("org_id", orgId);
+  if (eventsReadErr) return { error: eventsReadErr.message };
+
+  const eventIds = (events ?? []).map((e: { id: string }) => e.id);
+
+  if (eventIds.length > 0) {
+    // 2. Delete tickets belonging to those events
+    const { error: ticketsErr } = await adminClient
+      .from("tickets")
+      .delete()
+      .in("event_id", eventIds);
+    if (ticketsErr) return { error: ticketsErr.message };
+
+    // 3. Delete any staff event assignments for those events (ignore if table doesn't exist)
+    await adminClient.from("staff_event_assignments").delete().in("event_id", eventIds).catch(() => {});
+
+    // 4. Delete the events themselves
+    const { error: eventsErr } = await adminClient
+      .from("events")
+      .delete()
+      .eq("org_id", orgId);
+    if (eventsErr) return { error: eventsErr.message };
+  }
+
+  // 5. Unlink any profiles from this org (don't delete users — just detach)
+  await adminClient.from("profiles").update({ org_id: null }).eq("org_id", orgId).catch(() => {});
+
+  // 6. Finally delete the organization
+  const { error: orgErr } = await adminClient.from("organizations").delete().eq("id", orgId);
+  if (orgErr) return { error: orgErr.message };
+
+  return null;
+}
+
 // DELETE /api/super-admin/organizations/:id
 router.delete("/super-admin/organizations/:id", requireSuperAdmin, async (req, res) => {
   try {
     const { id } = req.params;
     const adminClient = getAdminClient();
-    const { error } = await adminClient.from("organizations").delete().eq("id", id);
-    if (error) { res.status(500).json({ error: error.message }); return; }
+    const err = await deleteOrgCascade(adminClient, id);
+    if (err) { res.status(500).json({ error: err.error }); return; }
     res.json({ success: true });
   } catch {
     res.status(500).json({ error: "Internal server error" });
