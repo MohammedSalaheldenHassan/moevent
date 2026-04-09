@@ -10,51 +10,54 @@ import { AuthContext, type Profile } from "./authContextObject";
 // eliminating the "Invalid hook call" HMR crash.
 
 // Fetch the user's profile from the API server using their access token.
-// Always gets the freshest token via getSession() so we don't use a stale
-// access_token from the onAuthStateChange callback (which can lag behind
-// Supabase's background token refresh).
-async function fetchProfileFromApi(fallbackToken: string): Promise<Profile | null> {
-  try {
-    const apiBase = `${window.location.origin}/api`;
+// Uses the token directly — avoids calling supabase.auth.getSession() which
+// can block on a network refresh and hang the entire auth flow.
+async function fetchProfileFromApi(token: string): Promise<Profile | null> {
+  const apiBase = `${window.location.origin}/api`;
 
-    // Prefer the live session token; fall back to the one passed in
-    const { data: { session: liveSession } } = await supabase.auth.getSession();
-    const token = liveSession?.access_token ?? fallbackToken;
+  // Race the entire fetch against a 4-second wall clock so nothing can block
+  // the auth flow beyond that (AbortSignal.timeout only covers the fetch itself).
+  const result = await Promise.race([
+    (async (): Promise<Profile | null> => {
+      try {
+        const res = await fetch(`${apiBase}/auth/role`, {
+          headers: { Authorization: `Bearer ${token}` },
+          cache: "no-store",
+          signal: AbortSignal.timeout(4000),
+        });
 
-    const res = await fetch(`${apiBase}/auth/role`, {
-      headers: { Authorization: `Bearer ${token}` },
-      cache: "no-store",
-      signal: AbortSignal.timeout(5000),
-    });
+        if (res.ok) return await res.json() as Profile;
 
-    // If still 401, try once more after forcing a token refresh
-    if (res.status === 401) {
-      console.warn("[AuthContext] role API returned 401, attempting token refresh…");
-      const { data: refreshed } = await supabase.auth.refreshSession();
-      const refreshedToken = refreshed.session?.access_token;
-      if (!refreshedToken) return null;
+        // 401 means the token might be stale — try a one-shot refresh
+        if (res.status === 401) {
+          console.warn("[AuthContext] role API returned 401, attempting token refresh…");
+          const { data: refreshed } = await supabase.auth.refreshSession();
+          const freshToken = refreshed.session?.access_token;
+          if (!freshToken) return null;
 
-      const retry = await fetch(`${apiBase}/auth/role`, {
-        headers: { Authorization: `Bearer ${refreshedToken}` },
-        cache: "no-store",
-        signal: AbortSignal.timeout(5000),
-      });
-      if (!retry.ok) {
-        console.warn("[AuthContext] role API returned", retry.status, "after refresh");
+          const retry = await fetch(`${apiBase}/auth/role`, {
+            headers: { Authorization: `Bearer ${freshToken}` },
+            cache: "no-store",
+            signal: AbortSignal.timeout(4000),
+          });
+          if (!retry.ok) {
+            console.warn("[AuthContext] role API returned", retry.status, "after refresh");
+            return null;
+          }
+          return await retry.json() as Profile;
+        }
+
+        console.warn("[AuthContext] role API returned", res.status);
+        return null;
+      } catch (err) {
+        console.warn("[AuthContext] role API error:", err);
         return null;
       }
-      return await retry.json() as Profile;
-    }
+    })(),
+    new Promise<null>((resolve) => setTimeout(() => resolve(null), 4500)),
+  ]);
 
-    if (!res.ok) {
-      console.warn("[AuthContext] role API returned", res.status);
-      return null;
-    }
-    return await res.json() as Profile;
-  } catch (err) {
-    console.warn("[AuthContext] role API error:", err);
-    return null;
-  }
+  return result;
 }
 
 export function AuthProvider({ children }: { children: React.ReactNode }) {
