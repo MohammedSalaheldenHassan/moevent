@@ -118,22 +118,23 @@ function App() {
   return (
     <ErrorBoundary>
       <ThemeProvider>
-        <BrandingProvider>
-          <LocaleProvider>
-            <QueryClientProvider client={queryClient}>
-              <TooltipProvider>
-                <AuthProvider>
-                  <OrgProvider>
+        <LocaleProvider>
+          <QueryClientProvider client={queryClient}>
+            <TooltipProvider>
+              <AuthProvider>
+                <OrgProvider>
+                  {/* BrandingProvider must be inside OrgProvider so it can read org data */}
+                  <BrandingProvider>
                     <WouterRouter base={import.meta.env.BASE_URL.replace(/\/$/, "")}>
                       <ProtectedRoutes />
                     </WouterRouter>
                     <Toaster />
-                  </OrgProvider>
-                </AuthProvider>
-              </TooltipProvider>
-            </QueryClientProvider>
-          </LocaleProvider>
-        </BrandingProvider>
+                  </BrandingProvider>
+                </OrgProvider>
+              </AuthProvider>
+            </TooltipProvider>
+          </QueryClientProvider>
+        </LocaleProvider>
       </ThemeProvider>
     </ErrorBoundary>
   );

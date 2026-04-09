@@ -1,85 +1,109 @@
-import { createContext, useContext, useState, useEffect } from "react";
+import { createContext, useContext, useState, useEffect, useCallback } from "react";
+import { useOrg } from "@/contexts/OrgContext";
+import { useAuth } from "@/contexts/useAuth";
 import { supabase } from "@/lib/supabase";
-
-const NAME_KEY = "system_name";
-const LOGO_KEY = "system_logo";
 
 interface BrandingContextType {
   systemName: string;
   systemLogo: string;
   brandingLoaded: boolean;
   setSystemName: (name: string) => Promise<{ error: string | null }>;
-  setSystemLogo: (logo: string) => Promise<{ error: string | null }>;
+  setSystemLogo: (logoUrl: string) => Promise<{ error: string | null }>;
+  uploadLogo: (file: File) => Promise<{ url: string | null; error: string | null }>;
 }
 
 const BrandingContext = createContext<BrandingContextType | undefined>(undefined);
 
-function readCache(key: string): string {
-  try { return localStorage.getItem(key) ?? ""; } catch { return ""; }
-}
-
-function writeCache(key: string, value: string) {
-  try {
-    if (value) { localStorage.removeItem(key); localStorage.setItem(key, value); }
-    else { localStorage.removeItem(key); }
-  } catch { /* quota — skip */ }
-}
+const API_BASE = `${window.location.origin}/api`;
 
 export function BrandingProvider({ children }: { children: React.ReactNode }) {
-  const [systemName, setSystemNameState] = useState<string>(() => readCache(NAME_KEY));
-  const [systemLogo, setSystemLogoState] = useState<string>(() => readCache(LOGO_KEY));
-  const [brandingLoaded, setBrandingLoaded] = useState(false);
+  const { org_name, logo_url, org_id, orgLoaded } = useOrg();
+  const { session } = useAuth();
 
-  // Fetch from DB on mount — localStorage gives instant render, DB corrects it
+  const [systemName, setSystemNameState] = useState<string>("");
+  const [systemLogo, setSystemLogoState] = useState<string>("");
+
+  // Sync from org data whenever it loads or changes
   useEffect(() => {
-    let cancelled = false;
-    (async () => {
-      const { data, error } = await supabase
-        .from("system_settings")
-        .select("key, value")
-        .in("key", [NAME_KEY, LOGO_KEY]);
+    if (!orgLoaded) return;
+    setSystemNameState(org_name ?? "");
+    setSystemLogoState(logo_url ?? "");
+  }, [orgLoaded, org_name, logo_url]);
 
-      if (cancelled || error) {
-        setBrandingLoaded(true);
-        return;
-      }
+  const getToken = useCallback(async (): Promise<string> => {
+    // Prefer live refreshed session token over the cached one
+    const { data: { session: live } } = await supabase.auth.getSession();
+    return live?.access_token ?? session?.access_token ?? "";
+  }, [session?.access_token]);
 
-      const map: Record<string, string> = {};
-      for (const row of data ?? []) map[row.key] = row.value ?? "";
-
-      if (NAME_KEY in map) {
-        setSystemNameState(map[NAME_KEY]);
-        writeCache(NAME_KEY, map[NAME_KEY]);
-      }
-      if (LOGO_KEY in map) {
-        setSystemLogoState(map[LOGO_KEY]);
-        writeCache(LOGO_KEY, map[LOGO_KEY]);
-      }
-      setBrandingLoaded(true);
-    })();
-    return () => { cancelled = true; };
-  }, []);
-
-  const setSystemName = async (name: string): Promise<{ error: string | null }> => {
+  const setSystemName = useCallback(async (name: string): Promise<{ error: string | null }> => {
+    if (!org_id) return { error: "No organization linked to this account" };
     setSystemNameState(name);
-    writeCache(NAME_KEY, name);
-    const { error } = await supabase
-      .from("system_settings")
-      .upsert({ key: NAME_KEY, value: name }, { onConflict: "key" });
-    return { error: error?.message ?? null };
-  };
+    try {
+      const token = await getToken();
+      const res = await fetch(`${API_BASE}/org/branding`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json", Authorization: `Bearer ${token}` },
+        body: JSON.stringify({ name }),
+      });
+      const json = await res.json() as { error?: string };
+      if (!res.ok) return { error: json.error ?? "Failed to save name" };
+      return { error: null };
+    } catch (err) {
+      return { error: err instanceof Error ? err.message : "Failed to save name" };
+    }
+  }, [org_id, getToken]);
 
-  const setSystemLogo = async (logo: string): Promise<{ error: string | null }> => {
-    setSystemLogoState(logo);
-    writeCache(LOGO_KEY, logo);
-    const { error } = await supabase
-      .from("system_settings")
-      .upsert({ key: LOGO_KEY, value: logo }, { onConflict: "key" });
-    return { error: error?.message ?? null };
-  };
+  const setSystemLogo = useCallback(async (logoUrl: string): Promise<{ error: string | null }> => {
+    if (!org_id) return { error: "No organization linked to this account" };
+    setSystemLogoState(logoUrl);
+    try {
+      const token = await getToken();
+      const res = await fetch(`${API_BASE}/org/branding`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json", Authorization: `Bearer ${token}` },
+        body: JSON.stringify({ logo_url: logoUrl }),
+      });
+      const json = await res.json() as { error?: string };
+      if (!res.ok) return { error: json.error ?? "Failed to save logo" };
+      return { error: null };
+    } catch (err) {
+      return { error: err instanceof Error ? err.message : "Failed to save logo" };
+    }
+  }, [org_id, getToken]);
+
+  const uploadLogo = useCallback(async (file: File): Promise<{ url: string | null; error: string | null }> => {
+    if (!org_id) return { url: null, error: "No organization linked to this account" };
+    try {
+      const token = await getToken();
+      const base64 = await new Promise<string>((resolve, reject) => {
+        const reader = new FileReader();
+        reader.onload = (e) => resolve((e.target?.result as string).split(",")[1]);
+        reader.onerror = reject;
+        reader.readAsDataURL(file);
+      });
+      const res = await fetch(`${API_BASE}/org/upload-logo`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json", Authorization: `Bearer ${token}` },
+        body: JSON.stringify({ base64, mimeType: file.type }),
+      });
+      const json = await res.json() as { url?: string; error?: string };
+      if (!res.ok) return { url: null, error: json.error ?? "Upload failed" };
+      return { url: json.url ?? null, error: null };
+    } catch (err) {
+      return { url: null, error: err instanceof Error ? err.message : "Upload failed" };
+    }
+  }, [org_id, getToken]);
 
   return (
-    <BrandingContext.Provider value={{ systemName, systemLogo, brandingLoaded, setSystemName, setSystemLogo }}>
+    <BrandingContext.Provider value={{
+      systemName,
+      systemLogo,
+      brandingLoaded: orgLoaded,
+      setSystemName,
+      setSystemLogo,
+      uploadLogo,
+    }}>
       {children}
     </BrandingContext.Provider>
   );

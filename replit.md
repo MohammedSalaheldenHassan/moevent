@@ -10,7 +10,7 @@ React + Vite frontend at `/`. Connected to Supabase for auth, events, tickets, a
 
 ### Features
 - **Multi-tenant SaaS**: All queries filtered by `org_id` from the user's profile; each organization sees only its own data
-- **Dynamic org branding**: `OrgContext` fetches `logo_url` and `primary_color` from `organizations` table and applies theme
+- **Dynamic org branding**: `OrgContext` fetches `logo_url`, `name`, and `primary_color` from `organizations` table; `BrandingContext` reads from `OrgContext` (per-org) and exposes `setSystemName`/`setSystemLogo`/`uploadLogo` that write back to `organizations` via `/api/org/branding` and `/api/org/upload-logo`
 - **Revenue split**: Dashboard shows Total Revenue, Net Revenue (95% org), Platform Fees (5%)
 - **Recharts charts**: Bar chart (tickets per event), Donut pie chart (revenue split), live attendance progress bar
 - Supabase Auth with admin role check (profiles table, `org_id` now included)

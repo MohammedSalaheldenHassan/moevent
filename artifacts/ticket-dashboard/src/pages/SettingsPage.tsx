@@ -49,7 +49,7 @@ export default function SettingsPage() {
   const { t, lang, setLang } = useLocale();
   const { profile, user } = useAuth();
   const { theme, setTheme } = useTheme();
-  const { systemName, systemLogo, setSystemName, setSystemLogo } = useBranding();
+  const { systemName, systemLogo, setSystemName, setSystemLogo, uploadLogo } = useBranding();
   const isAr = lang === "ar";
 
   // ── Admin Profile ───────────────────────────────────────────
@@ -104,7 +104,7 @@ export default function SettingsPage() {
     setTimeout(() => setBrandSaved(false), 2500);
   };
 
-  const handleLogoUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
+  const handleLogoUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
     setLogoError(null);
     const file = e.target.files?.[0];
     if (!file) return;
@@ -112,41 +112,26 @@ export default function SettingsPage() {
       setLogoError(isAr ? "يرجى اختيار ملف صورة صالح" : "Please select a valid image file");
       return;
     }
-    const MAX_BYTES = 5 * 1024 * 1024;
+    const MAX_BYTES = 8 * 1024 * 1024;
     if (file.size > MAX_BYTES) {
-      setLogoError(isAr ? "حجم الصورة أكبر من 5 ميغابايت." : "Image is larger than 5 MB.");
+      setLogoError(isAr ? "حجم الصورة أكبر من 8 ميغابايت." : "Image is larger than 8 MB.");
       return;
     }
-    const reader = new FileReader();
-    reader.onload = (ev) => {
-      const rawDataUrl = ev.target?.result as string;
-      const img = new Image();
-      img.onload = async () => {
-        const MAX_DIM = 128;
-        let { width, height } = img;
-        if (width > MAX_DIM || height > MAX_DIM) {
-          const ratio = Math.min(MAX_DIM / width, MAX_DIM / height);
-          width = Math.round(width * ratio);
-          height = Math.round(height * ratio);
-        }
-        const canvas = document.createElement("canvas");
-        canvas.width = width;
-        canvas.height = height;
-        canvas.getContext("2d")!.drawImage(img, 0, 0, width, height);
-        const compressed = canvas.toDataURL("image/jpeg", 0.75);
-        setLogoSaving(true);
-        const { error } = await setSystemLogo(compressed);
-        setLogoSaving(false);
-        if (error) {
-          setLogoError(isAr ? `فشل حفظ الشعار: ${error}` : `Failed to save logo: ${error}`);
-          return;
-        }
-        logActivity("settings_changed", "System logo updated", profile?.email ?? undefined);
-      };
-      img.src = rawDataUrl;
-    };
-    reader.readAsDataURL(file);
     e.target.value = "";
+    setLogoSaving(true);
+    const { url, error: uploadError } = await uploadLogo(file);
+    if (uploadError || !url) {
+      setLogoSaving(false);
+      setLogoError(isAr ? `فشل رفع الشعار: ${uploadError}` : `Failed to upload logo: ${uploadError}`);
+      return;
+    }
+    const { error: saveError } = await setSystemLogo(url);
+    setLogoSaving(false);
+    if (saveError) {
+      setLogoError(isAr ? `فشل حفظ الشعار: ${saveError}` : `Failed to save logo: ${saveError}`);
+      return;
+    }
+    logActivity("settings_changed", "System logo updated", profile?.email ?? undefined);
   };
 
   // ── Auto-Cleanup ─────────────────────────────────────────────
@@ -286,7 +271,7 @@ export default function SettingsPage() {
               <div className="flex items-center gap-4">
                 {/* Current logo preview */}
                 <div className="w-20 h-20 rounded-2xl border-2 border-dashed border-border bg-muted/30 flex items-center justify-center shrink-0 overflow-hidden">
-                  {systemLogo && systemLogo.startsWith("data:") ? (
+                  {systemLogo ? (
                     <img
                       src={systemLogo}
                       alt="Logo"
@@ -334,7 +319,7 @@ export default function SettingsPage() {
                     </Button>
                   )}
                   <p className="text-[11px] text-muted-foreground">
-                    {isAr ? "PNG، JPG، SVG — بحد أقصى 800 كيلوبايت" : "PNG, JPG, SVG — max 800 KB"}
+                    {isAr ? "PNG، JPG، SVG — بحد أقصى 8 ميغابايت" : "PNG, JPG, SVG — max 8 MB"}
                   </p>
                 </div>
               </div>
@@ -346,7 +331,7 @@ export default function SettingsPage() {
                 </div>
               )}
 
-              {systemLogo && systemLogo.startsWith("data:") && (
+              {systemLogo && (
                 <div className="flex items-center gap-2 text-sm text-emerald-600 bg-emerald-50 dark:bg-emerald-900/20 rounded-xl px-3 py-2">
                   <CheckCircle2 className="w-4 h-4 shrink-0" />
                   {isAr ? "تم رفع الشعار بنجاح — يظهر في الشريط الجانبي" : "Logo uploaded — now showing in the sidebar"}
@@ -390,7 +375,7 @@ export default function SettingsPage() {
             {/* Preview */}
             <div className="flex items-center gap-3 p-3 bg-muted/40 rounded-xl border border-border">
               <div className="w-9 h-9 rounded-xl overflow-hidden shadow-sm shrink-0">
-                {systemLogo && systemLogo.startsWith("data:") ? (
+                {systemLogo ? (
                   <img src={systemLogo} alt="Logo preview" className="w-full h-full object-cover" />
                 ) : (
                   <div className="w-full h-full bg-gradient-to-br from-violet-500 to-purple-700 flex items-center justify-center text-lg">
