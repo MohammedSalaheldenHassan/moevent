@@ -2,16 +2,16 @@ import { Router, type IRouter } from "express";
 import { createClient } from "@supabase/supabase-js";
 import { deleteExpiredEvents } from "../lib/cleanup";
 import { logger } from "../lib/logger";
+import { getSupabaseProjectUrl } from "../lib/supabaseProjectUrl";
 
 const router: IRouter = Router();
 
-const SUPABASE_URL = "https://lzkitwefaxolgnuwdvuk.supabase.co";
 const DAYS_GRACE = 3;
 
 function getAdminClient() {
   const key = process.env["SUPABASE_SERVICE_ROLE_KEY"];
   if (!key) throw new Error("SUPABASE_SERVICE_ROLE_KEY is not set");
-  return createClient(SUPABASE_URL, key, {
+  return createClient(getSupabaseProjectUrl(), key, {
     auth: { autoRefreshToken: false, persistSession: false },
   });
 }

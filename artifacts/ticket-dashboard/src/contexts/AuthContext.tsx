@@ -13,52 +13,124 @@ import { AuthContext, type Profile } from "./authContextObject";
 // Fetch the user's profile from the API server using their access token.
 // Uses the token directly — avoids calling supabase.auth.getSession() which
 // can block on a network refresh and hang the entire auth flow.
-async function fetchProfileFromApi(token: string): Promise<Profile | null> {
+async function fetchProfileFromApi(
+  token: string,
+): Promise<{ profile: Profile | null; hint: string | null }> {
   const apiBase = getApiBase();
+  const url = `${apiBase}/auth/role`;
 
-  // Race the entire fetch against a 4-second wall clock so nothing can block
-  // the auth flow beyond that (AbortSignal.timeout only covers the fetch itself).
-  const result = await Promise.race([
-    (async (): Promise<Profile | null> => {
-      try {
-        const res = await fetch(`${apiBase}/auth/role`, {
-          headers: { Authorization: `Bearer ${token}` },
-          cache: "no-store",
-          signal: AbortSignal.timeout(4000),
-        });
+  const run = async (): Promise<{ profile: Profile | null; hint: string | null }> => {
+    try {
+      const res = await fetch(url, {
+        headers: { Authorization: `Bearer ${token}` },
+        cache: "no-store",
+        signal: AbortSignal.timeout(12_000),
+      });
 
-        if (res.ok) return await res.json() as Profile;
-
-        // 401 means the token might be stale — try a one-shot refresh
-        if (res.status === 401) {
-          console.warn("[AuthContext] role API returned 401, attempting token refresh…");
-          const { data: refreshed } = await supabase.auth.refreshSession();
-          const freshToken = refreshed.session?.access_token;
-          if (!freshToken) return null;
-
-          const retry = await fetch(`${apiBase}/auth/role`, {
-            headers: { Authorization: `Bearer ${freshToken}` },
-            cache: "no-store",
-            signal: AbortSignal.timeout(4000),
-          });
-          if (!retry.ok) {
-            console.warn("[AuthContext] role API returned", retry.status, "after refresh");
-            return null;
-          }
-          return await retry.json() as Profile;
-        }
-
-        console.warn("[AuthContext] role API returned", res.status);
-        return null;
-      } catch (err) {
-        console.warn("[AuthContext] role API error:", err);
-        return null;
+      if (res.ok) {
+        return { profile: (await res.json()) as Profile, hint: null };
       }
-    })(),
-    new Promise<null>((resolve) => setTimeout(() => resolve(null), 4500)),
-  ]);
 
-  return result;
+      let bodyText = "";
+      try {
+        bodyText = await res.text();
+      } catch {
+        /* ignore */
+      }
+
+      if (res.status === 401) {
+        const { data: refreshed } = await supabase.auth.refreshSession();
+        const freshToken = refreshed.session?.access_token;
+        if (!freshToken) {
+          return {
+            profile: null,
+            hint:
+              "The API rejected your session (401). Set SUPABASE_URL on the API service to the same project URL as VITE_SUPABASE_URL, and use a service_role key from that project.",
+          };
+        }
+        const retry = await fetch(url, {
+          headers: { Authorization: `Bearer ${freshToken}` },
+          cache: "no-store",
+          signal: AbortSignal.timeout(12_000),
+        });
+        if (!retry.ok) {
+          return {
+            profile: null,
+            hint: `Role check failed after refresh (HTTP ${retry.status}). Open ${url} in the browser network tab for details.`,
+          };
+        }
+        return { profile: (await retry.json()) as Profile, hint: null };
+      }
+
+      let apiErr = "";
+      try {
+        const j = JSON.parse(bodyText) as { error?: string };
+        apiErr = (j.error ?? "").trim();
+      } catch {
+        /* not JSON */
+      }
+
+      if (res.status === 404) {
+        if (apiErr.includes("Profile not found") || bodyText.includes("Profile not found")) {
+          return {
+            profile: null,
+            hint:
+              "No profile found for this user in the database. Add a row in Supabase `profiles` with this user's id and role admin or super_admin.",
+          };
+        }
+        return {
+          profile: null,
+          hint: `Wrong API URL (HTTP 404). Tried: ${url}. Set VITE_API_BASE to your Railway API hostname, redeploy the frontend, and open /api/healthz on that host to confirm.`,
+        };
+      }
+
+      if (res.status === 500 && apiErr.includes("SUPABASE_SERVICE_ROLE_KEY")) {
+        return {
+          profile: null,
+          hint: "API is missing SUPABASE_SERVICE_ROLE_KEY. Add it in Railway (API service) and redeploy.",
+        };
+      }
+
+      if (res.status >= 400 && bodyText.includes("Cannot GET")) {
+        return {
+          profile: null,
+          hint: `Wrong API path. Tried: ${url}. Set VITE_API_BASE to your API origin (e.g. https://xxx.up.railway.app), rebuild the frontend.`,
+        };
+      }
+
+      return {
+        profile: null,
+        hint: `Role API HTTP ${res.status}${apiErr ? `: ${apiErr}` : ""}. Request: ${url}`,
+      };
+    } catch (err) {
+      const name = err instanceof Error ? err.name : "";
+      const msg = err instanceof Error ? err.message : String(err);
+      if (name === "AbortError" || msg.toLowerCase().includes("abort")) {
+        return {
+          profile: null,
+          hint: `Timed out talking to ${url}. Confirm the API is running and VITE_API_BASE matches your API service URL.`,
+        };
+      }
+      return {
+        profile: null,
+        hint: `Cannot reach ${url} (${msg}). Often: wrong VITE_API_BASE, frontend not rebuilt after env change, or browser blocked the request (CORS).`,
+      };
+    }
+  };
+
+  return await Promise.race([
+    run(),
+    new Promise<{ profile: Profile | null; hint: string | null }>((resolve) =>
+      setTimeout(
+        () =>
+          resolve({
+            profile: null,
+            hint: `Role check timed out. Tried: ${url}`,
+          }),
+        13_000,
+      ),
+    ),
+  ]);
 }
 
 export function AuthProvider({ children }: { children: React.ReactNode }) {
@@ -112,11 +184,11 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         }
 
         // INITIAL_SESSION / SIGNED_IN (page restore): verify admin role before allowing in.
-        const p = await fetchProfileFromApi(sess.access_token);
+        const { profile: p, hint } = await fetchProfileFromApi(sess.access_token);
         if (!mountedRef.current) return;
 
         if (!p || (p.role !== "admin" && p.role !== "super_admin")) {
-          console.warn("[AuthContext] Non-admin user on session restore — clearing state and signing out");
+          console.warn("[AuthContext] Non-admin user on session restore — clearing state and signing out", hint ?? "");
           // Clear state immediately so the login page shows right away
           setUser(null);
           setSession(null);
@@ -159,13 +231,14 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       }
 
       if (data.user && data.session) {
-        const p = await fetchProfileFromApi(data.session.access_token);
+        const { profile: p, hint } = await fetchProfileFromApi(data.session.access_token);
 
         if (p === null) {
           await supabase.auth.signOut();
           return {
             error:
-              "Unable to verify your role. Locally: run the API on port 3001 and set SUPABASE_SERVICE_ROLE_KEY in the repo root .env. On Railway (split services): set VITE_API_BASE to your API public URL ending in /api at build time, and set SUPABASE_SERVICE_ROLE_KEY on the API service.",
+              hint ??
+              "Unable to verify your role. Set SUPABASE_URL + SUPABASE_SERVICE_ROLE_KEY on the API, VITE_API_BASE on the frontend build if the API is on another host, and redeploy both.",
           };
         }
 

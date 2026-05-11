@@ -3,11 +3,9 @@ import PDFDocument from "pdfkit";
 import QRCode from "qrcode";
 import { Resend } from "resend";
 import { createClient } from "@supabase/supabase-js";
+import { getSupabaseProjectUrl } from "../lib/supabaseProjectUrl";
 
 const router = Router();
-
-const SUPABASE_URL =
-  process.env["SUPABASE_URL"] ?? "https://lzkitwefaxolgnuwdvuk.supabase.co";
 
 // ── PDF builder ────────────────────────────────────────────────────────────────
 
@@ -302,7 +300,7 @@ router.post("/issue-ticket", async (req, res) => {
     // 4. Mark ticket as emailed in Supabase (best-effort — won't fail the request)
     const serviceKey = process.env["SUPABASE_SERVICE_ROLE_KEY"];
     if (serviceKey) {
-      const supabase = createClient(SUPABASE_URL, serviceKey, {
+      const supabase = createClient(getSupabaseProjectUrl(), serviceKey, {
         auth: { autoRefreshToken: false, persistSession: false },
       });
       const { error: dbErr } = await supabase

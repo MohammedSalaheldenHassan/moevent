@@ -1,14 +1,13 @@
 import { Router, type IRouter } from "express";
 import { createClient } from "@supabase/supabase-js";
+import { getSupabaseProjectUrl } from "../lib/supabaseProjectUrl";
 
 const router: IRouter = Router();
-
-const SUPABASE_URL = "https://lzkitwefaxolgnuwdvuk.supabase.co";
 
 function getAdminClient() {
   const serviceRoleKey = process.env["SUPABASE_SERVICE_ROLE_KEY"];
   if (!serviceRoleKey) throw new Error("SUPABASE_SERVICE_ROLE_KEY is not configured");
-  return createClient(SUPABASE_URL, serviceRoleKey, {
+  return createClient(getSupabaseProjectUrl(), serviceRoleKey, {
     auth: { autoRefreshToken: false, persistSession: false },
   });
 }
@@ -53,6 +52,11 @@ router.get("/auth/role", async (req, res) => {
       org_id: (profile.org_id ?? null) as string | null,
     });
   } catch (err) {
+    const msg = err instanceof Error ? err.message : String(err);
+    if (msg.includes("SUPABASE_SERVICE_ROLE_KEY")) {
+      res.status(500).json({ error: "Server misconfiguration: SUPABASE_SERVICE_ROLE_KEY is not set" });
+      return;
+    }
     res.status(500).json({ error: "Internal server error" });
   }
 });
