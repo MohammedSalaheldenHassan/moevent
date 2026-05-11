@@ -29,6 +29,7 @@ import {
   DialogFooter,
 } from "@/components/ui/dialog";
 import { logActivity } from "@/lib/activityLogger";
+import { getApiBase } from "@/lib/apiBase";
 
 interface Profile {
   id: string;
@@ -36,8 +37,6 @@ interface Profile {
   full_name: string | null;
   email: string | null;
 }
-
-const API_BASE = `${window.location.origin}/api`;
 
 export default function StaffPage() {
   const { t, lang } = useLocale();
@@ -123,7 +122,7 @@ export default function StaffPage() {
     setAddSaving(true);
     setAddError(null);
     try {
-      const res = await fetch(`${API_BASE}/staff/create`, {
+      const res = await fetch(`${getApiBase()}/staff/create`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({

@@ -29,6 +29,7 @@ import {
   Clock,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
+import { getApiBase } from "@/lib/apiBase";
 import { type Theme } from "@/contexts/ThemeContext";
 
 function SectionCard({ title, icon: Icon, children }: { title: string; icon: React.ElementType; children: React.ReactNode }) {
@@ -143,8 +144,7 @@ export default function SettingsPage() {
   const [cleanupLoading, setCleanupLoading] = useState(false);
   const [cleanupRunning, setCleanupRunning] = useState(false);
   const [cleanupMsg, setCleanupMsg] = useState<{ type: "ok" | "error"; text: string } | null>(null);
-  const API_BASE = import.meta.env.BASE_URL.replace(/\/$/, "").replace(/^\/[^/]+/, "") || "";
-  const cleanupApiBase = `${window.location.origin}${API_BASE}/api`;
+  const cleanupApiBase = getApiBase();
 
   useEffect(() => {
     setCleanupLoading(true);

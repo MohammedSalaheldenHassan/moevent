@@ -2,6 +2,7 @@ import { createContext, useContext, useState, useEffect, useCallback } from "rea
 import { useOrg } from "@/contexts/OrgContext";
 import { useAuth } from "@/contexts/useAuth";
 import { supabase } from "@/lib/supabase";
+import { getApiBase } from "@/lib/apiBase";
 
 interface BrandingContextType {
   systemName: string;
@@ -13,8 +14,6 @@ interface BrandingContextType {
 }
 
 const BrandingContext = createContext<BrandingContextType | undefined>(undefined);
-
-const API_BASE = `${window.location.origin}/api`;
 
 export function BrandingProvider({ children }: { children: React.ReactNode }) {
   const { org_name, logo_url, org_id, orgLoaded } = useOrg();
@@ -41,7 +40,7 @@ export function BrandingProvider({ children }: { children: React.ReactNode }) {
     setSystemNameState(name);
     try {
       const token = await getToken();
-      const res = await fetch(`${API_BASE}/org/branding`, {
+      const res = await fetch(`${getApiBase()}/org/branding`, {
         method: "PATCH",
         headers: { "Content-Type": "application/json", Authorization: `Bearer ${token}` },
         body: JSON.stringify({ name }),
@@ -59,7 +58,7 @@ export function BrandingProvider({ children }: { children: React.ReactNode }) {
     setSystemLogoState(logoUrl);
     try {
       const token = await getToken();
-      const res = await fetch(`${API_BASE}/org/branding`, {
+      const res = await fetch(`${getApiBase()}/org/branding`, {
         method: "PATCH",
         headers: { "Content-Type": "application/json", Authorization: `Bearer ${token}` },
         body: JSON.stringify({ logo_url: logoUrl }),
@@ -82,7 +81,7 @@ export function BrandingProvider({ children }: { children: React.ReactNode }) {
         reader.onerror = reject;
         reader.readAsDataURL(file);
       });
-      const res = await fetch(`${API_BASE}/org/upload-logo`, {
+      const res = await fetch(`${getApiBase()}/org/upload-logo`, {
         method: "POST",
         headers: { "Content-Type": "application/json", Authorization: `Bearer ${token}` },
         body: JSON.stringify({ base64, mimeType: file.type }),

@@ -2,6 +2,7 @@ import { useEffect, useState } from "react";
 import { useAuth } from "@/contexts/useAuth";
 import { useLocale } from "@/contexts/LocaleContext";
 import { supabase } from "@/lib/supabase";
+import { getApiBase } from "@/lib/apiBase";
 import {
   Building2, Users, CalendarDays, Ticket, DollarSign, TrendingUp,
   RefreshCw, Plus, Pencil, Trash2, X, Check, AlertCircle, Loader2,
@@ -63,7 +64,7 @@ export default function SuperAdminPage() {
   const { profile, session, signOut } = useAuth();
   const { lang } = useLocale();
   const isAr = lang === "ar";
-  const apiBase = `${window.location.origin}/api`;
+  const apiBase = getApiBase();
   const token = session?.access_token ?? "";
 
   const [tab, setTab] = useState<Tab>("overview");

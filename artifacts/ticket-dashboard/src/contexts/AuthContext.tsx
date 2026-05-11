@@ -1,5 +1,6 @@
 import React, { useEffect, useState, useRef } from "react";
 import { supabase } from "@/lib/supabase";
+import { getApiBase } from "@/lib/apiBase";
 import type { User, Session } from "@supabase/supabase-js";
 import { logActivity } from "@/lib/activityLogger";
 import { AuthContext, type Profile } from "./authContextObject";
@@ -13,7 +14,7 @@ import { AuthContext, type Profile } from "./authContextObject";
 // Uses the token directly — avoids calling supabase.auth.getSession() which
 // can block on a network refresh and hang the entire auth flow.
 async function fetchProfileFromApi(token: string): Promise<Profile | null> {
-  const apiBase = `${window.location.origin}/api`;
+  const apiBase = getApiBase();
 
   // Race the entire fetch against a 4-second wall clock so nothing can block
   // the auth flow beyond that (AbortSignal.timeout only covers the fetch itself).
@@ -164,7 +165,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
           await supabase.auth.signOut();
           return {
             error:
-              "Unable to verify your role. Start the API server (defaults to port 3001 with the dashboard dev proxy) and set SUPABASE_SERVICE_ROLE_KEY.",
+              "Unable to verify your role. Locally: run the API on port 3001 and set SUPABASE_SERVICE_ROLE_KEY in the repo root .env. On Railway (split services): set VITE_API_BASE to your API public URL ending in /api at build time, and set SUPABASE_SERVICE_ROLE_KEY on the API service.",
           };
         }
 
