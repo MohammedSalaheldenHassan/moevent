@@ -13,6 +13,11 @@ function getAdminClient() {
 }
 
 export async function deleteExpiredEvents(): Promise<void> {
+  if (!process.env["SUPABASE_SERVICE_ROLE_KEY"]) {
+    logger.warn("[cleanup] Skipping sweep — SUPABASE_SERVICE_ROLE_KEY is not set");
+    return;
+  }
+
   const cutoff = new Date();
   cutoff.setDate(cutoff.getDate() - DAYS_GRACE);
   const cutoffIso = cutoff.toISOString();

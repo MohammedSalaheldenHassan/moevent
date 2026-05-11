@@ -3,7 +3,10 @@
   "version": "0.0.0",
   "license": "MIT",
   "scripts": {
-    "preinstall": "sh -c 'rm -f package-lock.json yarn.lock; case \"$npm_config_user_agent\" in pnpm/*) ;; *) echo \"Use pnpm instead\" >&2; exit 1 ;; esac'",
+    "preinstall": "node -e \"const fs=require('fs');for(const f of['package-lock.json','yarn.lock']){try{fs.unlinkSync(f)}catch{}};const ua=process.env.npm_config_user_agent||'';if(!ua.includes('pnpm')){console.error('Use pnpm instead');process.exit(1)}\"",
+    "dev": "pnpm exec kill-port 3001 5173 5174 && concurrently -k -n api,dashboard -c cyan,magenta \"pnpm run dev:api\" \"pnpm exec wait-on http://127.0.0.1:3001/api/healthz && pnpm --filter @workspace/ticket-dashboard run dev\"",
+    "dev:api": "pnpm --filter @workspace/api-server run dev",
+    "dev:dashboard": "pnpm --filter @workspace/ticket-dashboard run dev",
     "build": "pnpm run typecheck && pnpm -r --if-present run build",
     "typecheck:libs": "tsc --build",
     "typecheck": "pnpm run typecheck:libs && pnpm -r --filter \"./artifacts/**\" --filter \"./scripts\" --if-present run typecheck"
@@ -17,6 +20,9 @@
     }
   },
   "devDependencies": {
+    "concurrently": "^9.2.1",
+    "kill-port": "^2.0.1",
+    "wait-on": "^8.0.5",
     "typescript": "~5.9.2",
     "prettier": "^3.8.1"
   }

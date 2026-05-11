@@ -1,15 +1,9 @@
+import "./env-loader";
 import app from "./app";
 import { logger } from "./lib/logger";
 import { deleteExpiredEvents } from "./lib/cleanup";
 
-const rawPort = process.env["PORT"];
-
-if (!rawPort) {
-  throw new Error(
-    "PORT environment variable is required but was not provided.",
-  );
-}
-
+const rawPort = process.env["PORT"] ?? "3001";
 const port = Number(rawPort);
 
 if (Number.isNaN(port) || port <= 0) {

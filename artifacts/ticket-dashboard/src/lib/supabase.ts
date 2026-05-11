@@ -1,41 +1,61 @@
 import { createClient, SupabaseClient } from "@supabase/supabase-js";
 
+/** Strip BOM, whitespace, and optional wrapping quotes from Vite env strings. */
+function normalizeEnv(value: unknown): string {
+  if (value === undefined || value === null) return "";
+  return String(value)
+    .replace(/^\uFEFF/, "")
+    .trim()
+    .replace(/^["']|["']$/g, "");
+}
+
 // Public Supabase project URL — not a secret
-const supabaseUrl = import.meta.env.VITE_SUPABASE_URL || "https://lzkitwefaxolgnuwdvuk.supabase.co";
-const supabaseAnonKey = import.meta.env.VITE_SUPABASE_ANON_KEY as string;
+const supabaseUrl =
+  normalizeEnv(import.meta.env.VITE_SUPABASE_URL) ||
+  "https://lzkitwefaxolgnuwdvuk.supabase.co";
+const supabaseAnonKey = normalizeEnv(import.meta.env.VITE_SUPABASE_ANON_KEY);
 
 if (!supabaseAnonKey) {
   console.error(
     "[TicketHub] VITE_SUPABASE_ANON_KEY is not set.\n" +
-    "Go to Replit Secrets and add:\n" +
-    "  Key: VITE_SUPABASE_ANON_KEY\n" +
-    "  Value: your Supabase project anon key\n" +
-    "You can find it at: https://supabase.com/dashboard/project/lzkitwefaxolgnuwdvuk/settings/api"
+      "Add it to the repo root .env (not the service role key):\n" +
+      "  VITE_SUPABASE_ANON_KEY=<anon or publishable key from Supabase → Project Settings → API>\n" +
+      "Then restart `pnpm dev` so Vite reloads env.\n" +
+      "https://supabase.com/dashboard/project/lzkitwefaxolgnuwdvuk/settings/api",
   );
 }
 
 console.log("[TicketHub] Supabase URL:", supabaseUrl);
 console.log("[TicketHub] Anon key present:", !!supabaseAnonKey);
 
-// Use a window-level singleton so HMR never creates multiple GoTrueClient instances
 declare global {
   interface Window {
     __tickethub_supabase__?: SupabaseClient;
+    __tickethub_supabase_cfg__?: { url: string; key: string };
   }
 }
 
+const cfg = { url: supabaseUrl, key: supabaseAnonKey || "MISSING_KEY" };
+const prev = window.__tickethub_supabase_cfg__;
+if (
+  window.__tickethub_supabase__ &&
+  prev &&
+  (prev.url !== cfg.url || prev.key !== cfg.key)
+) {
+  void window.__tickethub_supabase__.auth.signOut().catch(() => {});
+  delete window.__tickethub_supabase__;
+  delete window.__tickethub_supabase_cfg__;
+}
+
 if (!window.__tickethub_supabase__) {
-  window.__tickethub_supabase__ = createClient(
-    supabaseUrl,
-    supabaseAnonKey || "MISSING_KEY",
-    {
-      auth: {
-        persistSession: true,
-        autoRefreshToken: true,
-        detectSessionInUrl: false,
-      },
-    }
-  );
+  window.__tickethub_supabase__ = createClient(cfg.url, cfg.key, {
+    auth: {
+      persistSession: true,
+      autoRefreshToken: true,
+      detectSessionInUrl: false,
+    },
+  });
+  window.__tickethub_supabase_cfg__ = { url: cfg.url, key: cfg.key };
 }
 
 export const supabase = window.__tickethub_supabase__;

@@ -146,7 +146,16 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     signingInRef.current = true;
     try {
       const { data, error } = await supabase.auth.signInWithPassword({ email, password });
-      if (error) return { error: error.message };
+      if (error) {
+        const msg = error.message ?? "";
+        if (/invalid api key/i.test(msg)) {
+          return {
+            error:
+              "Supabase rejected the browser API key. In the repo root .env, set VITE_SUPABASE_ANON_KEY to the anon / publishable key from Supabase → Project Settings → API (not the service_role secret). Match VITE_SUPABASE_URL to the same project, save the file, then restart `pnpm dev`.",
+          };
+        }
+        return { error: msg };
+      }
 
       if (data.user && data.session) {
         const p = await fetchProfileFromApi(data.session.access_token);
@@ -154,7 +163,8 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         if (p === null) {
           await supabase.auth.signOut();
           return {
-            error: "Unable to verify account — please try again.",
+            error:
+              "Unable to verify your role. Start the API server (defaults to port 3001 with the dashboard dev proxy) and set SUPABASE_SERVICE_ROLE_KEY.",
           };
         }
 
