@@ -13,6 +13,37 @@ import { AuthContext, type Profile } from "./authContextObject";
 // Fetch the user's profile from the API server using their access token.
 // Uses the token directly — avoids calling supabase.auth.getSession() which
 // can block on a network refresh and hang the entire auth flow.
+// Parses GET /auth/role body; detects HTML (wrong host / static SPA) before JSON.parse throws.
+function parseRoleBody(body: string, url: string): { profile: Profile | null; hint: string | null } {
+  const t = body.trim();
+  if (t.startsWith("<!") || (t.startsWith("<") && t.toLowerCase().includes("doctype"))) {
+    return {
+      profile: null,
+      hint:
+        `That URL returned a web page (HTML), not the JSON API — usually the static frontend or the wrong Railway service. Point VITE_API_BASE at the service that runs the Node/Express API only. Check in a new tab: ${url.replace(/\/auth\/role$/, "/healthz")} must return JSON like {"status":"ok"}.`,
+    };
+  }
+  if (t.startsWith("<")) {
+    return {
+      profile: null,
+      hint:
+        `That URL returned HTML, not JSON. Fix VITE_API_BASE to your API Railway hostname (not the static site). Verify: …/api/healthz returns JSON.`,
+    };
+  }
+  try {
+    const profile = JSON.parse(t) as Profile;
+    if (!profile || typeof profile !== "object" || typeof profile.role !== "string") {
+      return { profile: null, hint: `Unexpected JSON from ${url}.` };
+    }
+    return { profile, hint: null };
+  } catch {
+    return {
+      profile: null,
+      hint: `Invalid JSON from ${url}: ${t.slice(0, 160)}${t.length > 160 ? "…" : ""}`,
+    };
+  }
+}
+
 async function fetchProfileFromApi(
   token: string,
 ): Promise<{ profile: Profile | null; hint: string | null }> {
@@ -27,16 +58,13 @@ async function fetchProfileFromApi(
         signal: AbortSignal.timeout(12_000),
       });
 
+      const text = await res.text();
+
       if (res.ok) {
-        return { profile: (await res.json()) as Profile, hint: null };
+        return parseRoleBody(text, url);
       }
 
-      let bodyText = "";
-      try {
-        bodyText = await res.text();
-      } catch {
-        /* ignore */
-      }
+      let bodyText = text;
 
       if (res.status === 401) {
         const { data: refreshed } = await supabase.auth.refreshSession();
@@ -53,13 +81,14 @@ async function fetchProfileFromApi(
           cache: "no-store",
           signal: AbortSignal.timeout(12_000),
         });
+        const retryText = await retry.text();
         if (!retry.ok) {
           return {
             profile: null,
             hint: `Role check failed after refresh (HTTP ${retry.status}). Open ${url} in the browser network tab for details.`,
           };
         }
-        return { profile: (await retry.json()) as Profile, hint: null };
+        return parseRoleBody(retryText, url);
       }
 
       let apiErr = "";
