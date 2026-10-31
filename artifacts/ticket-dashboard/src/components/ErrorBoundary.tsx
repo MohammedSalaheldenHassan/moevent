@@ -53,7 +53,7 @@ export class ErrorBoundary extends React.Component<Props, State> {
       return (
         <div className="min-h-screen flex items-center justify-center bg-background">
           <div className="text-center p-8 max-w-md">
-            <div className="w-16 h-16 bg-primary/10 rounded-2xl flex items-center justify-center mx-auto mb-4">
+            <div className="w-16 h-16 bg-primary/10 rounded-lg flex items-center justify-center mx-auto mb-4">
               <svg className="w-8 h-8 text-primary animate-spin" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
               </svg>
@@ -69,7 +69,7 @@ export class ErrorBoundary extends React.Component<Props, State> {
                 <p className="text-muted-foreground text-sm mb-6">{this.state.error?.message || "An unexpected error occurred."}</p>
                 <button
                   onClick={() => window.location.reload()}
-                  className="w-full px-4 py-2.5 bg-gradient-to-r from-violet-600 to-purple-600 text-white rounded-xl text-sm font-semibold shadow-md shadow-violet-500/25"
+                  className="w-full px-4 py-2.5 bg-primary text-white rounded-xl text-sm font-semibold shadow-md"
                 >
                   Reload page
                 </button>

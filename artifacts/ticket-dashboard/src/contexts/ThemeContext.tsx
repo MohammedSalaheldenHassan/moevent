@@ -19,9 +19,9 @@ function getResolved(t: Theme): "light" | "dark" {
 
 export function ThemeProvider({ children }: { children: React.ReactNode }) {
   const [theme, setThemeState] = useState<Theme>(() => {
-    return (localStorage.getItem("theme") as Theme) || "dark";
+    return (localStorage.getItem("theme") as Theme) || "light";
   });
-  const [resolvedTheme, setResolvedTheme] = useState<"light" | "dark">(() => getResolved((localStorage.getItem("theme") as Theme) || "dark"));
+  const [resolvedTheme, setResolvedTheme] = useState<"light" | "dark">(() => getResolved((localStorage.getItem("theme") as Theme) || "light"));
 
   useEffect(() => {
     const resolved = getResolved(theme);

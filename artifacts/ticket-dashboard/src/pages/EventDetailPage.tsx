@@ -484,13 +484,13 @@ export default function EventDetailPage() {
             * { box-sizing: border-box; margin: 0; padding: 0; }
             body { font-family: ${isAr ? "'Cairo'" : "'Inter'"}, system-ui, sans-serif; display: flex; justify-content: center; padding: 40px; background: #f3f4f6; }
             .ticket { background: white; border-radius: 24px; max-width: 420px; width: 100%; overflow: hidden; box-shadow: 0 20px 60px rgba(0,0,0,0.12); }
-            .ticket-header { background: linear-gradient(135deg, #7c3aed, #9333ea); padding: 28px 24px; text-align: center; }
+            .ticket-header { background: linear-gradient(135deg, hsl(var(--primary)), #9333ea); padding: 28px 24px; text-align: center; }
             .ticket-logo { font-size: 32px; margin-bottom: 6px; }
             .ticket-app { color: rgba(255,255,255,0.85); font-size: 14px; font-weight: 600; }
             .ticket-body { padding: 24px; }
             .event-name { font-size: 20px; font-weight: 800; color: #111827; margin-bottom: 8px; }
             .event-meta { display: flex; gap: 10px; font-size: 13px; color: #6b7280; margin-bottom: 8px; flex-wrap: wrap; }
-            .price-badge { display: inline-block; background: #f3f0ff; color: #6d28d9; font-size: 13px; font-weight: 700; padding: 4px 12px; border-radius: 999px; margin-bottom: 20px; }
+            .price-badge { display: inline-block; background: #f3f0ff; color: hsl(var(--primary)); font-size: 13px; font-weight: 700; padding: 4px 12px; border-radius: 999px; margin-bottom: 20px; }
             .divider { border: none; border-top: 2px dashed #e5e7eb; margin: 0 -24px 20px; }
             .customer-section { margin-bottom: 16px; }
             .customer-label { font-size: 10px; font-weight: 700; color: #9ca3af; text-transform: uppercase; letter-spacing: 0.08em; margin-bottom: 3px; }
@@ -597,86 +597,74 @@ export default function EventDetailPage() {
 
       {loading ? (
         <div className="space-y-6">
-          <div className="bg-gradient-to-br from-violet-600 to-purple-700 rounded-2xl p-6 animate-pulse">
+          <div className="bg-primary rounded-lg p-6 animate-pulse">
             <div className="h-8 bg-white/20 rounded-lg w-2/3 mb-4" />
             <div className="h-4 bg-white/20 rounded w-1/3" />
           </div>
         </div>
       ) : error ? (
-        <div className="flex items-center gap-2.5 p-4 bg-destructive/10 border border-destructive/20 rounded-2xl text-sm text-destructive">
+        <div className="flex items-center gap-2.5 p-4 bg-destructive/10 border border-destructive/20 rounded-lg text-sm text-destructive">
           <AlertCircle className="w-4 h-4 shrink-0" />
           {error}
         </div>
       ) : event ? (
         <>
           {/* Event Header */}
-          <div className="bg-gradient-to-br from-violet-600 via-purple-600 to-purple-800 rounded-2xl p-6 text-white shadow-xl shadow-violet-500/25 overflow-hidden relative">
-            {/* Event image as background */}
-            {event.image_url && (
-              <div className="absolute inset-0 rounded-2xl overflow-hidden">
+          <div className="bg-card border border-card-border rounded-lg overflow-hidden">
+            <div className="flex flex-col sm:flex-row">
+              {event.image_url && (
                 <img
                   src={event.image_url}
-                  alt={event.title}
-                  className="w-full h-full object-cover opacity-25"
+                  alt=""
+                  className="w-full sm:w-56 h-40 sm:h-auto object-cover border-b sm:border-b-0 sm:border-e border-border"
                 />
-                <div className="absolute inset-0 bg-gradient-to-br from-violet-700/80 via-purple-700/70 to-purple-900/80" />
+              )}
+              <div className="flex-1 p-6">
+                <div className="flex items-start justify-between gap-4">
+                  <h1 className="text-xl font-semibold tracking-tight text-foreground leading-tight">{event.title}</h1>
+                  {event.price != null && (
+                    <span className="shrink-0 text-sm font-medium text-foreground tabular-nums border border-border rounded-md px-2.5 py-1">
+                      {formatPrice(event.price)}
+                    </span>
+                  )}
+                </div>
+                <div className="flex flex-wrap gap-x-5 gap-y-1.5 mt-2 text-sm text-muted-foreground">
+                  {event.event_date && (
+                    <span className="flex items-center gap-1.5">
+                      <CalendarDays className="w-3.5 h-3.5" strokeWidth={1.75} />
+                      {fmtDate(event.event_date)}
+                    </span>
+                  )}
+                  {event.location && (
+                    <span className="flex items-center gap-1.5">
+                      <MapPin className="w-3.5 h-3.5" strokeWidth={1.75} />
+                      {event.location}
+                    </span>
+                  )}
+                </div>
               </div>
-            )}
-            {/* Background decoration (shown when no image) */}
-            {!event.image_url && (
-              <div className="absolute inset-0 opacity-10">
-                <div className="absolute -top-6 -end-6 w-40 h-40 rounded-full bg-white blur-3xl" />
-                <div className="absolute -bottom-6 -start-6 w-32 h-32 rounded-full bg-white blur-2xl" />
-              </div>
-            )}
-            <div className="relative">
-              <div className="flex items-start justify-between gap-4 mb-4">
-                <h1 className="text-2xl font-black leading-tight">{event.title}</h1>
-                {event.price != null && (
-                  <div className="shrink-0 flex items-center gap-1.5 bg-white/15 backdrop-blur-sm px-3 py-1.5 rounded-xl border border-white/20">
-                    <DollarSign className="w-4 h-4 text-yellow-300" />
-                    <span className="font-bold text-white text-sm">{formatPrice(event.price)}</span>
-                  </div>
-                )}
-              </div>
+            </div>
 
-              <div className="flex flex-wrap gap-4 text-sm text-white/80 mb-5">
-                {event.event_date && (
-                  <span className="flex items-center gap-1.5 bg-white/10 px-3 py-1 rounded-lg">
-                    <CalendarDays className="w-3.5 h-3.5" />
-                    {fmtDate(event.event_date)}
-                  </span>
-                )}
-                {event.location && (
-                  <span className="flex items-center gap-1.5 bg-white/10 px-3 py-1 rounded-lg">
-                    <MapPin className="w-3.5 h-3.5" />
-                    {event.location}
-                  </span>
-                )}
-              </div>
-
-              {/* Quick stats */}
-              <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
-                {[
-                  { label: t.totalTickets, value: tickets.length, icon: Ticket, iconColor: "text-white/60" },
-                  { label: t.scanned, value: scannedCount, icon: CheckCircle2, iconColor: "text-white/60" },
-                  { label: isAr ? "نسبة الحضور" : "Attendance", value: `${attendanceRate}%`, icon: Users, iconColor: "text-white/60" },
-                  { label: isAr ? "إجمالي الإيرادات" : "Total Revenue", value: totalRevenueStr, icon: DollarSign, iconColor: "text-yellow-300" },
-                ].map(({ label, value, icon: Icon, iconColor }) => (
-                  <div key={label} className="bg-white/10 backdrop-blur-sm rounded-xl px-3 py-2.5 text-center border border-white/10">
-                    <Icon className={`w-4 h-4 mx-auto mb-1 ${iconColor}`} />
-                    <p className="text-xl font-black text-white leading-tight">{value}</p>
-                    <p className="text-[10px] font-medium text-white/60 mt-0.5">{label}</p>
-                  </div>
-                ))}
-              </div>
+            {/* Key figures */}
+            <div className="grid grid-cols-2 sm:grid-cols-4 gap-px bg-border border-t border-border">
+              {[
+                { label: t.totalTickets, value: tickets.length },
+                { label: t.scanned, value: scannedCount },
+                { label: isAr ? "نسبة الحضور" : "Attendance", value: `${attendanceRate}%` },
+                { label: isAr ? "إجمالي الإيرادات" : "Total revenue", value: totalRevenueStr },
+              ].map(({ label, value }) => (
+                <div key={label} className="bg-card px-5 py-3.5">
+                  <p className="text-xs text-muted-foreground">{label}</p>
+                  <p className="text-lg font-semibold text-foreground tabular-nums mt-0.5">{value}</p>
+                </div>
+              ))}
             </div>
           </div>
 
           {/* Tickets Section */}
           <div className="space-y-4">
             <div className="flex items-center justify-between">
-              <h2 className="text-lg font-bold text-foreground">{t.eventTickets}</h2>
+              <h2 className="text-base font-semibold text-foreground">{t.eventTickets}</h2>
               <span className="text-sm text-muted-foreground">{filtered.length} / {tickets.length}</span>
             </div>
 
@@ -688,10 +676,10 @@ export default function EventDetailPage() {
                   placeholder={t.searchTickets}
                   value={search}
                   onChange={(e) => setSearch(e.target.value)}
-                  className={cn("h-10 rounded-xl", isRTL ? "pr-9" : "pl-9")}
+                  className={cn("h-10 rounded-md", isRTL ? "pr-9" : "pl-9")}
                 />
               </div>
-              <div className="flex gap-1 bg-muted/50 p-1 rounded-xl shrink-0">
+              <div className="flex gap-1 bg-muted/50 p-1 rounded-md shrink-0">
                 {(["all", "scanned", "not_scanned"] as Filter[]).map((f) => (
                   <button
                     key={f}
@@ -709,17 +697,17 @@ export default function EventDetailPage() {
 
             {/* Tickets list */}
             {filtered.length === 0 ? (
-              <div className="text-center py-16 bg-card border border-card-border rounded-2xl">
-                <div className="w-14 h-14 bg-primary/10 rounded-2xl flex items-center justify-center mx-auto mb-3">
+              <div className="text-center py-16 bg-card border border-card-border rounded-lg">
+                <div className="w-14 h-14 bg-primary/10 rounded-lg flex items-center justify-center mx-auto mb-3">
                   <Ticket className="w-7 h-7 text-primary" />
                 </div>
                 <p className="text-foreground font-semibold">{t.noTickets}</p>
                 <p className="text-muted-foreground text-sm mt-1">{t.noTicketsDesc}</p>
               </div>
             ) : (
-              <div className="bg-card border border-card-border rounded-2xl overflow-hidden shadow-sm">
+              <div className="bg-card border border-card-border rounded-lg overflow-hidden shadow-sm">
                 <div className="px-5 py-3 border-b border-border bg-muted/20 flex items-center justify-between">
-                  <p className="text-xs font-bold text-muted-foreground uppercase tracking-wider">{t.ticketCount}</p>
+                  <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wider">{t.ticketCount}</p>
                   <div className="flex items-center gap-2">
                     <div className="flex items-center gap-1.5 text-xs text-emerald-600 font-semibold">
                       <CheckCircle2 className="w-3.5 h-3.5" />
@@ -740,7 +728,7 @@ export default function EventDetailPage() {
                       onClick={() => openTicketDetail(tk)}
                     >
                       <div className={cn(
-                        "w-9 h-9 rounded-xl flex items-center justify-center shrink-0",
+                        "w-9 h-9 rounded-md flex items-center justify-center shrink-0",
                         tk.is_scanned ? "bg-emerald-100 dark:bg-emerald-900/30" : "bg-amber-100 dark:bg-amber-900/30"
                       )}>
                         {tk.is_scanned
@@ -758,7 +746,7 @@ export default function EventDetailPage() {
                       <div className="flex items-center gap-2 shrink-0">
                         <div className="text-end">
                           <span className={cn(
-                            "inline-block px-2.5 py-0.5 rounded-full text-[11px] font-bold",
+                            "inline-block px-2.5 py-0.5 rounded-full text-[11px] font-semibold",
                             tk.is_scanned
                               ? "bg-emerald-100 text-emerald-700 dark:bg-emerald-900/30 dark:text-emerald-400"
                               : "bg-amber-100 text-amber-700 dark:bg-amber-900/30 dark:text-amber-400"
@@ -788,7 +776,7 @@ export default function EventDetailPage() {
       ) : null}
 
       {/* ── Assigned Staff Panel ─────────────────────────────── */}
-      <div className="bg-card border border-card-border rounded-2xl overflow-hidden shadow-sm">
+      <div className="bg-card border border-card-border rounded-lg overflow-hidden shadow-sm">
         <div className="flex items-center gap-2.5 px-5 py-4 border-b border-border bg-muted/20">
           <div className="w-7 h-7 bg-primary/10 rounded-lg flex items-center justify-center">
             <Users className="w-3.5 h-3.5 text-primary" />
@@ -805,7 +793,7 @@ export default function EventDetailPage() {
               <select
                 value={addingStaffId}
                 onChange={(e) => setAddingStaffId(e.target.value)}
-                className="flex-1 h-9 rounded-xl border border-border bg-background text-sm px-3 text-foreground focus:outline-none focus:ring-2 focus:ring-primary/30"
+                className="flex-1 h-9 rounded-md border border-border bg-background text-sm px-3 text-foreground focus:outline-none focus:ring-2 focus:ring-primary/30"
               >
                 <option value="">{isAr ? "اختر موظفاً للإضافة…" : "Select staff to add…"}</option>
                 {availableStaff.map((s) => (
@@ -818,7 +806,7 @@ export default function EventDetailPage() {
                 size="sm"
                 onClick={handleAddStaff}
                 disabled={!addingStaffId}
-                className="h-9 px-3 rounded-xl bg-gradient-to-r from-violet-600 to-purple-600 border-0 shrink-0"
+                className="h-9 px-3 rounded-md bg-primary border-0 shrink-0"
               >
                 <UserPlus className="w-4 h-4" />
               </Button>
@@ -836,14 +824,14 @@ export default function EventDetailPage() {
               {isAr ? "لم يُسنَد أي موظف لهذا الفعالية بعد" : "No staff assigned to this event yet"}
             </div>
           ) : (
-            <div className="divide-y divide-border rounded-xl border border-border overflow-hidden">
+            <div className="divide-y divide-border rounded-md border border-border overflow-hidden">
               {staffAccess.map((row) => {
                 const s = row.profiles;
                 const initials = (s.full_name || s.email || "?")
                   .split(" ").map((w) => w[0]).join("").toUpperCase().slice(0, 2);
                 return (
                   <div key={row.id} className="flex items-center gap-3 px-4 py-3 bg-card hover:bg-muted/20 transition-colors">
-                    <div className="w-8 h-8 rounded-lg bg-primary/10 flex items-center justify-center shrink-0 text-xs font-bold text-primary">
+                    <div className="w-8 h-8 rounded-lg bg-primary/10 flex items-center justify-center shrink-0 text-xs font-semibold text-primary">
                       {initials}
                     </div>
                     <div className="flex-1 min-w-0">
@@ -852,9 +840,9 @@ export default function EventDetailPage() {
                     </div>
                     <div className="flex items-center gap-2 shrink-0">
                       <span className={cn(
-                        "inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-bold",
+                        "inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-semibold",
                         s.role === "admin"
-                          ? "bg-violet-100 text-violet-700 dark:bg-violet-900/30 dark:text-violet-400"
+                          ? "bg-primary/10 text-primary dark:bg-primary/15 dark:text-primary"
                           : "bg-emerald-100 text-emerald-700 dark:bg-emerald-900/30 dark:text-emerald-400"
                       )}>
                         <ShieldCheck className="w-2.5 h-2.5" />
@@ -882,7 +870,7 @@ export default function EventDetailPage() {
 
       {/* Ticket Detail Modal */}
       <Dialog open={!!selectedTicket} onOpenChange={(o) => !o && setSelectedTicket(null)}>
-        <DialogContent className="sm:max-w-sm p-0 rounded-2xl overflow-hidden border-0 shadow-2xl">
+        <DialogContent className="sm:max-w-sm p-0 rounded-lg overflow-hidden border-0 shadow-sm">
           <DialogTitle className="sr-only">
             {selectedTicket?.customer_name} — {isAr ? "تفاصيل التذكرة" : "Ticket Details"}
           </DialogTitle>
@@ -901,15 +889,15 @@ export default function EventDetailPage() {
 
               <div ref={printRef}>
                 {/* Header */}
-                <div className="bg-gradient-to-br from-violet-600 to-purple-700 px-6 pt-7 pb-5 text-center">
+                <div className="bg-primary px-6 pt-7 pb-5 text-center">
                   <div className="mb-1.5 flex justify-center">
                     {systemLogo && systemLogo.startsWith("data:") ? (
-                      <img src={systemLogo} alt="Logo" className="w-10 h-10 rounded-xl object-cover" />
+                      <img src={systemLogo} alt="Logo" className="w-10 h-10 rounded-md object-cover" />
                     ) : (
                       <span className="text-3xl">🎫</span>
                     )}
                   </div>
-                  <h2 className="text-white font-bold text-lg leading-snug">{event.title}</h2>
+                  <h2 className="text-white font-semibold text-lg leading-snug">{event.title}</h2>
                   <div className="flex items-center justify-center flex-wrap gap-3 mt-2 text-white/70 text-xs">
                     {event.event_date && (
                       <span className="flex items-center gap-1"><CalendarDays className="w-3 h-3" />{fmtDate(event.event_date)}</span>
@@ -919,14 +907,14 @@ export default function EventDetailPage() {
                     )}
                   </div>
                   {event.price != null && (
-                    <div className="mt-2 inline-flex items-center gap-1.5 bg-white/15 px-3 py-1 rounded-full text-xs font-bold text-white border border-white/20">
+                    <div className="mt-2 inline-flex items-center gap-1.5 bg-white/15 px-3 py-1 rounded-full text-xs font-semibold text-white border border-white/20">
                       <DollarSign className="w-3 h-3 text-yellow-300" />
                       {formatPrice(event.price)}
                     </div>
                   )}
                   <div className="mt-3">
                     <span className={cn(
-                      "inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-bold",
+                      "inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-semibold",
                       selectedTicket.is_scanned ? "bg-emerald-400/20 text-emerald-200" : "bg-amber-400/20 text-amber-200"
                     )}>
                       {selectedTicket.is_scanned
@@ -950,25 +938,25 @@ export default function EventDetailPage() {
                 <div className="bg-card px-6 pt-7 pb-5 space-y-4">
                   <div className="grid grid-cols-2 gap-4">
                     <div>
-                      <p className="text-[10px] font-bold text-muted-foreground uppercase tracking-wider mb-1 flex items-center gap-1">
+                      <p className="text-[10px] font-semibold text-muted-foreground uppercase tracking-wider mb-1 flex items-center gap-1">
                         <User className="w-3 h-3" />
                         {isAr ? "العميل" : "Customer"}
                       </p>
-                      <p className="font-bold text-foreground text-sm">{selectedTicket.customer_name}</p>
+                      <p className="font-semibold text-foreground text-sm">{selectedTicket.customer_name}</p>
                     </div>
                     {selectedTicket.customer_phone && (
                       <div>
-                        <p className="text-[10px] font-bold text-muted-foreground uppercase tracking-wider mb-1 flex items-center gap-1">
+                        <p className="text-[10px] font-semibold text-muted-foreground uppercase tracking-wider mb-1 flex items-center gap-1">
                           <Phone className="w-3 h-3" />
                           {isAr ? "الهاتف" : "Phone"}
                         </p>
-                        <p className="font-bold text-foreground text-sm">{selectedTicket.customer_phone}</p>
+                        <p className="font-semibold text-foreground text-sm">{selectedTicket.customer_phone}</p>
                       </div>
                     )}
                   </div>
 
                   <div>
-                    <p className="text-[10px] font-bold text-muted-foreground uppercase tracking-wider mb-1 flex items-center gap-1">
+                    <p className="text-[10px] font-semibold text-muted-foreground uppercase tracking-wider mb-1 flex items-center gap-1">
                       <Hash className="w-3 h-3" />
                       {isAr ? "رقم التذكرة" : "Ticket ID"}
                     </p>
@@ -976,13 +964,13 @@ export default function EventDetailPage() {
                   </div>
 
                   <div className="flex justify-center pt-1">
-                    <div className="bg-white rounded-2xl p-3 shadow-inner border border-gray-100">
+                    <div className="bg-white rounded-lg p-3 shadow-inner border border-gray-100">
                       {qrLoading ? (
                         <div className="w-36 h-36 flex items-center justify-center">
                           <Loader2 className="w-6 h-6 animate-spin text-primary" />
                         </div>
                       ) : qrDataUrl ? (
-                        <img src={qrDataUrl} alt="QR Code" className="w-36 h-36 rounded-xl block" />
+                        <img src={qrDataUrl} alt="QR Code" className="w-36 h-36 rounded-md block" />
                       ) : (
                         <div className="w-36 h-36 flex items-center justify-center text-muted-foreground text-xs text-center px-2">
                           QR unavailable
@@ -1001,7 +989,7 @@ export default function EventDetailPage() {
                 <Button
                   onClick={() => { if (selectedTicket) openWhatsApp(selectedTicket, { stopPropagation: () => {} } as React.MouseEvent); }}
                   variant="outline"
-                  className="flex-1 h-11 rounded-xl border-green-300 dark:border-green-700 text-green-700 dark:text-green-400 hover:bg-green-50 dark:hover:bg-green-900/20 font-semibold text-sm"
+                  className="flex-1 h-11 rounded-md border-green-300 dark:border-green-700 text-green-700 dark:text-green-400 hover:bg-green-50 dark:hover:bg-green-900/20 font-semibold text-sm"
                 >
                   <MessageCircle className="w-4 h-4" />
                   {isAr ? "واتساب" : "WhatsApp"}
@@ -1016,14 +1004,14 @@ export default function EventDetailPage() {
                     setSelectedTicket(null);
                   }}
                   variant="outline"
-                  className="flex-1 h-11 rounded-xl border-blue-300 dark:border-blue-700 text-blue-700 dark:text-blue-400 hover:bg-blue-50 dark:hover:bg-blue-900/20 font-semibold text-sm"
+                  className="flex-1 h-11 rounded-md border-blue-300 dark:border-blue-700 text-blue-700 dark:text-blue-400 hover:bg-blue-50 dark:hover:bg-blue-900/20 font-semibold text-sm"
                 >
                   <Mail className="w-4 h-4" />
                   {isAr ? "بريد" : "Email"}
                 </Button>
                 <Button
                   onClick={handlePrint}
-                  className="flex-1 h-11 rounded-xl bg-gradient-to-r from-violet-600 to-purple-600 hover:from-violet-700 hover:to-purple-700 border-0 shadow-md shadow-violet-500/20 font-semibold text-sm"
+                  className="flex-1 h-11 rounded-md bg-primary border-0 shadow-md font-semibold text-sm"
                 >
                   <Printer className="w-4 h-4" />
                   {t.printTicket}
@@ -1036,16 +1024,16 @@ export default function EventDetailPage() {
 
       {/* WhatsApp Send Modal */}
       <Dialog open={!!waTicket} onOpenChange={(o) => !o && setWaTicket(null)}>
-        <DialogContent className="sm:max-w-xs p-0 rounded-2xl overflow-hidden border-0 shadow-2xl">
+        <DialogContent className="sm:max-w-xs p-0 rounded-lg overflow-hidden border-0 shadow-sm">
           <DialogTitle className="sr-only">{isAr ? "إرسال عبر واتساب" : "Send via WhatsApp"}</DialogTitle>
           <DialogDescription className="sr-only">{isAr ? "أدخل رقم الواتساب" : "Enter WhatsApp number"}</DialogDescription>
 
           {/* Header */}
-          <div className="bg-gradient-to-br from-green-500 to-emerald-600 px-6 py-5 text-center">
-            <div className="w-12 h-12 bg-white/20 rounded-2xl flex items-center justify-center mx-auto mb-3">
+          <div className="bg-emerald-600 px-6 py-5 text-center">
+            <div className="w-12 h-12 bg-white/20 rounded-lg flex items-center justify-center mx-auto mb-3">
               <MessageCircle className="w-6 h-6 text-white" />
             </div>
-            <h3 className="text-white font-bold text-base">
+            <h3 className="text-white font-semibold text-base">
               {isAr ? "إرسال التذكرة عبر واتساب" : "Send Ticket via WhatsApp"}
             </h3>
             {waTicket && (
@@ -1065,7 +1053,7 @@ export default function EventDetailPage() {
                 <select
                   value={waDialCode}
                   onChange={(e) => setWaDialCode(e.target.value)}
-                  className="h-11 rounded-xl border border-border bg-background text-sm px-2 text-foreground focus:outline-none focus:ring-2 focus:ring-green-500/30 shrink-0 w-[110px] font-mono"
+                  className="h-11 rounded-md border border-border bg-background text-sm px-2 text-foreground focus:outline-none focus:ring-2 focus:ring-green-500/30 shrink-0 w-[110px] font-mono"
                 >
                   {DIAL_CODES.map((c, i) => (
                     <option key={`${c.code}-${c.name}-${i}`} value={c.code}>
@@ -1077,7 +1065,7 @@ export default function EventDetailPage() {
                   value={waPhone}
                   onChange={(e) => setWaPhone(e.target.value)}
                   placeholder={isAr ? "788 123 456" : "788 123 456"}
-                  className="h-11 rounded-xl text-sm font-mono flex-1"
+                  className="h-11 rounded-md text-sm font-mono flex-1"
                   dir="ltr"
                   type="tel"
                   onKeyDown={(e) => e.key === "Enter" && sendWhatsApp()}
@@ -1107,7 +1095,7 @@ export default function EventDetailPage() {
 
             {/* PDF loading info */}
             {waPdfLoading && (
-              <div className="flex items-center gap-2.5 text-sm text-muted-foreground bg-muted/50 rounded-xl px-3 py-2.5">
+              <div className="flex items-center gap-2.5 text-sm text-muted-foreground bg-muted/50 rounded-md px-3 py-2.5">
                 <Loader2 className="w-4 h-4 animate-spin shrink-0 text-green-600" />
                 <span className="text-xs">
                   {isAr ? "جارٍ إنشاء ملف PDF للتنزيل…" : "Generating PDF ticket for download…"}
@@ -1117,7 +1105,7 @@ export default function EventDetailPage() {
 
             {/* PDF error (non-blocking) */}
             {waPdfError && !waPdfLoading && (
-              <div className="flex items-start gap-2 text-xs text-amber-700 dark:text-amber-300 bg-amber-50 dark:bg-amber-900/20 rounded-xl px-3 py-2">
+              <div className="flex items-start gap-2 text-xs text-amber-700 dark:text-amber-300 bg-amber-50 dark:bg-amber-900/20 rounded-md px-3 py-2">
                 <AlertCircle className="w-3.5 h-3.5 shrink-0 mt-0.5" />
                 {waPdfError}
               </div>
@@ -1127,7 +1115,7 @@ export default function EventDetailPage() {
               <Button
                 variant="outline"
                 disabled={waPdfLoading}
-                className="flex-1 h-10 rounded-xl text-sm"
+                className="flex-1 h-10 rounded-md text-sm"
                 onClick={() => setWaTicket(null)}
               >
                 {isAr ? "إلغاء" : "Cancel"}
@@ -1135,7 +1123,7 @@ export default function EventDetailPage() {
               <Button
                 disabled={!waPhone.replace(/\D/g, "").replace(/^0+/, "") || waPdfLoading}
                 onClick={sendWhatsApp}
-                className="flex-1 h-10 rounded-xl bg-gradient-to-r from-green-500 to-emerald-600 hover:from-green-600 hover:to-emerald-700 border-0 text-white font-semibold text-sm"
+                className="flex-1 h-10 rounded-md bg-emerald-600 hover:bg-emerald-700 border-0 text-white font-semibold text-sm"
               >
                 {waPdfLoading
                   ? <><Loader2 className="w-4 h-4 animate-spin" />{isAr ? "جارٍ التحضير…" : "Preparing…"}</>
@@ -1148,16 +1136,16 @@ export default function EventDetailPage() {
 
       {/* Email Ticket Modal */}
       <Dialog open={!!emailTicket} onOpenChange={(o) => !o && setEmailTicket(null)}>
-        <DialogContent className="sm:max-w-xs p-0 rounded-2xl overflow-hidden border-0 shadow-2xl">
+        <DialogContent className="sm:max-w-xs p-0 rounded-lg overflow-hidden border-0 shadow-sm">
           <DialogTitle className="sr-only">{isAr ? "إرسال التذكرة بالبريد" : "Send Ticket by Email"}</DialogTitle>
           <DialogDescription className="sr-only">{isAr ? "أدخل البريد الإلكتروني" : "Enter recipient email"}</DialogDescription>
 
           {/* Header */}
-          <div className="bg-gradient-to-br from-blue-600 to-indigo-600 px-6 py-5 text-center">
-            <div className="w-12 h-12 bg-white/20 rounded-2xl flex items-center justify-center mx-auto mb-3">
+          <div className="bg-primary px-6 py-5 text-center">
+            <div className="w-12 h-12 bg-white/20 rounded-lg flex items-center justify-center mx-auto mb-3">
               <Mail className="w-6 h-6 text-white" />
             </div>
-            <h3 className="text-white font-bold text-base">
+            <h3 className="text-white font-semibold text-base">
               {isAr ? "إرسال التذكرة بالبريد" : "Send Ticket by Email"}
             </h3>
             {emailTicket && (
@@ -1187,14 +1175,14 @@ export default function EventDetailPage() {
                     value={emailAddress}
                     onChange={(e) => setEmailAddress(e.target.value)}
                     onKeyDown={(e) => e.key === "Enter" && sendTicketEmail()}
-                    className="h-11 rounded-xl"
+                    className="h-11 rounded-md"
                     dir="ltr"
                     disabled={emailSending}
                   />
                 </div>
 
                 {emailError && (
-                  <div className="flex items-start gap-2 text-xs text-red-700 dark:text-red-400 bg-red-50 dark:bg-red-900/20 rounded-xl px-3 py-2">
+                  <div className="flex items-start gap-2 text-xs text-red-700 dark:text-red-400 bg-red-50 dark:bg-red-900/20 rounded-md px-3 py-2">
                     <AlertCircle className="w-3.5 h-3.5 shrink-0 mt-0.5" />
                     {emailError}
                   </div>
@@ -1204,7 +1192,7 @@ export default function EventDetailPage() {
                   <Button
                     variant="outline"
                     disabled={emailSending}
-                    className="flex-1 h-10 rounded-xl text-sm"
+                    className="flex-1 h-10 rounded-md text-sm"
                     onClick={() => setEmailTicket(null)}
                   >
                     {isAr ? "إلغاء" : "Cancel"}
@@ -1212,7 +1200,7 @@ export default function EventDetailPage() {
                   <Button
                     disabled={!emailAddress.trim() || emailSending}
                     onClick={sendTicketEmail}
-                    className="flex-1 h-10 rounded-xl bg-gradient-to-r from-blue-600 to-indigo-600 hover:from-blue-700 hover:to-indigo-700 border-0 text-white font-semibold text-sm"
+                    className="flex-1 h-10 rounded-md bg-primary border-0 text-white font-semibold text-sm"
                   >
                     {emailSending
                       ? <><Loader2 className="w-4 h-4 animate-spin" />{isAr ? "جارٍ الإرسال…" : "Sending…"}</>

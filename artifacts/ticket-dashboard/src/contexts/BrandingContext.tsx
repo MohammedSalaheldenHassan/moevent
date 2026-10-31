@@ -6,7 +6,6 @@ import { getApiBase } from "@/lib/apiBase";
 interface BrandingContextType {
   systemName: string;
   systemLogo: string;
-  primaryColor: string;
   brandingLoaded: boolean;
   setSystemName: (name: string) => Promise<{ error: string | null }>;
   setSystemLogo: (logoUrl: string) => Promise<{ error: string | null }>;
@@ -21,7 +20,6 @@ export function BrandingProvider({ children }: { children: React.ReactNode }) {
 
   const [systemName, setSystemNameState] = useState<string>("");
   const [systemLogo, setSystemLogoState] = useState<string>("");
-  const [primaryColor, setPrimaryColor] = useState<string>("");
   const [brandingLoaded, setBrandingLoaded] = useState(false);
 
   // Branding lives on the single organizations row (readable by any signed-in user)
@@ -34,13 +32,12 @@ export function BrandingProvider({ children }: { children: React.ReactNode }) {
     (async () => {
       const { data } = await supabase
         .from("organizations")
-        .select("name, logo_url, primary_color")
+        .select("name, logo_url")
         .limit(1)
         .maybeSingle();
       if (cancelled) return;
       setSystemNameState(data?.name ?? "");
       setSystemLogoState(data?.logo_url ?? "");
-      setPrimaryColor(data?.primary_color ?? "");
       setBrandingLoaded(true);
     })();
     return () => { cancelled = true; };
@@ -112,7 +109,6 @@ export function BrandingProvider({ children }: { children: React.ReactNode }) {
     <BrandingContext.Provider value={{
       systemName,
       systemLogo,
-      primaryColor,
       brandingLoaded,
       setSystemName,
       setSystemLogo,

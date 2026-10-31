@@ -30,20 +30,6 @@ interface Event {
 
 type ModalMode = "add" | "edit";
 
-const CARD_ACCENTS = [
-  "from-violet-500 to-purple-600",
-  "from-blue-500 to-cyan-600",
-  "from-emerald-500 to-green-600",
-  "from-orange-500 to-amber-500",
-  "from-rose-500 to-pink-600",
-  "from-indigo-500 to-violet-600",
-];
-
-function getAccent(id: string) {
-  const n = id.charCodeAt(0) + id.charCodeAt(id.length - 1);
-  return CARD_ACCENTS[n % CARD_ACCENTS.length];
-}
-
 export default function EventsPage() {
   const { t, isRTL, lang } = useLocale();
   const { profile } = useAuth();
@@ -316,14 +302,14 @@ export default function EventsPage() {
       {/* Header */}
       <div className="flex items-center justify-between gap-4">
         <div>
-          <h1 className="text-2xl font-bold text-foreground">{t.eventsTitle}</h1>
+          <h1 className="text-2xl font-semibold text-foreground">{t.eventsTitle}</h1>
           <p className="text-muted-foreground text-sm mt-1">{t.eventsSubtitle}</p>
         </div>
         <div className="flex items-center gap-2 shrink-0">
-          <Button variant="outline" size="sm" onClick={() => { setLoading(true); fetchEvents(); }} disabled={loading} className="rounded-xl">
+          <Button variant="outline" size="sm" onClick={() => { setLoading(true); fetchEvents(); }} disabled={loading} className="rounded-md">
             <RefreshCw className={cn("w-3.5 h-3.5", loading && "animate-spin")} />
           </Button>
-          <Button onClick={openAddModal} className="h-10 rounded-xl bg-gradient-to-r from-violet-600 to-purple-600 hover:from-violet-700 hover:to-purple-700 border-0 shadow-md shadow-violet-500/25 font-semibold">
+          <Button onClick={openAddModal} className="h-10 rounded-md bg-primary border-0 shadow-md font-semibold">
             <Plus className="w-4 h-4" />
             {t.addEvent}
           </Button>
@@ -332,7 +318,7 @@ export default function EventsPage() {
 
       {/* Error */}
       {error && (
-        <div className="flex items-start gap-3 p-4 bg-destructive/10 border border-destructive/20 rounded-2xl text-sm text-destructive">
+        <div className="flex items-start gap-3 p-4 bg-destructive/10 border border-destructive/20 rounded-lg text-sm text-destructive">
           <AlertCircle className="w-4 h-4 shrink-0 mt-0.5" />
           <div className="flex-1 min-w-0">
             <p className="font-semibold">{t.failedLoadEvents}</p>
@@ -345,7 +331,7 @@ export default function EventsPage() {
       {loading ? (
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-5">
           {[...Array(6)].map((_, i) => (
-            <div key={i} className="bg-card border border-card-border rounded-2xl overflow-hidden animate-pulse">
+            <div key={i} className="bg-card border border-card-border rounded-lg overflow-hidden animate-pulse">
               <div className="h-2 bg-muted" />
               <div className="p-5 space-y-3">
                 <div className="h-5 bg-muted rounded-lg w-3/4" />
@@ -356,13 +342,13 @@ export default function EventsPage() {
           ))}
         </div>
       ) : events.length === 0 && !error ? (
-        <div className="text-center py-24 bg-card border border-card-border rounded-2xl">
-          <div className="w-20 h-20 bg-gradient-to-br from-violet-100 to-purple-100 dark:from-violet-900/20 dark:to-purple-900/20 rounded-3xl flex items-center justify-center mx-auto mb-5">
-            <CalendarDays className="w-10 h-10 text-violet-500" />
+        <div className="text-center py-24 bg-card border border-card-border rounded-lg">
+          <div className="w-20 h-20 bg-muted rounded-lg flex items-center justify-center mx-auto mb-5">
+            <CalendarDays className="w-10 h-10 text-primary" />
           </div>
-          <p className="text-foreground font-bold text-lg">{t.noEvents}</p>
+          <p className="text-foreground font-semibold text-lg">{t.noEvents}</p>
           <p className="text-muted-foreground text-sm mt-1 mb-5">{t.noEventsDesc}</p>
-          <Button onClick={openAddModal} className="rounded-xl bg-gradient-to-r from-violet-600 to-purple-600 border-0 shadow-md shadow-violet-500/20">
+          <Button onClick={openAddModal} className="rounded-md bg-primary border-0 shadow-md">
             <Plus className="w-4 h-4" />
             {t.addEvent}
           </Button>
@@ -372,34 +358,30 @@ export default function EventsPage() {
           {events.map((event) => {
             const upcoming = isUpcoming(event.event_date);
             const past = isPast(event.event_date);
-            const accent = getAccent(event.id);
             const price = formatPrice(event.price as number | null);
 
             return (
               <div
                 key={event.id}
-                className="group bg-card border border-card-border rounded-2xl overflow-hidden hover:shadow-xl hover:shadow-black/8 hover:-translate-y-0.5 hover:border-primary/20 transition-all duration-200 cursor-pointer"
+                className="group bg-card border border-card-border rounded-lg overflow-hidden hover:shadow-sm hover:border-primary/20 transition-all duration-200 cursor-pointer"
                 onClick={() => navigate(`/events/${event.id}`)}
               >
-                {/* Image banner or gradient accent bar */}
+                {/* Image banner */}
                 {event.image_url ? (
                   <div className="h-36 overflow-hidden relative">
                     <img
                       src={event.image_url as string}
                       alt={event.title}
-                      className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-300"
+                      className="w-full h-full object-cover transition-transform duration-300"
                     />
-                    <div className={`absolute bottom-0 start-0 end-0 h-1 bg-gradient-to-r ${accent}`} />
                   </div>
-                ) : (
-                  <div className={`h-1.5 bg-gradient-to-r ${accent}`} />
-                )}
+                ) : null}
 
                 <div className="p-5">
                   {/* Status + Price row */}
                   <div className="flex items-center justify-between mb-3">
                     <span className={cn(
-                      "inline-flex items-center gap-1.5 text-[11px] font-bold px-2.5 py-1 rounded-full",
+                      "inline-flex items-center gap-1.5 text-[11px] font-semibold px-2.5 py-1 rounded-full",
                       upcoming
                         ? "bg-emerald-100 text-emerald-700 dark:bg-emerald-900/30 dark:text-emerald-400"
                         : past
@@ -410,7 +392,7 @@ export default function EventsPage() {
                       {upcoming ? (isAr ? "قادم" : "Upcoming") : past ? (isAr ? "منتهي" : "Past") : (isAr ? "اليوم" : "Today")}
                     </span>
                     {price != null && (
-                      <span className="inline-flex items-center gap-1 text-xs font-bold text-violet-700 dark:text-violet-400 bg-violet-100 dark:bg-violet-900/30 px-2.5 py-1 rounded-full">
+                      <span className="inline-flex items-center gap-1 text-xs font-semibold text-primary dark:text-primary bg-primary/10 dark:bg-primary/15 px-2.5 py-1 rounded-full">
                         {event.price === 0 ? "🎁" : <DollarSign className="w-3 h-3" />}
                         {price}
                       </span>
@@ -418,7 +400,7 @@ export default function EventsPage() {
                   </div>
 
                   {/* Title */}
-                  <h3 className="font-bold text-foreground text-base leading-snug mb-3 group-hover:text-primary transition-colors line-clamp-2">
+                  <h3 className="font-semibold text-foreground text-base leading-snug mb-3 group-hover:text-primary transition-colors line-clamp-2">
                     {event.title}
                   </h3>
 
@@ -455,7 +437,7 @@ export default function EventsPage() {
                   >
                     <button
                       onClick={() => navigate(`/events/${event.id}`)}
-                      className="flex items-center gap-1.5 text-xs font-bold text-primary hover:text-primary/80 transition-colors"
+                      className="flex items-center gap-1.5 text-xs font-semibold text-primary hover:text-primary/80 transition-colors"
                     >
                       <Ticket className="w-3.5 h-3.5" />
                       {t.viewTickets}
@@ -486,9 +468,9 @@ export default function EventsPage() {
 
       {/* Add / Edit Modal */}
       <Dialog open={modalOpen} onOpenChange={setModalOpen}>
-        <DialogContent className="sm:max-w-md rounded-2xl flex flex-col max-h-[90dvh] overflow-hidden">
+        <DialogContent className="sm:max-w-md rounded-lg flex flex-col max-h-[90dvh] overflow-hidden">
           <DialogHeader className="shrink-0">
-            <DialogTitle className="text-lg font-bold">
+            <DialogTitle className="text-lg font-semibold">
               {modalMode === "add" ? t.addNewEvent : t.editEventTitle}
             </DialogTitle>
             <DialogDescription className="text-sm text-muted-foreground">
@@ -508,7 +490,7 @@ export default function EventsPage() {
               </Label>
               <input ref={imgInputRef} type="file" accept="image/*" className="hidden" onChange={handleImageChange} />
               {(imagePreview || currentImageUrl) ? (
-                <div className="relative rounded-xl overflow-hidden border border-border h-36">
+                <div className="relative rounded-md overflow-hidden border border-border h-36">
                   <img
                     src={imagePreview ?? currentImageUrl!}
                     alt="Event preview"
@@ -537,7 +519,7 @@ export default function EventsPage() {
                 <button
                   type="button"
                   onClick={() => imgInputRef.current?.click()}
-                  className="w-full h-24 border-2 border-dashed border-border rounded-xl flex flex-col items-center justify-center gap-2 text-muted-foreground hover:border-primary/50 hover:text-primary/70 hover:bg-primary/5 transition-all"
+                  className="w-full h-24 border-2 border-dashed border-border rounded-md flex flex-col items-center justify-center gap-2 text-muted-foreground hover:border-primary/50 hover:text-primary/70 hover:bg-primary/5 transition-all"
                 >
                   <ImageIcon className="w-7 h-7 opacity-50" />
                   <span className="text-xs font-medium">{isAr ? "اضغط لإضافة صورة" : "Click to add an image"}</span>
@@ -553,7 +535,7 @@ export default function EventsPage() {
                 placeholder={t.eventTitlePlaceholder}
                 value={form.title}
                 onChange={(e) => setForm((f) => ({ ...f, title: e.target.value }))}
-                className="h-11 rounded-xl"
+                className="h-11 rounded-md"
               />
             </div>
 
@@ -573,7 +555,7 @@ export default function EventsPage() {
                   placeholder="0.00"
                   value={form.price}
                   onChange={(e) => setForm((f) => ({ ...f, price: e.target.value }))}
-                  className="h-11 rounded-xl ps-12"
+                  className="h-11 rounded-md ps-12"
                   dir="ltr"
                 />
               </div>
@@ -590,7 +572,7 @@ export default function EventsPage() {
                   value={form.date}
                   min={new Date().toISOString().split("T")[0]}
                   onChange={(e) => setForm((f) => ({ ...f, date: e.target.value }))}
-                  className="h-11 rounded-xl"
+                  className="h-11 rounded-md"
                 />
               </div>
               <div className="space-y-1.5">
@@ -601,13 +583,13 @@ export default function EventsPage() {
                   placeholder={t.locationPlaceholder}
                   value={form.location}
                   onChange={(e) => setForm((f) => ({ ...f, location: e.target.value }))}
-                  className="h-11 rounded-xl"
+                  className="h-11 rounded-md"
                 />
               </div>
             </div>
 
             {formError && (
-              <div className="flex items-start gap-2 p-3 bg-destructive/10 border border-destructive/20 rounded-xl text-sm text-destructive">
+              <div className="flex items-start gap-2 p-3 bg-destructive/10 border border-destructive/20 rounded-md text-sm text-destructive">
                 <AlertCircle className="w-4 h-4 shrink-0 mt-0.5" />
                 <p className="text-xs">{formError}</p>
               </div>
@@ -615,14 +597,14 @@ export default function EventsPage() {
           </div>
 
           <DialogFooter className="gap-2 shrink-0 pt-2">
-            <Button variant="outline" onClick={() => setModalOpen(false)} className="rounded-xl">
+            <Button variant="outline" onClick={() => setModalOpen(false)} className="rounded-md">
               <X className="w-4 h-4" />
               {t.cancel}
             </Button>
             <Button
               onClick={handleSave}
               disabled={saving}
-              className="rounded-xl bg-gradient-to-r from-violet-600 to-purple-600 hover:from-violet-700 hover:to-purple-700 border-0 shadow-md shadow-violet-500/20"
+              className="rounded-md bg-primary border-0 shadow-md"
             >
               {saving ? (
                 <><Loader2 className="w-4 h-4 animate-spin" />{imageUploading ? (isAr ? "جاري رفع الصورة…" : "Uploading image…") : t.saving}</>
@@ -638,15 +620,15 @@ export default function EventsPage() {
 
       {/* Delete Confirm Dialog */}
       <Dialog open={!!deleteTarget} onOpenChange={(o) => !o && setDeleteTarget(null)}>
-        <DialogContent className="sm:max-w-sm rounded-2xl">
+        <DialogContent className="sm:max-w-sm rounded-lg">
           <DialogHeader>
-            <DialogTitle className="text-lg font-bold text-destructive">{t.confirmDelete}</DialogTitle>
+            <DialogTitle className="text-lg font-semibold text-destructive">{t.confirmDelete}</DialogTitle>
             <DialogDescription className="text-sm text-muted-foreground">{t.confirmDeleteDesc}</DialogDescription>
           </DialogHeader>
           <div className="py-2">
             {deleteTarget && (
-              <div className="flex items-center gap-3 p-3 bg-muted/50 rounded-xl border border-border">
-                <div className={`w-9 h-9 rounded-xl bg-gradient-to-br ${getAccent(deleteTarget.id)} flex items-center justify-center shrink-0`}>
+              <div className="flex items-center gap-3 p-3 bg-muted/50 rounded-md border border-border">
+                <div className="w-9 h-9 rounded-md bg-destructive/10 text-destructive flex items-center justify-center shrink-0">
                   <CalendarDays className="w-4 h-4 text-white" />
                 </div>
                 <p className="font-semibold text-foreground text-sm truncate">"{deleteTarget.title}"</p>
@@ -654,8 +636,8 @@ export default function EventsPage() {
             )}
           </div>
           <DialogFooter className="gap-2">
-            <Button variant="outline" onClick={() => setDeleteTarget(null)} className="rounded-xl">{t.cancel}</Button>
-            <Button onClick={handleDelete} disabled={deleting} variant="destructive" className="rounded-xl">
+            <Button variant="outline" onClick={() => setDeleteTarget(null)} className="rounded-md">{t.cancel}</Button>
+            <Button onClick={handleDelete} disabled={deleting} variant="destructive" className="rounded-md">
               {deleting ? <><Loader2 className="w-4 h-4 animate-spin" />{t.deleting}</> : t.confirmDeleteBtn}
             </Button>
           </DialogFooter>

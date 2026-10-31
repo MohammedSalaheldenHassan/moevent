@@ -243,7 +243,7 @@ export default function StaffPage() {
           key={role}
           type="button"
           onClick={() => onChange(role)}
-          className={`flex-1 py-2.5 px-4 rounded-xl text-sm font-semibold border-2 transition-all flex items-center justify-center gap-1.5 ${
+          className={`flex-1 py-2.5 px-4 rounded-md text-sm font-semibold border-2 transition-all flex items-center justify-center gap-1.5 ${
             value === role
               ? "border-primary bg-primary text-primary-foreground"
               : "border-border text-muted-foreground hover:border-primary/40 hover:text-foreground"
@@ -261,7 +261,7 @@ export default function StaffPage() {
       {/* Header */}
       <div className="flex items-start justify-between gap-4">
         <div>
-          <h1 className="text-2xl font-bold text-foreground">{t.staffTitle}</h1>
+          <h1 className="text-2xl font-semibold text-foreground">{t.staffTitle}</h1>
           <p className="text-muted-foreground text-sm mt-1">{t.staffSubtitle}</p>
         </div>
         <div className="flex items-center gap-2 shrink-0">
@@ -270,7 +270,7 @@ export default function StaffPage() {
             size="sm"
             onClick={fetchProfiles}
             disabled={loading}
-            className="rounded-xl"
+            className="rounded-md"
           >
             <RefreshCw className={`w-3.5 h-3.5 ${loading ? "animate-spin" : ""}`} />
             <span className="hidden sm:inline">{t.tryAgain}</span>
@@ -278,7 +278,7 @@ export default function StaffPage() {
           <Button
             onClick={openAdd}
             size="sm"
-            className="rounded-xl bg-gradient-to-r from-violet-600 to-purple-600 hover:from-violet-700 hover:to-purple-700 border-0 shadow-md shadow-violet-500/25 font-semibold"
+            className="rounded-md bg-primary border-0 shadow-md font-semibold"
           >
             <Plus className="w-4 h-4" />
             {isAr ? "إضافة موظف" : "Add Staff"}
@@ -289,7 +289,7 @@ export default function StaffPage() {
       {/* Error banner */}
       {error && (
         <div className="space-y-2">
-          <div className="flex items-start gap-2.5 p-4 bg-destructive/10 border border-destructive/20 rounded-xl text-sm text-destructive">
+          <div className="flex items-start gap-2.5 p-4 bg-destructive/10 border border-destructive/20 rounded-md text-sm text-destructive">
             <AlertCircle className="w-4 h-4 shrink-0 mt-0.5" />
             <div>
               <p className="font-medium">{t.somethingWrong}</p>
@@ -303,7 +303,7 @@ export default function StaffPage() {
       {loading ? (
         <div className="space-y-3">
           {[...Array(3)].map((_, i) => (
-            <div key={i} className="bg-card border border-card-border rounded-2xl p-4 animate-pulse flex items-center gap-4">
+            <div key={i} className="bg-card border border-card-border rounded-lg p-4 animate-pulse flex items-center gap-4">
               <div className="w-11 h-11 rounded-full bg-muted shrink-0" />
               <div className="flex-1 space-y-2">
                 <div className="h-4 bg-muted rounded-lg w-32" />
@@ -318,22 +318,22 @@ export default function StaffPage() {
           ))}
         </div>
       ) : profiles.length === 0 ? (
-        <div className="text-center py-20 bg-card border border-card-border rounded-2xl">
-          <div className="w-16 h-16 bg-primary/10 rounded-2xl flex items-center justify-center mx-auto mb-4">
+        <div className="text-center py-20 bg-card border border-card-border rounded-lg">
+          <div className="w-16 h-16 bg-primary/10 rounded-lg flex items-center justify-center mx-auto mb-4">
             <Users className="w-8 h-8 text-primary" />
           </div>
           <p className="text-foreground font-semibold text-base">{t.noStaff}</p>
           <p className="text-muted-foreground text-sm mt-1">{t.noStaffDesc}</p>
           <Button
             onClick={openAdd}
-            className="mt-4 rounded-xl bg-gradient-to-r from-violet-600 to-purple-600 hover:from-violet-700 hover:to-purple-700 border-0 shadow-md shadow-violet-500/25"
+            className="mt-4 rounded-md bg-primary border-0 shadow-md"
           >
             <Plus className="w-4 h-4" />
             {isAr ? "إضافة أول موظف" : "Add First Staff Member"}
           </Button>
         </div>
       ) : (
-        <div className="bg-card border border-card-border rounded-2xl overflow-hidden shadow-sm">
+        <div className="bg-card border border-card-border rounded-lg overflow-hidden shadow-sm">
           <div className="px-5 py-3 border-b border-border bg-muted/30">
             <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wider">
               {profiles.length} {t.staffTitle}
@@ -352,10 +352,10 @@ export default function StaffPage() {
               return (
                 <div key={profile.id} className="flex items-center gap-3 px-5 py-4 hover:bg-muted/20 transition-colors">
                   <div className="relative shrink-0">
-                    <div className={`w-11 h-11 rounded-full flex items-center justify-center text-sm font-bold ${
+                    <div className={`w-11 h-11 rounded-full flex items-center justify-center text-sm font-semibold ${
                       isAdmin
-                        ? "bg-gradient-to-br from-violet-500 to-purple-700 text-white"
-                        : "bg-gradient-to-br from-blue-500 to-cyan-600 text-white"
+                        ? "bg-primary text-white"
+                        : "bg-primary text-white"
                     }`}>
                       {initials}
                     </div>
@@ -380,7 +380,7 @@ export default function StaffPage() {
                   </div>
                   <span className={`hidden sm:inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full text-xs font-semibold shrink-0 ${
                     isAdmin
-                      ? "bg-violet-100 text-violet-700 dark:bg-violet-900/30 dark:text-violet-400"
+                      ? "bg-primary/10 text-primary dark:bg-primary/15 dark:text-primary"
                       : "bg-blue-100 text-blue-700 dark:bg-blue-900/30 dark:text-blue-400"
                   }`}>
                     {isAdmin ? <ShieldCheck className="w-3 h-3" /> : <User className="w-3 h-3" />}
@@ -411,7 +411,7 @@ export default function StaffPage() {
       )}
 
       {/* Info note */}
-      <div className="bg-amber-50 dark:bg-amber-900/10 border border-amber-200 dark:border-amber-800/30 rounded-xl p-4">
+      <div className="bg-amber-50 dark:bg-amber-900/10 border border-amber-200 dark:border-amber-800/30 rounded-md p-4">
         <p className="text-sm text-amber-800 dark:text-amber-400">
           <span className="font-semibold">{t.staffNote}</span>{" "}
           {t.staffNoteDesc}{" "}
@@ -422,9 +422,9 @@ export default function StaffPage() {
 
       {/* ── Add Staff Modal ───────────────────────────────────── */}
       <Dialog open={addOpen} onOpenChange={(o) => { if (!o) setAddOpen(false); }}>
-        <DialogContent className="sm:max-w-sm rounded-2xl">
+        <DialogContent className="sm:max-w-sm rounded-lg">
           <DialogHeader>
-            <DialogTitle className="text-lg font-bold">
+            <DialogTitle className="text-lg font-semibold">
               {isAr ? "إضافة موظف جديد" : "Add New Staff Member"}
             </DialogTitle>
             <DialogDescription className="text-sm text-muted-foreground">
@@ -445,7 +445,7 @@ export default function StaffPage() {
                 placeholder={isAr ? "مثال: أحمد الرشيدي" : "e.g. Ahmed Al-Rashidi"}
                 value={addForm.full_name}
                 onChange={(e) => setAddForm((f) => ({ ...f, full_name: e.target.value }))}
-                className="h-11 rounded-xl"
+                className="h-11 rounded-md"
               />
             </div>
 
@@ -457,7 +457,7 @@ export default function StaffPage() {
                 placeholder="staff@example.com"
                 value={addForm.email}
                 onChange={(e) => setAddForm((f) => ({ ...f, email: e.target.value }))}
-                className="h-11 rounded-xl"
+                className="h-11 rounded-md"
                 dir="ltr"
               />
             </div>
@@ -471,7 +471,7 @@ export default function StaffPage() {
                   placeholder={isAr ? "8 أحرف على الأقل" : "Min. 8 characters"}
                   value={addForm.password}
                   onChange={(e) => setAddForm((f) => ({ ...f, password: e.target.value }))}
-                  className="h-11 rounded-xl pe-10"
+                  className="h-11 rounded-md pe-10"
                   dir="ltr"
                 />
                 <button
@@ -491,7 +491,7 @@ export default function StaffPage() {
             </div>
 
             {addError && (
-              <div className="flex items-start gap-2 p-3 bg-destructive/10 border border-destructive/20 rounded-xl text-sm text-destructive">
+              <div className="flex items-start gap-2 p-3 bg-destructive/10 border border-destructive/20 rounded-md text-sm text-destructive">
                 <AlertCircle className="w-4 h-4 shrink-0 mt-0.5" />
                 <p className="text-xs">{addError}</p>
               </div>
@@ -499,14 +499,14 @@ export default function StaffPage() {
           </div>
 
           <DialogFooter className="gap-2">
-            <Button variant="outline" onClick={() => setAddOpen(false)} className="rounded-xl" disabled={addSaving}>
+            <Button variant="outline" onClick={() => setAddOpen(false)} className="rounded-md" disabled={addSaving}>
               <X className="w-4 h-4" />
               {t.cancel}
             </Button>
             <Button
               onClick={handleAddStaff}
               disabled={addSaving}
-              className="rounded-xl bg-gradient-to-r from-violet-600 to-purple-600 border-0 shadow-md shadow-violet-500/20"
+              className="rounded-md bg-primary border-0 shadow-md"
             >
               {addSaving
                 ? <><Loader2 className="w-4 h-4 animate-spin" />{isAr ? "جارٍ الإنشاء..." : "Creating..."}</>
@@ -519,9 +519,9 @@ export default function StaffPage() {
 
       {/* ── Edit Staff Modal ──────────────────────────────────── */}
       <Dialog open={!!editTarget} onOpenChange={(o) => !o && setEditTarget(null)}>
-        <DialogContent className="sm:max-w-sm rounded-2xl">
+        <DialogContent className="sm:max-w-sm rounded-lg">
           <DialogHeader>
-            <DialogTitle className="text-lg font-bold">
+            <DialogTitle className="text-lg font-semibold">
               {isAr ? "تعديل بيانات الموظف" : "Edit Staff Member"}
             </DialogTitle>
             {editTarget && (
@@ -537,7 +537,7 @@ export default function StaffPage() {
                 placeholder={isAr ? "مثال: أحمد الرشيدي" : "e.g. Ahmed Al-Rashidi"}
                 value={editForm.full_name}
                 onChange={(e) => setEditForm((f) => ({ ...f, full_name: e.target.value }))}
-                className="h-11 rounded-xl"
+                className="h-11 rounded-md"
               />
             </div>
             <div className="space-y-1.5">
@@ -545,21 +545,21 @@ export default function StaffPage() {
               <RoleToggle value={editForm.role} onChange={(r) => setEditForm((f) => ({ ...f, role: r }))} />
             </div>
             {editError && (
-              <div className="flex items-start gap-2 p-3 bg-destructive/10 border border-destructive/20 rounded-xl text-sm text-destructive">
+              <div className="flex items-start gap-2 p-3 bg-destructive/10 border border-destructive/20 rounded-md text-sm text-destructive">
                 <AlertCircle className="w-4 h-4 shrink-0 mt-0.5" />
                 <p className="text-xs">{editError}</p>
               </div>
             )}
           </div>
           <DialogFooter className="gap-2">
-            <Button variant="outline" onClick={() => setEditTarget(null)} className="rounded-xl">
+            <Button variant="outline" onClick={() => setEditTarget(null)} className="rounded-md">
               <X className="w-4 h-4" />
               {t.cancel}
             </Button>
             <Button
               onClick={handleEditSave}
               disabled={editSaving}
-              className="rounded-xl bg-gradient-to-r from-violet-600 to-purple-600 border-0 shadow-md shadow-violet-500/20"
+              className="rounded-md bg-primary border-0 shadow-md"
             >
               {editSaving
                 ? <><Loader2 className="w-4 h-4 animate-spin" />{t.saving}</>
@@ -572,9 +572,9 @@ export default function StaffPage() {
 
       {/* ── Delete Confirm Modal ──────────────────────────────── */}
       <Dialog open={!!deleteTarget} onOpenChange={(o) => { if (!o) { setDeleteTarget(null); setDeleteError(null); } }}>
-        <DialogContent className="sm:max-w-sm rounded-2xl">
+        <DialogContent className="sm:max-w-sm rounded-lg">
           <DialogHeader>
-            <DialogTitle className="text-lg font-bold text-destructive">{t.confirmDelete}</DialogTitle>
+            <DialogTitle className="text-lg font-semibold text-destructive">{t.confirmDelete}</DialogTitle>
             <DialogDescription className="text-sm text-muted-foreground">
               {isAr
                 ? "سيتم حذف سجل الملف الشخصي فقط. يمكنك إعادة إنشائه لاحقاً."
@@ -583,8 +583,8 @@ export default function StaffPage() {
           </DialogHeader>
           <div className="py-2">
             {deleteTarget && (
-              <div className="flex items-center gap-3 p-3 bg-muted/50 rounded-xl border border-border">
-                <div className="w-9 h-9 rounded-full bg-gradient-to-br from-violet-500 to-purple-700 text-white flex items-center justify-center text-sm font-bold shrink-0">
+              <div className="flex items-center gap-3 p-3 bg-muted/50 rounded-md border border-border">
+                <div className="w-9 h-9 rounded-full bg-primary text-white flex items-center justify-center text-sm font-semibold shrink-0">
                   {(deleteTarget.full_name || deleteTarget.email || "U")[0].toUpperCase()}
                 </div>
                 <div className="min-w-0">
@@ -596,17 +596,17 @@ export default function StaffPage() {
               </div>
             )}
             {deleteError && (
-              <div className="flex items-start gap-2 mt-3 p-3 bg-destructive/10 border border-destructive/20 rounded-xl text-sm text-destructive">
+              <div className="flex items-start gap-2 mt-3 p-3 bg-destructive/10 border border-destructive/20 rounded-md text-sm text-destructive">
                 <AlertCircle className="w-4 h-4 shrink-0 mt-0.5" />
                 <p className="text-xs">{deleteError}</p>
               </div>
             )}
           </div>
           <DialogFooter className="gap-2">
-            <Button variant="outline" onClick={() => { setDeleteTarget(null); setDeleteError(null); }} className="rounded-xl">
+            <Button variant="outline" onClick={() => { setDeleteTarget(null); setDeleteError(null); }} className="rounded-md">
               {t.cancel}
             </Button>
-            <Button onClick={handleDelete} disabled={deleting} variant="destructive" className="rounded-xl">
+            <Button onClick={handleDelete} disabled={deleting} variant="destructive" className="rounded-md">
               {deleting
                 ? <><Loader2 className="w-4 h-4 animate-spin" />{t.deleting}</>
                 : <><Trash2 className="w-4 h-4" />{t.confirmDeleteBtn}</>

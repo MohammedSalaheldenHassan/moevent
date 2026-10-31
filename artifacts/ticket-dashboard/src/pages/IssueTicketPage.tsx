@@ -138,13 +138,13 @@ export default function IssueTicketPage() {
             * { box-sizing: border-box; margin: 0; padding: 0; }
             body { font-family: ${isAr ? "'Cairo'" : "'Inter'"}, system-ui, sans-serif; display: flex; justify-content: center; padding: 40px; background: #f3f4f6; }
             .ticket { background: white; border-radius: 24px; max-width: 420px; width: 100%; overflow: hidden; box-shadow: 0 20px 60px rgba(0,0,0,0.12); }
-            .ticket-header { background: linear-gradient(135deg, #7c3aed, #9333ea); padding: 28px 24px; text-align: center; }
+            .ticket-header { background: linear-gradient(135deg, hsl(var(--primary)), #9333ea); padding: 28px 24px; text-align: center; }
             .ticket-logo { font-size: 32px; margin-bottom: 6px; }
             .ticket-app { color: rgba(255,255,255,0.85); font-size: 14px; font-weight: 600; }
             .ticket-body { padding: 24px; }
             .event-name { font-size: 20px; font-weight: 800; color: #111827; margin-bottom: 6px; }
             .event-meta { display: flex; gap: 10px; font-size: 13px; color: #6b7280; margin-bottom: 8px; flex-wrap: wrap; }
-            .price-badge { display: inline-block; background: #f3f0ff; color: #6d28d9; font-size: 13px; font-weight: 700; padding: 4px 12px; border-radius: 999px; margin-bottom: 20px; }
+            .price-badge { display: inline-block; background: #f3f0ff; color: hsl(var(--primary)); font-size: 13px; font-weight: 700; padding: 4px 12px; border-radius: 999px; margin-bottom: 20px; }
             .divider { border: none; border-top: 2px dashed #e5e7eb; margin: 0 -24px 20px; }
             .customer-label { font-size: 10px; font-weight: 700; color: #9ca3af; text-transform: uppercase; letter-spacing: 0.08em; margin-bottom: 3px; }
             .customer-value { font-size: 17px; font-weight: 700; color: #111827; margin-bottom: 16px; }
@@ -187,13 +187,12 @@ export default function IssueTicketPage() {
   return (
     <div className="space-y-8 max-w-2xl">
       <div>
-        <h1 className="text-2xl font-bold text-foreground">{t.issueTicketTitle}</h1>
+        <h1 className="text-2xl font-semibold text-foreground">{t.issueTicketTitle}</h1>
         <p className="text-muted-foreground text-sm mt-1">{t.issueTicketSubtitle}</p>
       </div>
 
-      <div className="bg-card border border-card-border rounded-2xl shadow-sm overflow-hidden">
+      <div className="bg-card border border-card-border rounded-lg shadow-sm overflow-hidden">
         {/* Form header */}
-        <div className="h-1.5 bg-gradient-to-r from-violet-600 to-purple-600" />
         <div className="p-6 space-y-5">
           {/* Event selector */}
           <div className="space-y-1.5">
@@ -202,13 +201,13 @@ export default function IssueTicketPage() {
               {t.event} *
             </Label>
             {eventsLoading ? (
-              <div className="h-11 bg-muted animate-pulse rounded-xl" />
+              <div className="h-11 bg-muted animate-pulse rounded-md" />
             ) : (
               <Select value={form.eventId} onValueChange={(v) => setForm(f => ({ ...f, eventId: v }))}>
-                <SelectTrigger className="h-11 rounded-xl">
+                <SelectTrigger className="h-11 rounded-md">
                   <SelectValue placeholder={t.selectEvent} />
                 </SelectTrigger>
-                <SelectContent className="rounded-xl">
+                <SelectContent className="rounded-md">
                   {events.length === 0 ? (
                     <SelectItem value="none" disabled>{t.noEventsAvailable}</SelectItem>
                   ) : (
@@ -227,21 +226,21 @@ export default function IssueTicketPage() {
 
           {/* Selected event preview */}
           {selectedEvent && (
-            <div className="flex items-center gap-3 p-3.5 bg-violet-50 dark:bg-violet-900/10 rounded-xl border border-violet-200 dark:border-violet-800/30">
-              <div className="w-10 h-10 rounded-xl bg-gradient-to-br from-violet-500 to-purple-700 flex items-center justify-center shrink-0">
+            <div className="flex items-center gap-3 p-3.5 bg-primary/10 dark:bg-primary/15 rounded-md border border-primary/30 dark:border-primary/30">
+              <div className="w-10 h-10 rounded-md bg-primary flex items-center justify-center shrink-0">
                 <CalendarDays className="w-4.5 h-4.5 text-white" />
               </div>
               <div className="flex-1 min-w-0">
-                <p className="font-bold text-violet-900 dark:text-violet-300 text-sm truncate">{selectedEvent.title}</p>
+                <p className="font-semibold text-primary dark:text-primary text-sm truncate">{selectedEvent.title}</p>
                 <div className="flex items-center gap-3 mt-0.5">
                   {selectedEvent.event_date && (
-                    <span className="text-xs text-violet-700/70 dark:text-violet-400/70 flex items-center gap-1">
+                    <span className="text-xs text-primary/70 dark:text-primary/70 flex items-center gap-1">
                       <CalendarDays className="w-3 h-3" />
                       {new Date(selectedEvent.event_date).toLocaleDateString(isAr ? "ar-SA" : "en-US", { month: "short", day: "numeric", year: "numeric" })}
                     </span>
                   )}
                   {selectedEvent.location && (
-                    <span className="text-xs text-violet-700/70 dark:text-violet-400/70 flex items-center gap-1">
+                    <span className="text-xs text-primary/70 dark:text-primary/70 flex items-center gap-1">
                       <MapPin className="w-3 h-3" />
                       {selectedEvent.location}
                     </span>
@@ -250,9 +249,9 @@ export default function IssueTicketPage() {
               </div>
               {selectedEvent.price != null && (
                 <div className="shrink-0 text-end">
-                  <div className="flex items-center gap-1 bg-violet-100 dark:bg-violet-900/30 px-2.5 py-1.5 rounded-xl">
-                    <DollarSign className="w-3.5 h-3.5 text-violet-600" />
-                    <span className="text-sm font-black text-violet-700 dark:text-violet-400">{formatPrice(selectedEvent.price)}</span>
+                  <div className="flex items-center gap-1 bg-primary/10 dark:bg-primary/15 px-2.5 py-1.5 rounded-md">
+                    <DollarSign className="w-3.5 h-3.5 text-primary" />
+                    <span className="text-sm font-semibold text-primary dark:text-primary">{formatPrice(selectedEvent.price)}</span>
                   </div>
                 </div>
               )}
@@ -270,7 +269,7 @@ export default function IssueTicketPage() {
               placeholder={t.customerNamePlaceholder}
               value={form.customerName}
               onChange={(e) => setForm(f => ({ ...f, customerName: e.target.value }))}
-              className="h-11 rounded-xl"
+              className="h-11 rounded-md"
             />
           </div>
 
@@ -286,13 +285,13 @@ export default function IssueTicketPage() {
               placeholder={t.customerPhonePlaceholder}
               value={form.customerPhone}
               onChange={(e) => setForm(f => ({ ...f, customerPhone: e.target.value }))}
-              className="h-11 rounded-xl"
+              className="h-11 rounded-md"
               dir="ltr"
             />
           </div>
 
           {error && (
-            <div className="flex items-center gap-2 p-3.5 bg-destructive/10 border border-destructive/20 rounded-xl text-sm text-destructive">
+            <div className="flex items-center gap-2 p-3.5 bg-destructive/10 border border-destructive/20 rounded-md text-sm text-destructive">
               <AlertCircle className="w-4 h-4 shrink-0" />
               {error}
             </div>
@@ -301,7 +300,7 @@ export default function IssueTicketPage() {
           <Button
             onClick={handleIssue}
             disabled={saving}
-            className="w-full h-12 rounded-xl text-sm font-bold bg-gradient-to-r from-violet-600 to-purple-600 hover:from-violet-700 hover:to-purple-700 border-0 shadow-lg shadow-violet-500/25"
+            className="w-full h-12 rounded-md text-sm font-semibold bg-primary border-0 shadow-sm"
           >
             {saving
               ? <><Loader2 className="w-4 h-4 animate-spin" />{t.issuingTicket}</>
@@ -313,29 +312,29 @@ export default function IssueTicketPage() {
 
       {/* Success: Issued ticket preview */}
       {issuedTicket && (
-        <div className="bg-card border border-emerald-200 dark:border-emerald-900/50 rounded-2xl overflow-hidden shadow-sm">
+        <div className="bg-card border border-emerald-200 dark:border-emerald-900/50 rounded-lg overflow-hidden shadow-sm">
           {/* Success header */}
-          <div className="bg-gradient-to-r from-emerald-500 to-green-600 px-5 py-4 flex items-center gap-3">
-            <div className="w-9 h-9 bg-white/20 rounded-xl flex items-center justify-center shrink-0">
+          <div className="bg-emerald-600 px-5 py-4 flex items-center gap-3">
+            <div className="w-9 h-9 bg-white/20 rounded-md flex items-center justify-center shrink-0">
               <CheckCircle2 className="w-5 h-5 text-white" />
             </div>
             <div>
-              <p className="font-bold text-white">{t.ticketIssuedSuccessfully}</p>
+              <p className="font-semibold text-white">{t.ticketIssuedSuccessfully}</p>
               <p className="text-white/70 text-xs mt-0.5">#{issuedTicket.id.slice(0, 12)}…</p>
             </div>
           </div>
 
           {/* Ticket card preview */}
-          <div ref={printRef} className="m-5 rounded-2xl overflow-hidden border border-border shadow-sm">
-            <div className="bg-gradient-to-br from-violet-600 to-purple-700 p-5 text-center">
+          <div ref={printRef} className="m-5 rounded-lg overflow-hidden border border-border shadow-sm">
+            <div className="bg-primary p-5 text-center">
               <div className="mb-1.5 flex justify-center">
                 {systemLogo && systemLogo.startsWith("data:") ? (
-                  <img src={systemLogo} alt="Logo" className="w-10 h-10 rounded-xl object-cover" />
+                  <img src={systemLogo} alt="Logo" className="w-10 h-10 rounded-md object-cover" />
                 ) : (
                   <span className="text-2xl">🎫</span>
                 )}
               </div>
-              <div className="text-white font-bold text-lg leading-tight">{issuedTicket.event.title}</div>
+              <div className="text-white font-semibold text-lg leading-tight">{issuedTicket.event.title}</div>
               <div className="flex items-center justify-center flex-wrap gap-3 mt-2 text-white/70 text-xs">
                 {issuedTicket.event.event_date && (
                   <span className="flex items-center gap-1">
@@ -351,7 +350,7 @@ export default function IssueTicketPage() {
                 )}
               </div>
               {issuedTicket.event.price != null && (
-                <div className="mt-2 inline-flex items-center gap-1.5 bg-white/15 px-3 py-1 rounded-full text-xs font-bold text-white border border-white/20">
+                <div className="mt-2 inline-flex items-center gap-1.5 bg-white/15 px-3 py-1 rounded-full text-xs font-semibold text-white border border-white/20">
                   <DollarSign className="w-3 h-3 text-yellow-300" />
                   {formatPrice(issuedTicket.event.price)}
                 </div>
@@ -359,11 +358,11 @@ export default function IssueTicketPage() {
             </div>
             <div className="bg-white p-5">
               <div className="flex items-center gap-3 mb-4 pb-4 border-b-2 border-dashed border-gray-200">
-                <div className="w-10 h-10 bg-violet-100 rounded-full flex items-center justify-center shrink-0">
-                  <User className="w-5 h-5 text-violet-600" />
+                <div className="w-10 h-10 bg-primary/10 rounded-full flex items-center justify-center shrink-0">
+                  <User className="w-5 h-5 text-primary" />
                 </div>
                 <div>
-                  <div className="font-bold text-gray-900 text-sm">{issuedTicket.customer_name}</div>
+                  <div className="font-semibold text-gray-900 text-sm">{issuedTicket.customer_name}</div>
                   <div className="text-gray-500 text-xs flex items-center gap-1">
                     <Phone className="w-3 h-3" />
                     {issuedTicket.customer_phone}
@@ -371,8 +370,8 @@ export default function IssueTicketPage() {
                 </div>
               </div>
               <div className="flex justify-center">
-                <div className="bg-white rounded-2xl p-2 shadow-inner border border-gray-100">
-                  <img src={issuedTicket.qrDataUrl} alt="QR Code" className="w-40 h-40 rounded-xl" />
+                <div className="bg-white rounded-lg p-2 shadow-inner border border-gray-100">
+                  <img src={issuedTicket.qrDataUrl} alt="QR Code" className="w-40 h-40 rounded-md" />
                 </div>
               </div>
               <p className="text-center text-[10px] text-gray-300 mt-3 break-all px-2 font-mono">{issuedTicket.id}</p>
@@ -382,12 +381,12 @@ export default function IssueTicketPage() {
           <div className="flex gap-3 px-5 pb-5">
             <Button
               onClick={handlePrint}
-              className="flex-1 h-11 rounded-xl bg-gradient-to-r from-violet-600 to-purple-600 hover:from-violet-700 hover:to-purple-700 border-0 shadow-md shadow-violet-500/20 font-semibold"
+              className="flex-1 h-11 rounded-md bg-primary border-0 shadow-md font-semibold"
             >
               <Printer className="w-4 h-4" />
               {t.printTicket}
             </Button>
-            <Button variant="outline" onClick={() => setIssuedTicket(null)} className="flex-1 h-11 rounded-xl font-semibold">
+            <Button variant="outline" onClick={() => setIssuedTicket(null)} className="flex-1 h-11 rounded-md font-semibold">
               {t.issueAnother}
             </Button>
           </div>

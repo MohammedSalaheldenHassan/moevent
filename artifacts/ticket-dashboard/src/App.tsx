@@ -61,7 +61,7 @@ function LoadingScreen() {
   return (
     <div className="min-h-screen flex items-center justify-center bg-background">
       <div className="flex flex-col items-center gap-3 text-center">
-        <div className="w-12 h-12 rounded-2xl bg-primary/10 flex items-center justify-center">
+        <div className="w-12 h-12 rounded-lg bg-primary/10 flex items-center justify-center">
           <Loader2 className="w-6 h-6 animate-spin text-primary" />
         </div>
         <p className="text-sm text-muted-foreground">{t.loading}</p>
