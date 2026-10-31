@@ -319,7 +319,7 @@ const translations = {
   },
 };
 
-export type Translations = typeof translations.en;
+export type Translations = Omit<typeof translations.en, "dir"> & { dir: "ltr" | "rtl" };
 
 interface LocaleContextType {
   lang: Lang;

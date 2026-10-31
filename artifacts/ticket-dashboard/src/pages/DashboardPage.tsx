@@ -134,7 +134,7 @@ export default function DashboardPage() {
     // Step 1: fetch events (and recent events) — already org_id filtered above
     // allowedEventIds: null = no staff restriction; [] = staff with zero access
     const noEventsAccess = allowedEventIds !== null && allowedEventIds.length === 0;
-    const emptyResult0 = { data: [], error: null, count: 0 };
+    const emptyResult0 = { data: [], error: null, count: 0 } as unknown as Awaited<typeof eventsQuery>;
 
     const [eventsRes, recentRes] = noEventsAccess
       ? [emptyResult0, emptyResult0]

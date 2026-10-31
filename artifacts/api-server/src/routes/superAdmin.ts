@@ -215,7 +215,7 @@ router.post("/super-admin/organizations", requireSuperAdmin, async (req, res) =>
   } catch (err) {
     // Best-effort cleanup
     if (authUserId) await adminClient.auth.admin.deleteUser(authUserId).catch(() => {});
-    if (orgId) await adminClient.from("organizations").delete().eq("id", orgId).catch(() => {});
+    if (orgId) await adminClient.from("organizations").delete().eq("id", orgId);
     res.status(500).json({ error: err instanceof Error ? err.message : "Internal server error" });
   }
 });
@@ -260,7 +260,7 @@ async function deleteOrgCascade(adminClient: ReturnType<typeof getAdminClient>, 
     if (ticketsErr) return { error: ticketsErr.message };
 
     // 3. Delete any staff event assignments for those events (ignore if table doesn't exist)
-    await adminClient.from("staff_event_assignments").delete().in("event_id", eventIds).catch(() => {});
+    await adminClient.from("staff_event_assignments").delete().in("event_id", eventIds);
 
     // 4. Delete the events themselves
     const { error: eventsErr } = await adminClient
@@ -271,7 +271,7 @@ async function deleteOrgCascade(adminClient: ReturnType<typeof getAdminClient>, 
   }
 
   // 5. Unlink any profiles from this org (don't delete users — just detach)
-  await adminClient.from("profiles").update({ org_id: null }).eq("org_id", orgId).catch(() => {});
+  await adminClient.from("profiles").update({ org_id: null }).eq("org_id", orgId);
 
   // 6. Finally delete the organization
   const { error: orgErr } = await adminClient.from("organizations").delete().eq("id", orgId);
@@ -285,7 +285,7 @@ router.delete("/super-admin/organizations/:id", requireSuperAdmin, async (req, r
   try {
     const { id } = req.params;
     const adminClient = getAdminClient();
-    const err = await deleteOrgCascade(adminClient, id);
+    const err = await deleteOrgCascade(adminClient, String(id));
     if (err) { res.status(500).json({ error: err.error }); return; }
     res.json({ success: true });
   } catch {

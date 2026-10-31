@@ -407,7 +407,7 @@ export default function EventDetailPage() {
         ? supabase.from("profiles").select("id, full_name, email, role").eq("role", "staff")
         : Promise.resolve({ data: [], error: null }),
     ]);
-    if (!accessRes.error) setStaffAccess((accessRes.data ?? []) as AccessRow[]);
+    if (!accessRes.error) setStaffAccess((accessRes.data ?? []) as unknown as AccessRow[]);
     if (!allStaffRes.error) setAllStaff((allStaffRes.data ?? []) as StaffProfile[]);
     setStaffLoading(false);
   };
