@@ -7,7 +7,6 @@ import { useAuth } from "@/contexts/useAuth";
 import { LocaleProvider, useLocale } from "@/contexts/LocaleContext";
 import { ThemeProvider } from "@/contexts/ThemeContext";
 import { BrandingProvider, useBranding } from "@/contexts/BrandingContext";
-import { OrgProvider } from "@/contexts/OrgContext";
 import { ErrorBoundary } from "@/components/ErrorBoundary";
 import { Sidebar } from "@/components/Sidebar";
 import LoginPage from "@/pages/LoginPage";
@@ -18,7 +17,6 @@ import IssueTicketPage from "@/pages/IssueTicketPage";
 import StaffPage from "@/pages/StaffPage";
 import SettingsPage from "@/pages/SettingsPage";
 import ActivityLogsPage from "@/pages/ActivityLogsPage";
-import SuperAdminPage from "@/pages/SuperAdminPage";
 import NotFound from "@/pages/not-found";
 import { Loader2 } from "lucide-react";
 import { useState, useEffect } from "react";
@@ -86,18 +84,6 @@ function ProtectedRoutes() {
   if (loading) return <LoadingScreen />;
   if (!user) return <LoginPage />;
 
-  // Super admin gets a fully separate layout
-  if (profile?.role === "super_admin") {
-    return (
-      <Switch>
-        <Route path="/super-admin" component={SuperAdminPage} />
-        <Route>
-          <SuperAdminPage />
-        </Route>
-      </Switch>
-    );
-  }
-
   return (
     <AppLayout>
       <Switch>
@@ -122,15 +108,12 @@ function App() {
           <QueryClientProvider client={queryClient}>
             <TooltipProvider>
               <AuthProvider>
-                <OrgProvider>
-                  {/* BrandingProvider must be inside OrgProvider so it can read org data */}
-                  <BrandingProvider>
-                    <WouterRouter base={import.meta.env.BASE_URL.replace(/\/$/, "")}>
-                      <ProtectedRoutes />
-                    </WouterRouter>
-                    <Toaster />
-                  </BrandingProvider>
-                </OrgProvider>
+                <BrandingProvider>
+                  <WouterRouter base={import.meta.env.BASE_URL.replace(/\/$/, "")}>
+                    <ProtectedRoutes />
+                  </WouterRouter>
+                  <Toaster />
+                </BrandingProvider>
               </AuthProvider>
             </TooltipProvider>
           </QueryClientProvider>

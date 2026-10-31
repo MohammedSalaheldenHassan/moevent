@@ -71,17 +71,10 @@ export default function StaffPage() {
     setLoading(true);
     setError(null);
     try {
-      let query = supabase
+      const { data, error } = await supabase
         .from("profiles")
         .select("id, role, full_name, email")
         .order("role", { ascending: false });
-
-      // Multi-tenant isolation: only show staff within the same org
-      if (currentProfile?.org_id) {
-        query = query.eq("org_id", currentProfile.org_id) as typeof query;
-      }
-
-      const { data, error } = await query;
       if (error) throw error;
       setProfiles(data ?? []);
     } catch (err: unknown) {
@@ -100,7 +93,7 @@ export default function StaffPage() {
     }
   };
 
-  useEffect(() => { fetchProfiles(); }, [currentProfile?.org_id]);
+  useEffect(() => { fetchProfiles(); }, []);
 
   // ── Add Staff ──────────────────────────────────────────────
   const openAdd = () => {
@@ -130,7 +123,6 @@ export default function StaffPage() {
           password: addForm.password,
           full_name: addForm.full_name.trim() || null,
           role: addForm.role,
-          org_id: currentProfile?.org_id ?? null,
         }),
       });
       const json = await res.json() as { user?: Profile; error?: string; warning?: string };
@@ -221,11 +213,12 @@ export default function StaffPage() {
     setDeleting(true);
     setDeleteError(null);
     try {
-      const { error } = await supabase
-        .from("profiles")
-        .delete()
-        .eq("id", deleteTarget.id);
-      if (error) throw error;
+      const res = await fetch(`${getApiBase()}/staff/${deleteTarget.id}`, {
+        method: "DELETE",
+        headers: await getApiAuthHeaders(),
+      });
+      const json = await res.json() as { error?: string };
+      if (!res.ok) throw new Error(json.error || `Server error ${res.status}`);
       logActivity("settings_changed", `Deleted staff: ${deleteTarget.email}`, currentProfile?.email ?? undefined);
       setProfiles((prev) => prev.filter((p) => p.id !== deleteTarget.id));
       setDeleteTarget(null);

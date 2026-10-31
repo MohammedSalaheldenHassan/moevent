@@ -3,17 +3,14 @@ import { supabase } from "@/lib/supabase";
 import { useLocale } from "@/contexts/LocaleContext";
 import { useAuth } from "@/contexts/useAuth";
 import { useBranding } from "@/contexts/BrandingContext";
-import { useOrg } from "@/contexts/OrgContext";
 import {
   CalendarDays, Ticket, ScanLine, TrendingUp, AlertCircle, RefreshCw,
   Users, ArrowRight, ArrowLeft, DollarSign, CalendarCheck2, CalendarX2,
-  Building2, Percent,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { useLocation } from "wouter";
 import {
   BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer,
-  PieChart, Pie, Cell, Legend,
 } from "recharts";
 
 interface Stats {
@@ -81,15 +78,13 @@ function StatCard({
   );
 }
 
-const PIE_COLORS = ["#7c3aed", "#a78bfa", "#e879f9", "#6d28d9"];
 const BAR_COLOR = "#7c3aed";
 const BAR_COLOR2 = "#06b6d4";
 
 export default function DashboardPage() {
   const { t, isRTL, lang } = useLocale();
   const { profile } = useAuth();
-  const { systemName } = useBranding();
-  const { org_name, logo_url, primary_color } = useOrg();
+  const { systemName, systemLogo, primaryColor } = useBranding();
   const [, navigate] = useLocation();
   const isAr = lang === "ar";
 
@@ -104,7 +99,6 @@ export default function DashboardPage() {
 
   const ArrowIcon = isRTL ? ArrowLeft : ArrowRight;
   const isAdmin = !profile || profile.role === "admin";
-  const orgId = profile?.org_id ?? null;
 
   const fetchStats = async () => {
     setLoading(true);
@@ -122,16 +116,10 @@ export default function DashboardPage() {
       allowedEventIds = (accessData ?? []).map((a: { event_id: string }) => a.event_id);
     }
 
-    let eventsQuery = supabase.from("events").select("id, title, price, event_date", { count: "exact" });
-    let recentQuery = supabase.from("events").select("id, title, event_date, price").order("created_at", { ascending: false }).limit(5);
+    const eventsQuery = supabase.from("events").select("id, title, price, event_date", { count: "exact" });
+    const recentQuery = supabase.from("events").select("id, title, event_date, price").order("created_at", { ascending: false }).limit(5);
 
-    // Multi-tenant: filter by org_id when available
-    if (orgId) {
-      eventsQuery = eventsQuery.eq("org_id", orgId) as typeof eventsQuery;
-      recentQuery = recentQuery.eq("org_id", orgId) as typeof recentQuery;
-    }
-
-    // Step 1: fetch events (and recent events) — already org_id filtered above
+    // Step 1: fetch events (and recent events)
     // allowedEventIds: null = no staff restriction; [] = staff with zero access
     const noEventsAccess = allowedEventIds !== null && allowedEventIds.length === 0;
     const emptyResult0 = { data: [], error: null, count: 0 } as unknown as Awaited<typeof eventsQuery>;
@@ -143,14 +131,12 @@ export default function DashboardPage() {
           allowedEventIds ? recentQuery.in("id", allowedEventIds) : recentQuery,
         ]);
 
-    // Step 2: build the event ID list to filter tickets — no org_id on tickets table
+    // Step 2: build the event ID list to filter tickets (null = all tickets)
     let ticketEventIds: string[] | null = null;
     if (noEventsAccess) {
       ticketEventIds = [];
     } else if (allowedEventIds) {
       ticketEventIds = allowedEventIds;
-    } else if (orgId && eventsRes.data) {
-      ticketEventIds = eventsRes.data.map((ev) => ev.id);
     }
 
     // If we have an explicit empty list, skip DB calls entirely — nothing to query
@@ -226,21 +212,11 @@ export default function DashboardPage() {
       .on("postgres_changes", { event: "*", schema: "public", table: "tickets" }, fetchStats)
       .subscribe();
     return () => { supabase.removeChannel(channel); };
-  }, [orgId]);
+  }, []);
 
   const attendanceRate = stats.totalTickets > 0
     ? Math.round((stats.scannedTickets / stats.totalTickets) * 100)
     : 0;
-
-  const netRevenue = Math.round(stats.totalRevenue * 0.95);
-  const platformFees = Math.round(stats.totalRevenue * 0.05);
-
-  const pieData = stats.totalRevenue > 0
-    ? [
-        { name: isAr ? "صافي الإيراد (95%)" : "Net Revenue (95%)", value: netRevenue },
-        { name: isAr ? "رسوم المنصة (5%)" : "Platform Fees (5%)", value: platformFees },
-      ]
-    : [];
 
   const greeting = () => {
     const h = new Date().getHours();
@@ -248,7 +224,7 @@ export default function DashboardPage() {
     return h < 12 ? "Good morning" : h < 17 ? "Good afternoon" : "Good evening";
   };
 
-  const accentColor = primary_color ?? "#7c3aed";
+  const accentColor = primaryColor || "#7c3aed";
 
   return (
     <div className="space-y-8">
@@ -259,20 +235,14 @@ export default function DashboardPage() {
             {greeting()}, {profile?.full_name?.split(" ")[0] || (isAr ? "مدير" : "Admin")} 👋
           </p>
           <div className="flex items-center gap-2.5">
-            {logo_url && (
-              <img src={logo_url} alt="org logo" className="w-8 h-8 rounded-lg object-cover border border-border" />
+            {systemLogo && (
+              <img src={systemLogo} alt="logo" className="w-8 h-8 rounded-lg object-cover border border-border" />
             )}
             <h1 className="text-2xl font-black text-foreground">
-              {org_name || systemName || t.appName}
+              {systemName || t.appName}
             </h1>
           </div>
           <p className="text-muted-foreground text-sm mt-0.5">{t.dashboardSubtitle}</p>
-          {orgId && (
-            <div className="inline-flex items-center gap-1.5 mt-2 px-2.5 py-1 rounded-full border border-violet-500/20 bg-violet-500/5 text-violet-500 text-[11px] font-semibold">
-              <Building2 className="w-3 h-3" />
-              {isAr ? "مؤسستك" : "Your Organization"}
-            </div>
-          )}
         </div>
         <Button variant="outline" size="sm" onClick={fetchStats} disabled={loading} className="rounded-xl shrink-0">
           <RefreshCw className={`w-3.5 h-3.5 ${loading ? "animate-spin" : ""}`} />
@@ -324,59 +294,6 @@ export default function DashboardPage() {
         />
       </div>
 
-      {/* Revenue Split */}
-      <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-        <div className="relative overflow-hidden rounded-2xl p-5 bg-gradient-to-br from-violet-600 via-purple-700 to-indigo-800 shadow-lg shadow-violet-500/20">
-          <div className="absolute inset-0 opacity-10">
-            <div className="absolute -top-4 -end-4 w-28 h-28 rounded-full bg-white blur-2xl" />
-          </div>
-          <div className="relative">
-            <div className="flex items-start justify-between mb-4">
-              <div className="w-10 h-10 rounded-xl bg-white/20 backdrop-blur-sm flex items-center justify-center">
-                <Building2 className="w-5 h-5 text-white" />
-              </div>
-              <div className="flex items-center gap-1 text-[11px] font-bold text-white/80 bg-white/15 px-2 py-1 rounded-lg">
-                <Percent className="w-3 h-3" />
-                {isAr ? "95%" : "95%"}
-              </div>
-            </div>
-            {loading ? (
-              <div className="h-9 w-24 bg-white/20 animate-pulse rounded-lg mb-1" />
-            ) : (
-              <p className="text-3xl font-black text-white tracking-tight">RWF {netRevenue.toLocaleString()}</p>
-            )}
-            <p className="text-sm font-medium text-white/70 mt-1">
-              {isAr ? "صافي إيرادك (95%)" : "Your Net Revenue (95%)"}
-            </p>
-          </div>
-        </div>
-
-        <div className="relative overflow-hidden rounded-2xl p-5 bg-gradient-to-br from-rose-500 via-pink-600 to-fuchsia-700 shadow-lg shadow-rose-500/20">
-          <div className="absolute inset-0 opacity-10">
-            <div className="absolute -top-4 -end-4 w-28 h-28 rounded-full bg-white blur-2xl" />
-          </div>
-          <div className="relative">
-            <div className="flex items-start justify-between mb-4">
-              <div className="w-10 h-10 rounded-xl bg-white/20 backdrop-blur-sm flex items-center justify-center">
-                <Percent className="w-5 h-5 text-white" />
-              </div>
-              <div className="flex items-center gap-1 text-[11px] font-bold text-white/80 bg-white/15 px-2 py-1 rounded-lg">
-                <TrendingUp className="w-3 h-3" />
-                {isAr ? "5%" : "5%"}
-              </div>
-            </div>
-            {loading ? (
-              <div className="h-9 w-24 bg-white/20 animate-pulse rounded-lg mb-1" />
-            ) : (
-              <p className="text-3xl font-black text-white tracking-tight">RWF {platformFees.toLocaleString()}</p>
-            )}
-            <p className="text-sm font-medium text-white/70 mt-1">
-              {isAr ? "رسوم المنصة (5%)" : "Platform Fees (5%)"}
-            </p>
-          </div>
-        </div>
-      </div>
-
       {/* Charts Row */}
       <div className="grid grid-cols-1 lg:grid-cols-5 gap-6">
         {/* Bar chart: tickets per event */}
@@ -420,43 +337,8 @@ export default function DashboardPage() {
           )}
         </div>
 
-        {/* Pie chart: revenue split + recent events */}
+        {/* Attendance + recent events */}
         <div className="lg:col-span-2 flex flex-col gap-6">
-          {/* Pie chart */}
-          <div className="bg-card border border-card-border rounded-2xl p-6 shadow-sm flex-1">
-            <h3 className="font-bold text-foreground mb-1">{isAr ? "توزيع الإيرادات" : "Revenue Split"}</h3>
-            <p className="text-xs text-muted-foreground mb-3">{isAr ? "المؤسسة مقابل المنصة" : "Org vs Platform"}</p>
-            {loading ? (
-              <div className="h-36 bg-muted/30 animate-pulse rounded-xl" />
-            ) : pieData.length === 0 ? (
-              <div className="h-36 flex items-center justify-center text-muted-foreground text-sm">
-                {isAr ? "لا توجد إيرادات بعد" : "No revenue yet"}
-              </div>
-            ) : (
-              <ResponsiveContainer width="100%" height={160}>
-                <PieChart>
-                  <Pie data={pieData} cx="50%" cy="50%" innerRadius={42} outerRadius={65}
-                    paddingAngle={3} dataKey="value" stroke="none">
-                    {pieData.map((_, i) => (
-                      <Cell key={i} fill={PIE_COLORS[i % PIE_COLORS.length]} />
-                    ))}
-                  </Pie>
-                  <Tooltip
-                    contentStyle={{
-                      background: "hsl(var(--card))", border: "1px solid hsl(var(--border))",
-                      borderRadius: "12px", fontSize: "12px",
-                    }}
-                    formatter={(val: number) => [`RWF ${val.toLocaleString()}`]}
-                  />
-                  <Legend
-                    iconType="circle" iconSize={8}
-                    wrapperStyle={{ fontSize: "11px", color: "hsl(var(--muted-foreground))" }}
-                  />
-                </PieChart>
-              </ResponsiveContainer>
-            )}
-          </div>
-
           {/* Attendance ring */}
           <div className="bg-card border border-card-border rounded-2xl p-5 shadow-sm">
             <div className="flex items-center justify-between mb-3">

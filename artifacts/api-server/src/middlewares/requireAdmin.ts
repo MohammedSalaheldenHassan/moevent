@@ -2,8 +2,6 @@ import type { Request, Response, NextFunction } from "express";
 import { createClient } from "@supabase/supabase-js";
 import { getSupabaseProjectUrl } from "../lib/supabaseProjectUrl";
 
-const ADMIN_ROLES = ["admin", "super_admin"];
-
 function getAdminClient() {
   const serviceRoleKey = process.env["SUPABASE_SERVICE_ROLE_KEY"];
   if (!serviceRoleKey) throw new Error("SUPABASE_SERVICE_ROLE_KEY is not configured");
@@ -29,7 +27,7 @@ export async function requireAdmin(req: Request, res: Response, next: NextFuncti
     const { data: profile, error: profileError } = await adminClient
       .from("profiles").select("id, role").eq("id", user.id).single();
 
-    if (profileError || !profile || !ADMIN_ROLES.includes(profile.role)) {
+    if (profileError || !profile || profile.role !== "admin") {
       res.status(403).json({ error: "Forbidden: admin role required" });
       return;
     }

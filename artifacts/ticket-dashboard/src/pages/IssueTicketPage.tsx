@@ -3,7 +3,6 @@ import { supabase } from "@/lib/supabase";
 import { useLocale } from "@/contexts/LocaleContext";
 import { useBranding } from "@/contexts/BrandingContext";
 import { useAuth } from "@/contexts/useAuth";
-import { useOrg } from "@/contexts/OrgContext";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -31,7 +30,6 @@ export default function IssueTicketPage() {
   const { t, lang } = useLocale();
   const { systemName, systemLogo } = useBranding();
   const { profile } = useAuth();
-  const { org_id: orgId } = useOrg();
   const isAr = lang === "ar";
   const isAdmin = !profile || profile.role === "admin";
 
@@ -66,7 +64,6 @@ export default function IssueTicketPage() {
           .from("events")
           .select("id, title, event_date, location, price")
           .order("created_at", { ascending: false });
-        if (orgId) query = query.eq("org_id", orgId) as typeof query;
         if (eventIds) query = query.in("id", eventIds);
         const { data, error } = await query;
         if (error) throw error;
@@ -78,7 +75,7 @@ export default function IssueTicketPage() {
       }
     };
     fetchEvents();
-  }, [orgId]);
+  }, []);
 
   const selectedEvent = events.find((e) => e.id === form.eventId);
 
