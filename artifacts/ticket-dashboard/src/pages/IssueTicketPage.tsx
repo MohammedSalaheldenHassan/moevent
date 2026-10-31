@@ -11,6 +11,7 @@ import { AlertCircle, Loader2, Printer, CheckCircle2, Ticket, CalendarDays, MapP
 import { logActivity } from "@/lib/activityLogger";
 import { cn } from "@/lib/utils";
 import QRCode from "qrcode";
+import { printTicket, isImageUrl, shortTicketId as shortId } from "@/lib/printTicket";
 
 interface Event {
   id: string;
@@ -35,17 +36,6 @@ interface TicketView {
   id?: string;
   qrDataUrl?: string;
 }
-
-function escapeHtml(value: string): string {
-  return value
-    .replace(/&/g, "&amp;")
-    .replace(/</g, "&lt;")
-    .replace(/>/g, "&gt;")
-    .replace(/"/g, "&quot;")
-    .replace(/'/g, "&#39;");
-}
-
-const isImageUrl = (v: string) => v.startsWith("data:image/") || v.startsWith("https://") || v.startsWith("/");
 
 export default function IssueTicketPage() {
   const { t, lang } = useLocale();
@@ -161,78 +151,12 @@ export default function IssueTicketPage() {
         : { day: "numeric", month: "short", year: "numeric" })
       : "";
 
-  const shortId = (id: string) => id.slice(0, 8).toUpperCase();
-
   const handlePrint = () => {
     if (!issuedTicket) return;
-    const win = window.open("", "_blank");
-    if (!win) return;
-    const evt = issuedTicket.event;
-    const esc = (v: string | null | undefined) => escapeHtml(v ?? "");
-    const logo = systemLogo && isImageUrl(systemLogo)
-      ? `<img class="logo" src="${esc(systemLogo)}" alt="" />`
-      : "";
-    const priceStr = formatPrice(evt.price) ?? "";
-    win.document.write(`<!DOCTYPE html>
-<html dir="${isAr ? "rtl" : "ltr"}" lang="${lang}">
-<head>
-<meta charset="utf-8" />
-<title>${isAr ? "تذكرة" : "Ticket"} ${shortId(issuedTicket.id)}</title>
-<link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Sans:wght@400;500;600&family=IBM+Plex+Sans+Arabic:wght@400;500;600&family=IBM+Plex+Mono:wght@500&display=swap" rel="stylesheet">
-<style>
-  * { box-sizing: border-box; margin: 0; padding: 0; }
-  body { font-family: ${isAr ? "'IBM Plex Sans Arabic'" : "'IBM Plex Sans'"}, system-ui, sans-serif; color: #111418; background: #f4f3f0; display: flex; justify-content: center; padding: 40px 16px; }
-  .ticket { width: 360px; background: #fff; border: 1px solid #dcdad5; border-radius: 10px; overflow: hidden; }
-  .top { padding: 22px 24px 20px; }
-  .brand { display: flex; align-items: center; justify-content: space-between; gap: 12px; margin-bottom: 18px; }
-  .brand-name { display: flex; align-items: center; gap: 8px; font-size: 13px; font-weight: 600; }
-  .logo { width: 26px; height: 26px; border-radius: 5px; object-fit: contain; background: #000; }
-  .admit { font-size: 10px; font-weight: 600; letter-spacing: .12em; text-transform: uppercase; color: #6b6a66; border: 1px solid #dcdad5; border-radius: 4px; padding: 3px 7px; }
-  .event { font-size: 20px; font-weight: 600; line-height: 1.25; letter-spacing: -.01em; }
-  .meta { margin-top: 8px; font-size: 12.5px; color: #5d5c58; line-height: 1.6; }
-  .tear { position: relative; border-top: 1.5px dashed #cfccc6; margin: 0 14px; }
-  .tear::before, .tear::after { content: ""; position: absolute; top: -9px; width: 16px; height: 16px; border-radius: 50%; background: #f4f3f0; border: 1px solid #dcdad5; }
-  .tear::before { left: -23px; } .tear::after { right: -23px; }
-  .bottom { padding: 20px 24px 22px; display: flex; gap: 18px; align-items: flex-start; }
-  .fields { flex: 1; min-width: 0; }
-  .label { font-size: 10px; font-weight: 600; letter-spacing: .08em; text-transform: uppercase; color: #8a8984; margin-bottom: 2px; }
-  .value { font-size: 14px; font-weight: 500; margin-bottom: 12px; word-break: break-word; }
-  .qr { width: 118px; height: 118px; border: 1px solid #e6e4df; border-radius: 6px; padding: 4px; }
-  .id { font-family: 'IBM Plex Mono', monospace; font-size: 11px; color: #5d5c58; text-align: center; padding: 10px 24px 14px; border-top: 1px solid #eeece8; letter-spacing: .06em; }
-  @media print { body { background: #fff; padding: 0; } .ticket { border-color: #bbb; } .tear::before, .tear::after { background: #fff; } }
-</style>
-</head>
-<body>
-  <div class="ticket">
-    <div class="top">
-      <div class="brand">
-        <div class="brand-name">${logo}<span>${esc(brandName)}</span></div>
-        <span class="admit">${isAr ? "تذكرة دخول" : "Admit one"}</span>
-      </div>
-      <div class="event">${esc(evt.title)}</div>
-      <div class="meta">
-        ${evt.event_date ? `<div>${esc(formatDate(evt.event_date, true))}</div>` : ""}
-        ${evt.location ? `<div>${esc(evt.location)}</div>` : ""}
-      </div>
-    </div>
-    <div class="tear"></div>
-    <div class="bottom">
-      <div class="fields">
-        <div class="label">${isAr ? "اسم الحامل" : "Ticket holder"}</div>
-        <div class="value">${esc(issuedTicket.customer_name)}</div>
-        <div class="label">${isAr ? "الهاتف" : "Phone"}</div>
-        <div class="value" dir="ltr">${esc(issuedTicket.customer_phone)}</div>
-        ${priceStr ? `<div class="label">${isAr ? "السعر" : "Price"}</div><div class="value">${esc(priceStr)}</div>` : ""}
-      </div>
-      <img class="qr" src="${issuedTicket.qrDataUrl}" alt="QR" />
-    </div>
-    <div class="id">${isAr ? "رقم التذكرة" : "Ticket"} ${shortId(issuedTicket.id)}</div>
-  </div>
-</body>
-</html>`);
-    win.document.close();
-    win.focus();
-    setTimeout(() => { win.print(); win.close(); }, 600);
+    printTicket({
+      lang, brandName, logoUrl: systemLogo,
+      ticket: issuedTicket, event: issuedTicket.event, qrDataUrl: issuedTicket.qrDataUrl,
+    });
   };
 
   const preview: TicketView = issuedTicket
