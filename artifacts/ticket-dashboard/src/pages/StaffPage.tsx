@@ -108,8 +108,8 @@ export default function StaffPage() {
       setAddError(isAr ? "البريد الإلكتروني غير صالح" : "Please enter a valid email address.");
       return;
     }
-    if (addForm.password.length < 6) {
-      setAddError(isAr ? "كلمة المرور يجب أن تكون 6 أحرف على الأقل" : "Password must be at least 6 characters.");
+    if (addForm.password.length < 8) {
+      setAddError(isAr ? "كلمة المرور يجب أن تكون 8 أحرف على الأقل" : "Password must be at least 8 characters.");
       return;
     }
     setAddSaving(true);
@@ -468,7 +468,7 @@ export default function StaffPage() {
               <div className="relative">
                 <Input
                   type={showPassword ? "text" : "password"}
-                  placeholder={isAr ? "6 أحرف على الأقل" : "Min. 6 characters"}
+                  placeholder={isAr ? "8 أحرف على الأقل" : "Min. 8 characters"}
                   value={addForm.password}
                   onChange={(e) => setAddForm((f) => ({ ...f, password: e.target.value }))}
                   className="h-11 rounded-xl pe-10"

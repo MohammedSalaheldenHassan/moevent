@@ -19,7 +19,7 @@ function getAdminClient() {
 
 // GET /api/cleanup/status
 // Returns count of events past their date, and count due for deletion (> 3 days expired)
-router.get("/cleanup/status", async (_req, res) => {
+router.get("/cleanup/status", requireAdmin, async (_req, res) => {
   try {
     const supabase = getAdminClient();
     const now = new Date().toISOString();
@@ -42,7 +42,7 @@ router.get("/cleanup/status", async (_req, res) => {
   } catch (err: unknown) {
     const msg = err instanceof Error ? err.message : "Internal server error";
     logger.error({ err: msg }, "[cleanup/status] error");
-    res.status(500).json({ error: msg });
+    res.status(500).json({ error: "Internal server error" });
   }
 });
 
@@ -56,7 +56,7 @@ router.post("/cleanup/run", requireAdmin, async (_req, res) => {
   } catch (err: unknown) {
     const msg = err instanceof Error ? err.message : "Internal server error";
     logger.error({ err: msg }, "[cleanup/run] error");
-    res.status(500).json({ error: msg });
+    res.status(500).json({ error: "Internal server error" });
   }
 });
 

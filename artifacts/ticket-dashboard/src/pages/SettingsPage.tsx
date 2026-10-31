@@ -148,7 +148,8 @@ export default function SettingsPage() {
 
   useEffect(() => {
     setCleanupLoading(true);
-    fetch(`${cleanupApiBase}/cleanup/status`)
+    getApiAuthHeaders()
+      .then((headers) => fetch(`${cleanupApiBase}/cleanup/status`, { headers }))
       .then((r) => r.json())
       .then((d) => setCleanupStatus(d))
       .catch(() => setCleanupStatus(null))
@@ -165,7 +166,7 @@ export default function SettingsPage() {
       setCleanupMsg({ type: "ok", text: isAr ? "تم تنفيذ عملية التنظيف بنجاح" : "Cleanup sweep completed successfully" });
       logActivity("settings_changed", "Manual cleanup sweep triggered", profile?.email ?? undefined);
       // Refresh status
-      const statusRes = await fetch(`${cleanupApiBase}/cleanup/status`);
+      const statusRes = await fetch(`${cleanupApiBase}/cleanup/status`, { headers: await getApiAuthHeaders() });
       if (statusRes.ok) setCleanupStatus(await statusRes.json());
     } catch (err: unknown) {
       setCleanupMsg({ type: "error", text: err instanceof Error ? err.message : "Cleanup failed" });

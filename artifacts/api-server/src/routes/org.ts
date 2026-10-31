@@ -50,7 +50,8 @@ router.post("/org/upload-logo", requireAdmin, async (req, res) => {
     const { data: { publicUrl } } = adminClient.storage.from("org-logos").getPublicUrl(fileName);
     res.json({ url: publicUrl });
   } catch (err) {
-    res.status(500).json({ error: err instanceof Error ? err.message : "Upload failed" });
+    console.error("[org/upload-logo]", err instanceof Error ? err.message : err);
+    res.status(500).json({ error: "Upload failed" });
   }
 });
 
@@ -84,7 +85,8 @@ router.patch("/org/branding", requireAdmin, async (req, res) => {
 
     res.json(data);
   } catch (err) {
-    res.status(500).json({ error: err instanceof Error ? err.message : "Update failed" });
+    console.error("[org/branding]", err instanceof Error ? err.message : err);
+    res.status(500).json({ error: "Update failed" });
   }
 });
 

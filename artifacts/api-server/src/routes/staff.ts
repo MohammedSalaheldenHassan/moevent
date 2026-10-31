@@ -28,8 +28,8 @@ router.post("/staff/create", requireAdmin, async (req, res) => {
       res.status(400).json({ error: "A valid email address is required." });
       return;
     }
-    if (!password || password.length < 6) {
-      res.status(400).json({ error: "Password must be at least 6 characters." });
+    if (!password || password.length < 8) {
+      res.status(400).json({ error: "Password must be at least 8 characters." });
       return;
     }
     const allowedRoles = ["admin", "staff"];
@@ -81,7 +81,7 @@ router.post("/staff/create", requireAdmin, async (req, res) => {
   } catch (err: unknown) {
     const msg = err instanceof Error ? err.message : "Internal server error";
     console.error("[staff/create] unexpected error:", msg);
-    res.status(500).json({ error: msg });
+    res.status(500).json({ error: "Internal server error" });
   }
 });
 
@@ -115,7 +115,7 @@ router.delete("/staff/:id", requireAdmin, async (req, res) => {
   } catch (err: unknown) {
     const msg = err instanceof Error ? err.message : "Internal server error";
     console.error("[staff/delete] unexpected error:", msg);
-    res.status(500).json({ error: msg });
+    res.status(500).json({ error: "Internal server error" });
   }
 });
 
