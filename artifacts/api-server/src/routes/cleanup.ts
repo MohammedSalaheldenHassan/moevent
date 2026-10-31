@@ -3,6 +3,7 @@ import { createClient } from "@supabase/supabase-js";
 import { deleteExpiredEvents } from "../lib/cleanup";
 import { logger } from "../lib/logger";
 import { getSupabaseProjectUrl } from "../lib/supabaseProjectUrl";
+import { requireAdmin } from "../middlewares/requireAdmin";
 
 const router: IRouter = Router();
 
@@ -46,8 +47,8 @@ router.get("/cleanup/status", async (_req, res) => {
 });
 
 // POST /api/cleanup/run
-// Manually trigger the cleanup sweep (admin use only)
-router.post("/cleanup/run", async (_req, res) => {
+// Manually trigger the cleanup sweep. Requires: Authorization: Bearer <admin token>
+router.post("/cleanup/run", requireAdmin, async (_req, res) => {
   try {
     logger.info("[cleanup/run] Manual sweep triggered");
     await deleteExpiredEvents();

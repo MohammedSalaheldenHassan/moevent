@@ -29,7 +29,7 @@ import {
   Clock,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
-import { getApiBase } from "@/lib/apiBase";
+import { getApiBase, getApiAuthHeaders } from "@/lib/apiBase";
 import { type Theme } from "@/contexts/ThemeContext";
 
 function SectionCard({ title, icon: Icon, children }: { title: string; icon: React.ElementType; children: React.ReactNode }) {
@@ -159,7 +159,7 @@ export default function SettingsPage() {
     setCleanupRunning(true);
     setCleanupMsg(null);
     try {
-      const res = await fetch(`${cleanupApiBase}/cleanup/run`, { method: "POST" });
+      const res = await fetch(`${cleanupApiBase}/cleanup/run`, { method: "POST", headers: await getApiAuthHeaders() });
       const data = await res.json();
       if (!res.ok) throw new Error(data.error || "Failed");
       setCleanupMsg({ type: "ok", text: isAr ? "تم تنفيذ عملية التنظيف بنجاح" : "Cleanup sweep completed successfully" });

@@ -29,7 +29,7 @@ import {
   DialogFooter,
 } from "@/components/ui/dialog";
 import { logActivity } from "@/lib/activityLogger";
-import { getApiBase } from "@/lib/apiBase";
+import { getApiBase, getApiAuthHeaders } from "@/lib/apiBase";
 
 interface Profile {
   id: string;
@@ -124,7 +124,7 @@ export default function StaffPage() {
     try {
       const res = await fetch(`${getApiBase()}/staff/create`, {
         method: "POST",
-        headers: { "Content-Type": "application/json" },
+        headers: { "Content-Type": "application/json", ...(await getApiAuthHeaders()) },
         body: JSON.stringify({
           email: addForm.email.trim().toLowerCase(),
           password: addForm.password,

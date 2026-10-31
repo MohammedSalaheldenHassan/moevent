@@ -1,6 +1,7 @@
 import { Router, type IRouter } from "express";
 import { createClient } from "@supabase/supabase-js";
 import { getSupabaseProjectUrl } from "../lib/supabaseProjectUrl";
+import { requireAdmin } from "../middlewares/requireAdmin";
 
 const router: IRouter = Router();
 
@@ -14,7 +15,7 @@ function getAdminClient() {
 
 // POST /api/staff/create
 // Body: { email, password, full_name, role }
-router.post("/staff/create", async (req, res) => {
+router.post("/staff/create", requireAdmin, async (req, res) => {
   try {
     const { email, password, full_name, role, org_id } = req.body as {
       email?: string;

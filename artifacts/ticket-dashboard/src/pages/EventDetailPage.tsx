@@ -1,7 +1,7 @@
 import { useEffect, useRef, useState } from "react";
 import { useParams, useLocation } from "wouter";
 import { supabase } from "@/lib/supabase";
-import { getApiBase } from "@/lib/apiBase";
+import { getApiBase, getApiAuthHeaders } from "@/lib/apiBase";
 import { useLocale } from "@/contexts/LocaleContext";
 import { useBranding } from "@/contexts/BrandingContext";
 import { useAuth } from "@/contexts/useAuth";
@@ -365,7 +365,7 @@ export default function EventDetailPage() {
       const apiBase = getApiBase();
       const res = await fetch(`${apiBase}/issue-ticket`, {
         method: "POST",
-        headers: { "Content-Type": "application/json" },
+        headers: { "Content-Type": "application/json", ...(await getApiAuthHeaders()) },
         body: JSON.stringify({
           customerEmail: emailAddress.trim(),
           customerName: emailTicket.customer_name,

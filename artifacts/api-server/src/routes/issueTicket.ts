@@ -4,6 +4,7 @@ import QRCode from "qrcode";
 import { Resend } from "resend";
 import { createClient } from "@supabase/supabase-js";
 import { getSupabaseProjectUrl } from "../lib/supabaseProjectUrl";
+import { requireAdmin } from "../middlewares/requireAdmin";
 
 const router = Router();
 
@@ -237,7 +238,7 @@ function buildEmailHtml({
 
 // ── POST /api/issue-ticket ─────────────────────────────────────────────────────
 
-router.post("/issue-ticket", async (req, res) => {
+router.post("/issue-ticket", requireAdmin, async (req, res) => {
   const { customerEmail, customerName, ticketId, eventName } = req.body ?? {};
 
   // Validate required fields
