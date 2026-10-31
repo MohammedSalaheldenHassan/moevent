@@ -1,7 +1,7 @@
 import { Router } from "express";
 import PDFDocument from "pdfkit";
 import QRCode from "qrcode";
-import { Resend } from "resend";
+import nodemailer from "nodemailer";
 import { createClient } from "@supabase/supabase-js";
 import { getSupabaseProjectUrl } from "../lib/supabaseProjectUrl";
 import { requireAdmin } from "../middlewares/requireAdmin";
@@ -247,6 +247,26 @@ function buildEmailHtml({
 </html>`;
 }
 
+// ── SMTP transport ─────────────────────────────────────────────────────────────
+// Defaults to Gmail. SMTP_USER is the mailbox, SMTP_PASS its app password,
+// SMTP_FROM the display sender (e.g. "MoEvent <moevent.tickets@gmail.com>").
+
+function getMailer() {
+  const user = process.env["SMTP_USER"];
+  const pass = process.env["SMTP_PASS"];
+  if (!user || !pass) return null;
+  const port = Number(process.env["SMTP_PORT"] ?? 465);
+  return {
+    from: process.env["SMTP_FROM"] || user,
+    transport: nodemailer.createTransport({
+      host: process.env["SMTP_HOST"] ?? "smtp.gmail.com",
+      port,
+      secure: port === 465,
+      auth: { user, pass },
+    }),
+  };
+}
+
 // ── POST /api/issue-ticket ─────────────────────────────────────────────────────
 
 // Body: { customerEmail, ticketId }. customerName / eventName are still accepted
@@ -263,9 +283,9 @@ router.post("/issue-ticket", requireAdmin, async (req, res) => {
     return;
   }
 
-  const resendKey = process.env["RESEND_API_KEY"];
+  const mailer = getMailer();
   const serviceKey = process.env["SUPABASE_SERVICE_ROLE_KEY"];
-  if (!resendKey || !serviceKey) {
+  if (!mailer || !serviceKey) {
     res.status(500).json({ error: "Email sending is not configured on the server" });
     return;
   }
@@ -294,7 +314,7 @@ router.post("/issue-ticket", requireAdmin, async (req, res) => {
       {
         width: 200,
         margin: 1,
-        color: { dark: "#8B5CF6", light: "#1A1A2E" },
+        color: { dark: "#000000", light: "#FFFFFF" },
         errorCorrectionLevel: "M",
       },
     );
@@ -307,25 +327,25 @@ router.post("/issue-ticket", requireAdmin, async (req, res) => {
       qrBuffer,
     });
 
-    // 3. Send email via Resend
-    const resend = new Resend(resendKey);
+    // 3. Send email over SMTP
     const shortId = ticketId.slice(0, 8).toUpperCase();
 
-    const { error: emailError } = await resend.emails.send({
-      from: "MO Event System <tickets@moevents.online>",
-      to: customerEmail.trim(),
-      subject: `🎫 Your Ticket for ${eventName} – #${shortId}`,
-      html: buildEmailHtml({ customerName, eventName, ticketId }),
-      attachments: [
-        {
-          filename: `ticket-${shortId}.pdf`,
-          content: pdfBuffer,
-        },
-      ],
-    });
-
-    if (emailError) {
-      console.warn("[issue-ticket] email delivery failed:", emailError);
+    try {
+      await mailer.transport.sendMail({
+        from: mailer.from,
+        to: customerEmail.trim(),
+        subject: `Your ticket for ${eventName} – #${shortId}`,
+        html: buildEmailHtml({ customerName, eventName, ticketId }),
+        attachments: [
+          {
+            filename: `ticket-${shortId}.pdf`,
+            content: pdfBuffer,
+            contentType: "application/pdf",
+          },
+        ],
+      });
+    } catch (emailError) {
+      console.warn("[issue-ticket] email delivery failed:", emailError instanceof Error ? emailError.message : emailError);
       res.status(502).json({ error: "Email delivery failed" });
       return;
     }
