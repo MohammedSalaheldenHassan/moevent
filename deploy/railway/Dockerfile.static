@@ -36,4 +36,4 @@ COPY --from=build /out /srv
 # without any trailing /api (a CSP source with a path only matches that path).
 ENV SUPABASE_URL=$VITE_SUPABASE_URL \
     VITE_API_BASE=$VITE_API_BASE
-CMD ["sh", "-c", "export API_ORIGIN=$(printf '%s' \"$VITE_API_BASE\" | sed -E 's#/+$##; s#/api$##'); exec caddy run --config /etc/caddy/Caddyfile --adapter caddyfile"]
+CMD ["sh", "-c", "export API_ORIGIN=$(printf '%s' \"$VITE_API_BASE\" | sed -E 's#/+$##; s#/api$##; /^https?:\\/\\//!s#^#https://#'); exec caddy run --config /etc/caddy/Caddyfile --adapter caddyfile"]

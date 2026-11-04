@@ -29,7 +29,8 @@ Set these under each service's **Variables** tab. `https://…` values are your 
 | `SUPABASE_URL` | `https://YOUR-PROJECT.supabase.co` |
 | `SUPABASE_SERVICE_ROLE_KEY` | Supabase → Project Settings → API → **service_role** (secret!) |
 | `CORS_ORIGINS` | **Required:** `https://<site domain>,https://<dashboard domain>`, comma-separated, no trailing slash. Without it the site and dashboard can't reach the API (the API logs an error at startup). |
-| `SMTP_USER` / `SMTP_PASS` / `SMTP_FROM` | Gmail address, its 16-character **App password**, and `MoEvent <address@gmail.com>` |
+| `BREVO_API_KEY` / `MAIL_FROM` | **Use this on Railway Free/Hobby, which blocks SMTP.** Brevo (free, 300 emails/day) → *SMTP & API → API keys*; `MAIL_FROM` = `MoEvent <address@gmail.com>`, an address verified under *Senders*. |
+| `SMTP_USER` / `SMTP_PASS` / `SMTP_FROM` | Only on a plan that allows SMTP (Railway Pro): Gmail address, its 16-character **App password**, and `MoEvent <address@gmail.com>` |
 | `TURNSTILE_SECRET_KEY` | Turnstile secret key (see step 3), recommended |
 | `TRUST_PROXY_HOPS` | `1` (the default; Railway puts one proxy in front of the service) |
 

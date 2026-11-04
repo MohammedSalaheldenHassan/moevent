@@ -11,8 +11,14 @@ import EventPage from "@/pages/EventPage";
 // In dev /api is proxied to the Express server; a deployed site points at the
 // API host (e.g. https://api.up.railway.app). Generated URLs already start with
 // /api, so a trailing /api in the variable is dropped — like the dashboard,
-// either form works.
-const apiBase = (import.meta.env.VITE_API_BASE as string | undefined)?.trim().replace(/\/+$/, "").replace(/\/api$/, "");
+// either form works. A bare hostname gets https:// (otherwise the browser would
+// treat it as a path on this site).
+function normalizeApiBase(raw: string | undefined): string {
+  let base = (raw ?? "").trim().replace(/^["']|["']$/g, "").replace(/\/+$/, "").replace(/\/api$/, "");
+  if (base && !/^https?:\/\//i.test(base)) base = `https://${base}`;
+  return base;
+}
+const apiBase = normalizeApiBase(import.meta.env.VITE_API_BASE as string | undefined);
 if (apiBase) setBaseUrl(apiBase);
 
 const queryClient = new QueryClient();
