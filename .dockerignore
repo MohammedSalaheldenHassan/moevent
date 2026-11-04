@@ -4,7 +4,6 @@
 .env
 .env.*
 !.env.example
-!.env.production.example
 attached_assets
 .cache
 .local

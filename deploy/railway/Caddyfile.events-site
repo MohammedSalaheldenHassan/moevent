@@ -1,0 +1,32 @@
+# Public site on Railway. Railway terminates HTTPS and sets PORT.
+# API_ORIGIN / SUPABASE_URL are set by Dockerfile.static.
+
+{
+	auto_https off
+	admin off
+}
+
+:{$PORT:8080} {
+	encode zstd gzip
+
+	header {
+		Strict-Transport-Security "max-age=31536000; includeSubDomains"
+		X-Content-Type-Options "nosniff"
+		Referrer-Policy "strict-origin-when-cross-origin"
+		X-Frame-Options "DENY"
+		Permissions-Policy "camera=(), microphone=(), geolocation=(), payment=()"
+		# Maps: OpenStreetMap embed. Bot check: Cloudflare Turnstile.
+		Content-Security-Policy "default-src 'self'; script-src 'self' https://challenges.cloudflare.com; style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; font-src 'self' https://fonts.gstatic.com; img-src 'self' data: blob: https:; connect-src 'self' {$API_ORIGIN} {$SUPABASE_URL}; frame-src https://www.openstreetmap.org https://challenges.cloudflare.com; object-src 'none'; base-uri 'self'; form-action 'self'; frame-ancestors 'none'"
+		-Server
+	}
+
+	# Hashed build assets never change; HTML must always be revalidated.
+	@assets path /assets/*
+	header @assets Cache-Control "public, max-age=31536000, immutable"
+	@html path / /index.html
+	header @html Cache-Control "no-cache"
+
+	root * /srv
+	try_files {path} /index.html
+	file_server
+}

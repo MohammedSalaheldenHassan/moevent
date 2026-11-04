@@ -1,67 +1,88 @@
-# Deploying MoEvent
+# Deploying MoEvent on Railway
 
-One server runs everything with Docker:
+MoEvent runs as **three Railway services** from this one repo, plus your existing Supabase project:
 
-| Container | What it does |
+| Service | What it is | Config file |
+|---|---|---|
+| **API** | Express API (bookings, emails, stats, admin actions) | `deploy/railway/api.railway.json` |
+| **Site** | Public booking website | `deploy/railway/site.railway.json` |
+| **Dashboard** | Admin dashboard | `deploy/railway/dashboard.railway.json` |
+
+Each service builds from a Dockerfile in `deploy/railway/`. The site and dashboard are served by Caddy, which adds the security headers (Content-Security-Policy, HSTS, etc.). All database migrations in `supabase/migrations/` are already applied.
+
+## 1. Point each service at its config file
+
+For **each** service: *Settings → Config-as-code → Railway Config File* and enter its path from the table above. Leave *Root Directory* empty (the repo root): the Dockerfiles need the whole monorepo.
+
+That's all the build setup: no build or start commands to type. Each service only rebuilds when its own files change.
+
+If you already have API and dashboard services, switch them to these config files. For the site, **add a new service** from the same GitHub repo.
+
+## 2. Variables
+
+Set these under each service's **Variables** tab. `https://…` values are your Railway domains (Settings → Networking → *Generate Domain*, or a custom domain).
+
+### API service
+
+| Variable | Value |
 |---|---|
-| `web` (Caddy) | HTTPS (automatic Let's Encrypt certificates), serves the **public site** on `SITE_DOMAIN` and the **dashboard** on `ADMIN_DOMAIN`, adds security headers, forwards `/api` to the API |
-| `api` (Node) | The Express API. Not reachable from the internet, only through Caddy |
+| `SUPABASE_URL` | `https://YOUR-PROJECT.supabase.co` |
+| `SUPABASE_SERVICE_ROLE_KEY` | Supabase → Project Settings → API → **service_role** (secret!) |
+| `CORS_ORIGINS` | **Required:** `https://<site domain>,https://<dashboard domain>`, comma-separated, no trailing slash. Without it the site and dashboard can't reach the API (the API logs an error at startup). |
+| `SMTP_USER` / `SMTP_PASS` / `SMTP_FROM` | Gmail address, its 16-character **App password**, and `MoEvent <address@gmail.com>` |
+| `TURNSTILE_SECRET_KEY` | Turnstile secret key (see step 3), recommended |
+| `TRUST_PROXY_HOPS` | `1` (the default; Railway puts one proxy in front of the service) |
 
-The database is your existing Supabase project; all migrations in `supabase/migrations/` are already applied to it.
+Railway sets `PORT` itself.
 
-## 1. Before you start
+### Site service
 
-- **A server** (any Linux VPS with 1 GB+ RAM) with [Docker](https://docs.docker.com/engine/install/) and the Compose plugin.
-- **Two domain names** pointing at the server's IP (DNS `A` records), e.g. `tickets.example.com` (site) and `admin.example.com` (dashboard).
-- Ports **80 and 443** open in the server's firewall.
+| Variable | Value |
+|---|---|
+| `APP` | `events-site` |
+| `VITE_SUPABASE_URL` | `https://YOUR-PROJECT.supabase.co` |
+| `VITE_SUPABASE_ANON_KEY` | Supabase → **anon / public** key |
+| `VITE_API_BASE` | The API service's URL, e.g. `https://moevent-api.up.railway.app` |
+| `VITE_TURNSTILE_SITE_KEY` | Turnstile site key (see step 3), recommended |
 
-## 2. Supabase settings (dashboard → your project)
+### Dashboard service
 
-1. **Authentication → Sign In / Providers → turn off "Allow new users to sign up".** Staff accounts are created from the dashboard, so nobody needs public sign-up. (Strangers who sign up can't access anything today, but there's no reason to let them create accounts.)
-2. **Authentication → URL Configuration:** set *Site URL* to `https://ADMIN_DOMAIN` and add it to *Redirect URLs*, so password-reset links open the dashboard.
-3. Keep the **service_role key** secret. It lives only in `.env.production` on the server.
+| Variable | Value |
+|---|---|
+| `APP` | `ticket-dashboard` |
+| `VITE_SUPABASE_URL` | same as above |
+| `VITE_SUPABASE_ANON_KEY` | same as above |
+| `VITE_API_BASE` | same as above |
+
+`VITE_*` values are baked in when the app is built, so **after changing one, redeploy** that service.
 
 ## 3. Bot protection (strongly recommended)
 
-Cloudflare **Turnstile** is free and doesn't need your domain to be on Cloudflare:
-dash.cloudflare.com → **Turnstile → Add widget** → add `SITE_DOMAIN` → copy the **site key** and **secret key** into `.env.production`.
+Cloudflare **Turnstile** is free and doesn't need your domain on Cloudflare:
+dash.cloudflare.com → **Turnstile → Add widget** → add the **site's domain** → put the *site key* in the Site service (`VITE_TURNSTILE_SITE_KEY`) and the *secret key* in the API service (`TURNSTILE_SECRET_KEY`).
 
-With both keys set, every booking must pass the check. With them empty, bookings still have rate limits and daily caps (see below), but scripts are easier.
+Set **both or neither**. With neither, bookings still have rate limits and daily caps, but scripts have an easier time.
 
-## 4. Deploy
+## 4. Supabase settings
 
-```bash
-git clone <your repo> moevent && cd moevent
-cp .env.production.example .env.production
-nano .env.production            # fill in every value
-docker compose --env-file .env.production up -d --build
-```
+1. **Authentication → Sign In / Providers → turn off "Allow new users to sign up".** Staff accounts are created from the dashboard.
+2. **Authentication → URL Configuration:** *Site URL* = the dashboard's URL, and add it to *Redirect URLs*, so password-reset emails open the dashboard.
 
-The first start takes a few minutes (it builds all three apps). Caddy gets the certificates on first visit.
+## 5. Check it works
 
-**Check it:**
-- `https://SITE_DOMAIN` shows the events
-- `https://ADMIN_DOMAIN` shows the login
-- `https://SITE_DOMAIN/api/healthz` returns `{"status":"ok"}`
-- `docker compose logs -f api` shows `Server listening` and no errors
+- `https://<api domain>/api/healthz` → `{"status":"ok"}`
+- The site lists events, and a test booking (with your own email) arrives in your inbox
+- The dashboard logs in, and the browser console shows **no CORS or Content-Security-Policy errors**. If it does, check `CORS_ORIGINS` and `VITE_API_BASE`.
+- API service → *Deployments → Logs*: `Server listening`, and **no** `CORS_ORIGINS is not set` error
 
-## 5. Updating
+## Day-to-day
 
-```bash
-git pull
-docker compose --env-file .env.production up -d --build
-```
-
-## 6. Day-to-day
-
-- **Logs:** `docker compose logs -f api` / `docker compose logs -f web`
-- **Restart:** `docker compose restart api`
-- **Backups:** the data is in Supabase. Turn on backups in Supabase (Database → Backups); the server itself holds nothing that can't be rebuilt.
-- **Old events:** the API deletes events, and their tickets, **3 days after the event date** (`artifacts/api-server/src/lib/cleanup.ts`). Export anything you need to keep before then.
+- **Deploys:** push to the branch Railway watches; only the services whose files changed rebuild.
+- **Logs:** each service → *Deployments → View logs*.
+- **Backups:** all data is in Supabase. Turn on backups there (Database → Backups).
+- **Old events:** the API deletes events, and their tickets, **3 days after the event date** (`artifacts/api-server/src/lib/cleanup.ts`). Export anything you need before then.
 
 ## Security model
-
-What the public can and can't do:
 
 | Who | Can | Can't |
 |---|---|---|
@@ -72,6 +93,6 @@ What the public can and can't do:
 
 Booking abuse protection: per IP **10 bookings / 15 min**; per email and per phone **5 bookings and 3 organization requests / 24 h**; Turnstile when configured; seat limits enforced inside the database, so they hold even under concurrent bookings.
 
-Other protections: HTTPS everywhere with HSTS; strict Content-Security-Policy (no inline scripts); dashboard not indexed by search engines; API container runs read-only as a non-root user; image uploads must be real PNG/JPEG/WebP/GIF under 5 MB; the API rejects cross-origin requests in production.
+Other protections: strict Content-Security-Policy on the site and dashboard (no inline scripts); HSTS; dashboard not indexed by search engines; API runs as a non-root user; only the listed origins may call the API; image uploads must be real PNG/JPEG/WebP/GIF under 5 MB.
 
-> **Gate / other apps:** the public key can no longer create tickets. If any other app (e.g. an older booking site) inserted tickets with the anon key, it must book through `POST /api/public/bookings` instead. The staff gate app is unaffected: it signs in and only reads/scans.
+> **Other apps:** the public key can no longer create tickets. Anything else that inserted tickets with the anon key must book through `POST /api/public/bookings` instead. The staff gate app is unaffected: it signs in and only reads/scans.

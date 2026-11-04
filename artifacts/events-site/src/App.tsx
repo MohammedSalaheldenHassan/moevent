@@ -8,8 +8,11 @@ import { Footer } from "@/components/Footer";
 import HomePage from "@/pages/HomePage";
 import EventPage from "@/pages/EventPage";
 
-// In dev /api is proxied to the Express server; a deployed site points at the API host.
-const apiBase = import.meta.env.VITE_API_BASE as string | undefined;
+// In dev /api is proxied to the Express server; a deployed site points at the
+// API host (e.g. https://api.up.railway.app). Generated URLs already start with
+// /api, so a trailing /api in the variable is dropped — like the dashboard,
+// either form works.
+const apiBase = (import.meta.env.VITE_API_BASE as string | undefined)?.trim().replace(/\/+$/, "").replace(/\/api$/, "");
 if (apiBase) setBaseUrl(apiBase);
 
 const queryClient = new QueryClient();

@@ -1,0 +1,22 @@
+# Railway service: API (Express). Built from the repo root.
+# Config: deploy/railway/api.railway.json. Variables: see DEPLOY.md.
+
+FROM node:22-bookworm-slim AS build
+RUN npm install -g pnpm@10.18.0
+WORKDIR /app
+COPY . .
+# Only the API and the workspace libraries it uses.
+RUN pnpm install --frozen-lockfile --filter "@workspace/api-server..."
+RUN pnpm --filter @workspace/api-server run build
+# Standalone folder: production node_modules (pdfkit and nodemailer aren't
+# bundled by esbuild) plus the build output.
+RUN pnpm --filter @workspace/api-server deploy --prod --legacy /out \
+ && cp -r artifacts/api-server/dist /out/dist
+
+FROM node:22-bookworm-slim
+ENV NODE_ENV=production
+WORKDIR /app
+COPY --from=build --chown=node:node /out ./
+USER node
+# Railway sets PORT.
+CMD ["node", "--enable-source-maps", "dist/index.mjs"]
