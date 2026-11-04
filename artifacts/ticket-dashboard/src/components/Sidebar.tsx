@@ -14,8 +14,10 @@ import {
   Globe,
   Settings,
   ClipboardList,
+  Building2,
 } from "lucide-react";
-import { useState } from "react";
+import { useEffect, useState } from "react";
+import { supabase } from "@/lib/supabase";
 
 export function Sidebar() {
   const [location] = useLocation();
@@ -30,11 +32,27 @@ export function Sidebar() {
 
   const isAdmin = !profile || profile.role === "admin";
 
-  const navItems = [
+  // Pending organization requests, refreshed on every navigation.
+  const [pendingRequests, setPendingRequests] = useState(0);
+  useEffect(() => {
+    if (!isAdmin) return;
+    supabase
+      .from("booking_requests")
+      .select("id", { count: "exact", head: true })
+      .eq("status", "pending")
+      .then(({ count }) => setPendingRequests(count ?? 0));
+  }, [isAdmin, location]);
+
+  const navItems: { href: string; label: string; icon: React.ElementType; badge?: number }[] = [
     { href: "/", label: t.dashboard, icon: LayoutDashboard },
     { href: "/events", label: t.events, icon: CalendarDays },
     { href: "/issue-ticket", label: t.issueTicket, icon: Ticket },
-    ...(isAdmin ? [{ href: "/staff", label: t.staff, icon: Users }] : []),
+    ...(isAdmin
+      ? [
+          { href: "/requests", label: lang === "ar" ? "طلبات المؤسسات" : "Requests", icon: Building2, badge: pendingRequests },
+          { href: "/staff", label: t.staff, icon: Users },
+        ]
+      : []),
   ];
 
   const bottomNavItems = [
@@ -54,105 +72,119 @@ export function Sidebar() {
     return location.startsWith(href);
   };
 
-  const NavLink = ({ href, label, icon: Icon }: { href: string; label: string; icon: React.ElementType }) => {
+  const NavLink = ({ href, label, icon: Icon, badge }: { href: string; label: string; icon: React.ElementType; badge?: number }) => {
     const active = isActive(href);
     return (
       <Link href={href}>
         <div
           onClick={() => setMobileOpen(false)}
+          aria-current={active ? "page" : undefined}
           className={cn(
-            "group flex items-center gap-3 px-3 py-2.5 rounded-xl text-sm font-medium cursor-pointer transition-all duration-150",
+            "flex items-center gap-2.5 h-9 px-2.5 rounded-md text-sm cursor-pointer border transition-colors",
             active
-              ? "bg-gradient-to-r from-violet-600 to-purple-600 text-white shadow-sm shadow-violet-900/30"
-              : "text-sidebar-foreground/70 hover:bg-sidebar-accent hover:text-sidebar-foreground"
+              ? "bg-sidebar-accent border-sidebar-border text-sidebar-accent-foreground font-medium shadow-2xs"
+              : "border-transparent text-sidebar-foreground/65 hover:text-sidebar-foreground hover:bg-sidebar-accent/60"
           )}
         >
-          <Icon className={cn("w-4 h-4 shrink-0 transition-transform", active ? "" : "group-hover:scale-110")} />
-          <span>{label}</span>
-          {active && <div className="ms-auto w-1.5 h-1.5 rounded-full bg-white/70" />}
+          <Icon className={cn("w-4 h-4 shrink-0", active ? "text-primary" : "")} strokeWidth={1.75} />
+          <span className="flex-1">{label}</span>
+          {!!badge && (
+            <span className="min-w-5 h-5 px-1.5 rounded-full bg-amber-500 text-white text-[11px] font-semibold flex items-center justify-center tabular-nums">
+              {badge}
+            </span>
+          )}
         </div>
       </Link>
     );
   };
 
+  const SectionLabel = ({ children }: { children: React.ReactNode }) => (
+    <p className="px-2.5 pt-4 pb-1.5 text-[11px] font-medium uppercase tracking-wider text-sidebar-foreground/45">
+      {children}
+    </p>
+  );
+
   const NavContent = () => (
     <div className="flex flex-col h-full">
-      {/* Logo */}
-      <div className="px-5 py-5 border-b border-sidebar-border">
-        <div className="flex items-center gap-3">
+      {/* Business */}
+      <div className="px-4 h-16 flex items-center border-b border-sidebar-border">
+        <div className="flex items-center gap-2.5 min-w-0">
           {isImageLogo ? (
             <img
               src={displayLogo}
-              alt="Logo"
-              className="w-9 h-9 rounded-xl object-cover shadow-md shrink-0"
+              alt=""
+              className="w-8 h-8 rounded-md object-contain bg-black border border-sidebar-border shrink-0"
             />
           ) : (
-            <div className="w-9 h-9 bg-gradient-to-br from-violet-500 to-purple-700 rounded-xl flex items-center justify-center shadow-md text-lg shrink-0">
-              🎟️
+            <div className="w-8 h-8 rounded-md bg-primary text-primary-foreground flex items-center justify-center shrink-0">
+              <Ticket className="w-4 h-4" />
             </div>
           )}
           <div className="min-w-0">
-            <p className="font-bold text-sidebar-foreground text-sm leading-tight truncate">{displayName}</p>
-            <p className="text-[10px] text-sidebar-foreground/50 truncate leading-tight">{t.appTagline}</p>
+            <p className="font-semibold text-sidebar-foreground text-sm leading-tight truncate">{displayName}</p>
+            <p className="text-[11px] text-sidebar-foreground/50 truncate leading-tight mt-0.5">{t.appTagline}</p>
           </div>
         </div>
       </div>
 
-      {/* Main Nav */}
-      <nav className="flex-1 px-3 py-4 space-y-0.5 overflow-y-auto">
-        {navItems.map((item) => (
-          <NavLink key={item.href} {...item} />
-        ))}
-
-        <div className="pt-3 pb-1">
-          <div className="h-px bg-sidebar-border mx-1" />
+      {/* Navigation */}
+      <nav className="flex-1 px-3 pb-4 overflow-y-auto">
+        <SectionLabel>{lang === "ar" ? "العمليات" : "Operations"}</SectionLabel>
+        <div className="space-y-0.5">
+          {navItems.map((item) => (
+            <NavLink key={item.href} {...item} />
+          ))}
         </div>
 
-        {bottomNavItems.map((item) => (
-          <NavLink key={item.href} {...item} />
-        ))}
+        <SectionLabel>{lang === "ar" ? "الإدارة" : "Administration"}</SectionLabel>
+        <div className="space-y-0.5">
+          {bottomNavItems.map((item) => (
+            <NavLink key={item.href} {...item} />
+          ))}
+        </div>
       </nav>
 
-      {/* Bottom */}
-      <div className="px-3 pb-3 space-y-2 border-t border-sidebar-border pt-3">
-        {/* Language switcher */}
-        <div className="flex items-center gap-1 px-3 py-2 rounded-xl bg-sidebar-accent/50">
-          <Globe className="w-4 h-4 text-sidebar-foreground/50 shrink-0" />
-          <div className="flex ms-auto gap-1">
-            {(["en", "ar"] as const).map((code) => (
-              <button
-                key={code}
-                onClick={() => setLang(code)}
-                className={cn(
-                  "px-2.5 py-1 rounded-lg text-xs font-semibold transition-all",
-                  lang === code
-                    ? "bg-violet-600 text-white shadow-sm"
-                    : "text-sidebar-foreground/60 hover:text-sidebar-foreground hover:bg-sidebar-accent"
-                )}
-              >
-                {code === "en" ? "EN" : "عربي"}
-              </button>
-            ))}
-          </div>
+      {/* Account */}
+      <div className="px-3 py-3 border-t border-sidebar-border space-y-2">
+        <div className="flex items-center gap-1 p-0.5 rounded-md border border-sidebar-border bg-sidebar-accent/50" role="group" aria-label="Language">
+          <Globe className="w-3.5 h-3.5 text-sidebar-foreground/45 mx-1.5 shrink-0" />
+          {(["en", "ar"] as const).map((code) => (
+            <button
+              key={code}
+              onClick={() => setLang(code)}
+              aria-pressed={lang === code}
+              className={cn(
+                "flex-1 h-7 rounded text-xs font-medium transition-colors",
+                lang === code
+                  ? "bg-sidebar-accent text-sidebar-accent-foreground shadow-2xs border border-sidebar-border"
+                  : "text-sidebar-foreground/55 hover:text-sidebar-foreground"
+              )}
+            >
+              {code === "en" ? "English" : "العربية"}
+            </button>
+          ))}
         </div>
 
-        {/* User + sign out */}
-        <div
-          className="flex items-center gap-3 px-3 py-2.5 rounded-xl hover:bg-sidebar-accent transition-colors group cursor-pointer"
-          onClick={signOut}
-        >
-          <div className="w-8 h-8 rounded-full bg-gradient-to-br from-violet-500 to-purple-700 flex items-center justify-center text-white text-xs font-bold shrink-0">
+        <div className="flex items-center gap-2.5 px-1.5 py-1.5">
+          <div className="w-8 h-8 rounded-full bg-sidebar-accent border border-sidebar-border flex items-center justify-center text-sidebar-foreground text-xs font-semibold shrink-0">
             {initials}
           </div>
           <div className="flex-1 min-w-0">
             <p className="text-xs font-medium text-sidebar-foreground truncate">
-              {profile?.full_name || profile?.email || "Admin"}
+              {profile?.full_name || profile?.email || t.admin}
             </p>
-            <p className="text-[10px] text-sidebar-foreground/40 truncate">
-              {profile?.email || t.admin}
+            <p className="text-[11px] text-sidebar-foreground/50 truncate">
+              {profile?.full_name ? profile.email : t.admin}
             </p>
           </div>
-          <LogOut className="w-3.5 h-3.5 text-sidebar-foreground/30 group-hover:text-sidebar-foreground/70 transition-colors shrink-0" />
+          <button
+            onClick={signOut}
+            title={t.signOut}
+            aria-label={t.signOut}
+            className="p-1.5 rounded-md text-sidebar-foreground/50 hover:text-sidebar-foreground hover:bg-sidebar-accent transition-colors shrink-0"
+          >
+            <LogOut className="w-4 h-4" strokeWidth={1.75} />
+          </button>
         </div>
       </div>
     </div>
@@ -163,7 +195,7 @@ export function Sidebar() {
       {/* Mobile hamburger */}
       <button
         className={cn(
-          "lg:hidden fixed top-4 z-50 p-2.5 bg-sidebar rounded-xl border border-sidebar-border shadow-lg",
+          "lg:hidden fixed top-3 z-50 p-2 bg-card rounded-md border border-border shadow-xs",
           isRTL ? "right-4" : "left-4"
         )}
         onClick={() => setMobileOpen(!mobileOpen)}
@@ -175,7 +207,7 @@ export function Sidebar() {
       {/* Mobile overlay */}
       {mobileOpen && (
         <div
-          className="lg:hidden fixed inset-0 bg-black/60 z-40 backdrop-blur-sm"
+          className="lg:hidden fixed inset-0 bg-black/40 z-40"
           onClick={() => setMobileOpen(false)}
         />
       )}

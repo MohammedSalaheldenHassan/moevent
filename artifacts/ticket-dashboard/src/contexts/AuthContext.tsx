@@ -104,7 +104,7 @@ async function fetchProfileFromApi(
           return {
             profile: null,
             hint:
-              "No profile found for this user in the database. Add a row in Supabase `profiles` with this user's id and role admin or super_admin.",
+              "No profile found for this user in the database. Add a row in Supabase `profiles` with this user's id and role admin.",
           };
         }
         return {
@@ -216,7 +216,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         const { profile: p, hint } = await fetchProfileFromApi(sess.access_token);
         if (!mountedRef.current) return;
 
-        if (!p || (p.role !== "admin" && p.role !== "super_admin")) {
+        if (!p || p.role !== "admin") {
           console.warn("[AuthContext] Non-admin user on session restore — clearing state and signing out", hint ?? "");
           // Clear state immediately so the login page shows right away
           setUser(null);
@@ -271,7 +271,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
           };
         }
 
-        if (p.role !== "admin" && p.role !== "super_admin") {
+        if (p.role !== "admin") {
           await supabase.auth.signOut();
           return {
             error: "Access denied. Only admin accounts can access this dashboard.",

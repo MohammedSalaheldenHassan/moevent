@@ -6,11 +6,11 @@ const translations = {
   en: {
     dir: "ltr" as const,
     lang: "en",
-    font: "'Inter', system-ui, sans-serif",
+    font: "'IBM Plex Sans', system-ui, sans-serif",
 
     // App
-    appName: "TicketHub",
-    appTagline: "Event Management Platform",
+    appName: "MoEvent",
+    appTagline: "Event operations",
 
     // Auth
     signIn: "Sign In",
@@ -106,9 +106,9 @@ const translations = {
     staffTitle: "Staff",
     staffSubtitle: "Manage your team members and their roles",
     noStaff: "No staff found",
-    noStaffDesc: "Staff profiles will appear here once created in Supabase",
+    noStaffDesc: "Add admins and gate staff to give them access",
     staffNote: "Note:",
-    staffNoteDesc: "To manage staff roles, edit user profiles directly in your Supabase dashboard. Only users with the",
+    staffNoteDesc: "Staff sign in to the gate app and see only the events assigned to them. Only users with the",
     staffNoteDesc2: "role can access this dashboard.",
     rlsHint: "This may be due to Row Level Security (RLS) policies on the profiles table. Ensure your RLS policy allows admins to read all profiles.",
     unnamedUser: "Unnamed User",
@@ -163,11 +163,11 @@ const translations = {
   ar: {
     dir: "rtl" as const,
     lang: "ar",
-    font: "'Cairo', 'Noto Sans Arabic', system-ui, sans-serif",
+    font: "'IBM Plex Sans Arabic', system-ui, sans-serif",
 
     // App
-    appName: "تذكرتي",
-    appTagline: "منصة إدارة الفعاليات",
+    appName: "MoEvent",
+    appTagline: "إدارة الفعاليات",
 
     // Auth
     signIn: "تسجيل الدخول",
@@ -263,9 +263,9 @@ const translations = {
     staffTitle: "الموظفون",
     staffSubtitle: "إدارة أعضاء الفريق وأدوارهم",
     noStaff: "لا يوجد موظفون",
-    noStaffDesc: "ستظهر ملفات الموظفين هنا بعد إنشائها في Supabase",
+    noStaffDesc: "أضف المسؤولين وموظفي البوابة لمنحهم صلاحية الوصول",
     staffNote: "ملاحظة:",
-    staffNoteDesc: "لإدارة أدوار الموظفين، قم بتعديل ملفات المستخدمين مباشرةً في لوحة Supabase. فقط المستخدمون الذين لديهم دور",
+    staffNoteDesc: "يسجّل الموظفون الدخول إلى تطبيق البوابة ويرون الفعاليات المسندة إليهم فقط. فقط المستخدمون الذين لديهم دور",
     staffNoteDesc2: "يمكنهم الوصول إلى هذه اللوحة.",
     rlsHint: "قد يكون هذا بسبب سياسات أمان الصفوف (RLS) على جدول الملفات الشخصية. تأكد من أن سياسة RLS تسمح للمشرفين بقراءة جميع الملفات.",
     unnamedUser: "مستخدم بدون اسم",
@@ -319,7 +319,7 @@ const translations = {
   },
 };
 
-export type Translations = typeof translations.en;
+export type Translations = Omit<typeof translations.en, "dir"> & { dir: "ltr" | "rtl" };
 
 interface LocaleContextType {
   lang: Lang;

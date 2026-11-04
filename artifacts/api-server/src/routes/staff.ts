@@ -1,6 +1,7 @@
 import { Router, type IRouter } from "express";
 import { createClient } from "@supabase/supabase-js";
 import { getSupabaseProjectUrl } from "../lib/supabaseProjectUrl";
+import { requireAdmin } from "../middlewares/requireAdmin";
 
 const router: IRouter = Router();
 
@@ -14,22 +15,21 @@ function getAdminClient() {
 
 // POST /api/staff/create
 // Body: { email, password, full_name, role }
-router.post("/staff/create", async (req, res) => {
+router.post("/staff/create", requireAdmin, async (req, res) => {
   try {
-    const { email, password, full_name, role, org_id } = req.body as {
+    const { email, password, full_name, role } = req.body as {
       email?: string;
       password?: string;
       full_name?: string;
       role?: string;
-      org_id?: string | null;
     };
 
     if (!email || !email.includes("@")) {
       res.status(400).json({ error: "A valid email address is required." });
       return;
     }
-    if (!password || password.length < 6) {
-      res.status(400).json({ error: "Password must be at least 6 characters." });
+    if (!password || password.length < 8) {
+      res.status(400).json({ error: "Password must be at least 8 characters." });
       return;
     }
     const allowedRoles = ["admin", "staff"];
@@ -53,14 +53,13 @@ router.post("/staff/create", async (req, res) => {
 
     const userId = userData.user.id;
 
-    // 2. Upsert their profile row with correct role and org
+    // 2. Upsert their profile row with the correct role
     const profileRow: Record<string, unknown> = {
       id: userId,
       email,
       full_name: full_name?.trim() || null,
       role: assignedRole,
     };
-    if (org_id) profileRow["org_id"] = org_id;
 
     const { error: profileError } = await adminClient
       .from("profiles")
@@ -82,7 +81,41 @@ router.post("/staff/create", async (req, res) => {
   } catch (err: unknown) {
     const msg = err instanceof Error ? err.message : "Internal server error";
     console.error("[staff/create] unexpected error:", msg);
-    res.status(500).json({ error: msg });
+    res.status(500).json({ error: "Internal server error" });
+  }
+});
+
+// DELETE /api/staff/:id
+// Removes the profile (and its event_access rows, via cascade) and soft-deletes
+// the auth user so they can no longer sign in to the dashboard or the gate app.
+// The auth row is kept because tickets.scanned_by references it.
+router.delete("/staff/:id", requireAdmin, async (req, res) => {
+  try {
+    const id = String(req.params["id"]);
+    if (id === res.locals["userId"]) {
+      res.status(400).json({ error: "You cannot delete your own account." });
+      return;
+    }
+
+    const adminClient = getAdminClient();
+
+    const { error: profileError } = await adminClient.from("profiles").delete().eq("id", id);
+    if (profileError) {
+      res.status(500).json({ error: profileError.message });
+      return;
+    }
+
+    const { error: authError } = await adminClient.auth.admin.deleteUser(id, true);
+    if (authError) {
+      res.status(500).json({ error: `Profile removed but sign-in not revoked: ${authError.message}` });
+      return;
+    }
+
+    res.json({ success: true });
+  } catch (err: unknown) {
+    const msg = err instanceof Error ? err.message : "Internal server error";
+    console.error("[staff/delete] unexpected error:", msg);
+    res.status(500).json({ error: "Internal server error" });
   }
 });
 

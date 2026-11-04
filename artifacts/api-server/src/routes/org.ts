@@ -1,6 +1,7 @@
-import { Router, type IRouter, type Request, type Response } from "express";
+import { Router, type IRouter } from "express";
 import { createClient } from "@supabase/supabase-js";
 import { getSupabaseProjectUrl } from "../lib/supabaseProjectUrl";
+import { requireAdmin } from "../middlewares/requireAdmin";
 
 const router: IRouter = Router();
 
@@ -12,48 +13,28 @@ function getAdminClient() {
   });
 }
 
-// Resolve org_id for any authenticated user from their Bearer token
-async function getOrgIdFromToken(req: Request, res: Response): Promise<{ orgId: string; userId: string } | null> {
-  const authHeader = req.headers["authorization"];
-  if (!authHeader?.startsWith("Bearer ")) {
-    res.status(401).json({ error: "Unauthorized" });
-    return null;
-  }
-  const token = authHeader.slice(7);
-  const adminClient = getAdminClient();
+// The single organization row that holds the business name and logo
+async function getOrgId(adminClient: ReturnType<typeof getAdminClient>): Promise<string> {
+  const { data, error } = await adminClient.from("organizations").select("id").limit(1).single();
+  if (error || !data) throw new Error(error?.message ?? "Organization row not found");
+  return data.id as string;
+}
 
-  const { data: { user }, error: userError } = await adminClient.auth.getUser(token);
-  if (userError || !user) {
-    res.status(401).json({ error: "Invalid token" });
-    return null;
-  }
+const MAX_LOGO_BYTES = 5 * 1024 * 1024;
 
-  const { data: profile, error: profileError } = await adminClient
-    .from("profiles")
-    .select("id, org_id, role")
-    .eq("id", user.id)
-    .single();
-
-  if (profileError || !profile) {
-    res.status(404).json({ error: "Profile not found" });
-    return null;
-  }
-
-  if (!profile.org_id) {
-    res.status(400).json({ error: "No organization linked to this account" });
-    return null;
-  }
-
-  return { orgId: profile.org_id, userId: user.id };
+/** Identifies PNG / JPEG / WebP / GIF from their magic bytes. */
+function detectImageType(b: Buffer): { mime: string; ext: string } | null {
+  if (b.length >= 8 && b.subarray(0, 8).equals(Buffer.from([0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a]))) return { mime: "image/png", ext: "png" };
+  if (b.length >= 3 && b[0] === 0xff && b[1] === 0xd8 && b[2] === 0xff) return { mime: "image/jpeg", ext: "jpg" };
+  if (b.length >= 12 && b.toString("ascii", 0, 4) === "RIFF" && b.toString("ascii", 8, 12) === "WEBP") return { mime: "image/webp", ext: "webp" };
+  if (b.length >= 6 && /^GIF8[79]a$/.test(b.toString("ascii", 0, 6))) return { mime: "image/gif", ext: "gif" };
+  return null;
 }
 
 // POST /api/org/upload-logo
-// Any authenticated user with an org — uploads image to Storage, returns URL
-router.post("/org/upload-logo", async (req, res) => {
+// Admin only — uploads image to Storage, returns URL
+router.post("/org/upload-logo", requireAdmin, async (req, res) => {
   try {
-    const ctx = await getOrgIdFromToken(req, res);
-    if (!ctx) return;
-
     const { base64, mimeType } = req.body as { base64?: string; mimeType?: string };
     if (!base64 || !mimeType) {
       res.status(400).json({ error: "base64 and mimeType are required" });
@@ -61,15 +42,26 @@ router.post("/org/upload-logo", async (req, res) => {
     }
 
     const adminClient = getAdminClient();
+    const orgId = await getOrgId(adminClient);
     await adminClient.storage.createBucket("org-logos", { public: true }).catch(() => {});
 
-    const ext = mimeType.split("/")[1]?.split("+")[0] ?? "png";
-    const fileName = `${ctx.orgId}-${Date.now()}.${ext}`;
+    // Raster images only (SVG can carry scripts), checked by the file's own
+    // bytes rather than the client-supplied type.
     const buffer = Buffer.from(base64, "base64");
+    if (buffer.length === 0 || buffer.length > MAX_LOGO_BYTES) {
+      res.status(400).json({ error: "Logo must be an image under 5 MB" });
+      return;
+    }
+    const detected = detectImageType(buffer);
+    if (!detected) {
+      res.status(400).json({ error: "Logo must be a PNG, JPEG, WebP or GIF image" });
+      return;
+    }
+    const fileName = `${orgId}-${Date.now()}.${detected.ext}`;
 
     const { error: uploadError } = await adminClient.storage
       .from("org-logos")
-      .upload(fileName, buffer, { contentType: mimeType, upsert: true });
+      .upload(fileName, buffer, { contentType: detected.mime, upsert: true });
 
     if (uploadError) {
       res.status(500).json({ error: uploadError.message });
@@ -79,17 +71,15 @@ router.post("/org/upload-logo", async (req, res) => {
     const { data: { publicUrl } } = adminClient.storage.from("org-logos").getPublicUrl(fileName);
     res.json({ url: publicUrl });
   } catch (err) {
-    res.status(500).json({ error: err instanceof Error ? err.message : "Upload failed" });
+    console.error("[org/upload-logo]", err instanceof Error ? err.message : err);
+    res.status(500).json({ error: "Upload failed" });
   }
 });
 
 // PATCH /api/org/branding
-// Any authenticated user with an org — updates their org's name and/or logo_url
-router.patch("/org/branding", async (req, res) => {
+// Admin only — updates the business name and/or logo_url
+router.patch("/org/branding", requireAdmin, async (req, res) => {
   try {
-    const ctx = await getOrgIdFromToken(req, res);
-    if (!ctx) return;
-
     const { name, logo_url } = req.body as { name?: string; logo_url?: string };
     const adminClient = getAdminClient();
 
@@ -105,7 +95,7 @@ router.patch("/org/branding", async (req, res) => {
     const { data, error } = await adminClient
       .from("organizations")
       .update(updates)
-      .eq("id", ctx.orgId)
+      .eq("id", await getOrgId(adminClient))
       .select("id, name, logo_url, primary_color")
       .single();
 
@@ -116,7 +106,8 @@ router.patch("/org/branding", async (req, res) => {
 
     res.json(data);
   } catch (err) {
-    res.status(500).json({ error: err instanceof Error ? err.message : "Update failed" });
+    console.error("[org/branding]", err instanceof Error ? err.message : err);
+    res.status(500).json({ error: "Update failed" });
   }
 });
 

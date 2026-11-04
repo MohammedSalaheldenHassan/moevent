@@ -1,5 +1,4 @@
 import { createContext, useContext, useState, useEffect, useCallback } from "react";
-import { useOrg } from "@/contexts/OrgContext";
 import { useAuth } from "@/contexts/useAuth";
 import { supabase } from "@/lib/supabase";
 import { getApiBase } from "@/lib/apiBase";
@@ -16,18 +15,33 @@ interface BrandingContextType {
 const BrandingContext = createContext<BrandingContextType | undefined>(undefined);
 
 export function BrandingProvider({ children }: { children: React.ReactNode }) {
-  const { org_name, logo_url, org_id, orgLoaded } = useOrg();
   const { session } = useAuth();
+  const userId = session?.user.id ?? null;
 
   const [systemName, setSystemNameState] = useState<string>("");
   const [systemLogo, setSystemLogoState] = useState<string>("");
+  const [brandingLoaded, setBrandingLoaded] = useState(false);
 
-  // Sync from org data whenever it loads or changes
+  // Branding lives on the single organizations row (readable by any signed-in user)
   useEffect(() => {
-    if (!orgLoaded) return;
-    setSystemNameState(org_name ?? "");
-    setSystemLogoState(logo_url ?? "");
-  }, [orgLoaded, org_name, logo_url]);
+    if (!userId) {
+      setBrandingLoaded(false);
+      return;
+    }
+    let cancelled = false;
+    (async () => {
+      const { data } = await supabase
+        .from("organizations")
+        .select("name, logo_url")
+        .limit(1)
+        .maybeSingle();
+      if (cancelled) return;
+      setSystemNameState(data?.name ?? "");
+      setSystemLogoState(data?.logo_url ?? "");
+      setBrandingLoaded(true);
+    })();
+    return () => { cancelled = true; };
+  }, [userId]);
 
   const getToken = useCallback(async (): Promise<string> => {
     // Prefer live refreshed session token over the cached one
@@ -36,7 +50,6 @@ export function BrandingProvider({ children }: { children: React.ReactNode }) {
   }, [session?.access_token]);
 
   const setSystemName = useCallback(async (name: string): Promise<{ error: string | null }> => {
-    if (!org_id) return { error: "No organization linked to this account" };
     setSystemNameState(name);
     try {
       const token = await getToken();
@@ -51,10 +64,9 @@ export function BrandingProvider({ children }: { children: React.ReactNode }) {
     } catch (err) {
       return { error: err instanceof Error ? err.message : "Failed to save name" };
     }
-  }, [org_id, getToken]);
+  }, [getToken]);
 
   const setSystemLogo = useCallback(async (logoUrl: string): Promise<{ error: string | null }> => {
-    if (!org_id) return { error: "No organization linked to this account" };
     setSystemLogoState(logoUrl);
     try {
       const token = await getToken();
@@ -69,10 +81,9 @@ export function BrandingProvider({ children }: { children: React.ReactNode }) {
     } catch (err) {
       return { error: err instanceof Error ? err.message : "Failed to save logo" };
     }
-  }, [org_id, getToken]);
+  }, [getToken]);
 
   const uploadLogo = useCallback(async (file: File): Promise<{ url: string | null; error: string | null }> => {
-    if (!org_id) return { url: null, error: "No organization linked to this account" };
     try {
       const token = await getToken();
       const base64 = await new Promise<string>((resolve, reject) => {
@@ -92,13 +103,13 @@ export function BrandingProvider({ children }: { children: React.ReactNode }) {
     } catch (err) {
       return { url: null, error: err instanceof Error ? err.message : "Upload failed" };
     }
-  }, [org_id, getToken]);
+  }, [getToken]);
 
   return (
     <BrandingContext.Provider value={{
       systemName,
       systemLogo,
-      brandingLoaded: orgLoaded,
+      brandingLoaded,
       setSystemName,
       setSystemLogo,
       uploadLogo,

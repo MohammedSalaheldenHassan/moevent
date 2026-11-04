@@ -14,3 +14,35 @@ import * as zod from "zod";
 export const HealthCheckResponse = zod.object({
   status: zod.string(),
 });
+
+/**
+ * Aggregate counts for the public site. No personal data. Cached on the server for about 5 minutes.
+ * @summary Public platform stats
+ */
+export const GetPublicStatsResponse = zod.object({
+  eventsHeld: zod
+    .number()
+    .describe("Events whose date has passed (still in the database)"),
+  upcomingEvents: zod.number().describe("Events dated today or later"),
+  ticketsBooked: zod.number().describe("All tickets, issued or booked"),
+  checkedIn: zod.number().describe("Tickets scanned at the gate"),
+});
+
+/**
+ * The only way to book from the public site. Student / Regular bookings create tickets and email them; Organization bookings create a request an admin must approve. Rate-limited per IP and per email / phone, and protected by Cloudflare Turnstile when it is configured.
+ * @summary Book tickets (Student / Regular) or request an Organization booking
+ */
+
+export const CreateBookingBody = zod.object({
+  eventId: zod.string().uuid(),
+  attendeeType: zod.enum(["student", "regular", "organization"]),
+  name: zod.string(),
+  phone: zod.string(),
+  email: zod.string(),
+  quantity: zod.number().min(1),
+  companyUrl: zod.string().optional().describe("Required for organization"),
+  captchaToken: zod
+    .string()
+    .optional()
+    .describe("Cloudflare Turnstile token, when enabled"),
+});
