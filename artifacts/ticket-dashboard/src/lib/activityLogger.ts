@@ -18,10 +18,17 @@ export type ActionType =
   | "user_logout"
   | "settings_changed";
 
+// crypto.randomUUID exists only in secure contexts (https / localhost); the
+// dashboard is also opened over plain http on the LAN, where it would throw.
+function newLogId(): string {
+  if (typeof crypto !== "undefined" && typeof crypto.randomUUID === "function") return crypto.randomUUID();
+  return `${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 10)}`;
+}
+
 export function logActivity(action: ActionType, details: string, user?: string) {
   const logs: ActivityLog[] = getActivityLogs();
   const newLog: ActivityLog = {
-    id: crypto.randomUUID(),
+    id: newLogId(),
     action,
     details,
     timestamp: new Date().toISOString(),

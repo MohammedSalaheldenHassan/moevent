@@ -10,6 +10,8 @@ servers:
 tags:
   - name: health
     description: Health operations
+  - name: public
+    description: Unauthenticated, read-only data for the public site
 paths:
   /healthz:
     get:
@@ -24,6 +26,56 @@ paths:
             application/json:
               schema:
                 $ref: "#/components/schemas/HealthStatus"
+  /public/stats:
+    get:
+      operationId: getPublicStats
+      tags: [public]
+      summary: Public platform stats
+      description: >-
+        Aggregate counts for the public site. No personal data. Cached on the
+        server for about 5 minutes.
+      responses:
+        "200":
+          description: Current counts
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/PublicStats"
+        "503":
+          description: Stats are temporarily unavailable
+  /public/bookings:
+    post:
+      operationId: createBooking
+      tags: [public]
+      summary: Book tickets (Student / Regular) or request an Organization booking
+      description: >-
+        The only way to book from the public site. Student / Regular bookings
+        create tickets and email them; Organization bookings create a request
+        an admin must approve. Rate-limited per IP and per email / phone, and
+        protected by Cloudflare Turnstile when it is configured.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/BookingRequest"
+      responses:
+        "201":
+          description: Booked (tickets) or request received (organization)
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/BookingResult"
+        "400":
+          description: Invalid input
+        "403":
+          description: Bot check failed
+        "404":
+          description: Event not found
+        "409":
+          description: Event ended, sold out, or over the per-booking limit (see `code`)
+        "429":
+          description: Too many bookings from this IP, email or phone
 components:
   schemas:
     HealthStatus:
@@ -33,4 +85,63 @@ components:
           type: string
       required:
         - status
-
+    PublicStats:
+      type: object
+      properties:
+        eventsHeld:
+          type: integer
+          description: Events whose date has passed (still in the database)
+        upcomingEvents:
+          type: integer
+          description: Events dated today or later
+        ticketsBooked:
+          type: integer
+          description: All tickets, issued or booked
+        checkedIn:
+          type: integer
+          description: Tickets scanned at the gate
+      required:
+        - eventsHeld
+        - upcomingEvents
+        - ticketsBooked
+        - checkedIn
+    BookingRequest:
+      type: object
+      properties:
+        eventId:
+          type: string
+          format: uuid
+        attendeeType:
+          type: string
+          enum: [student, regular, organization]
+        name:
+          type: string
+        phone:
+          type: string
+        email:
+          type: string
+        quantity:
+          type: integer
+          minimum: 1
+        companyUrl:
+          type: string
+          description: Required for organization
+        captchaToken:
+          type: string
+          description: Cloudflare Turnstile token, when enabled
+      required: [eventId, attendeeType, name, phone, email, quantity]
+    BookingResult:
+      type: object
+      properties:
+        kind:
+          type: string
+          enum: [tickets, request]
+        ticketIds:
+          type: array
+          items:
+            type: string
+        emailed:
+          type: boolean
+        requestId:
+          type: string
+      required: [kind]

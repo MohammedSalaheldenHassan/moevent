@@ -17,6 +17,7 @@ import { cn } from "@/lib/utils";
 import { printTicket, isImageUrl, shortTicketId } from "@/lib/printTicket";
 import QRCode from "qrcode";
 import { generateTicketPdf } from "@/lib/ticketPdf";
+import { BookingRequestsPanel } from "@/components/BookingRequestsPanel";
 
 interface Event {
   id: string;
@@ -31,9 +32,19 @@ interface TicketRow {
   id: string;
   customer_name: string;
   customer_phone: string | null;
+  // Set by the public booking site; null for tickets issued here.
+  customer_email: string | null;
+  attendee_type: "student" | "regular" | "organization" | "vvip" | null;
   is_scanned: boolean;
   created_at: string;
 }
+
+const ATTENDEE_TYPE_LABELS = {
+  student: { en: "Student", ar: "طالب" },
+  regular: { en: "Regular", ar: "عادي" },
+  organization: { en: "Organization", ar: "مؤسسة" },
+  vvip: { en: "VVIP", ar: "VVIP" },
+} as const;
 
 interface StaffProfile {
   id: string;
@@ -263,7 +274,7 @@ export default function EventDetailPage() {
       ? new Date(event.event_date).toLocaleDateString("en-US", { year: "numeric", month: "long", day: "numeric" })
       : "";
     const priceStr = event.price != null
-      ? (event.price === 0 ? "Free" : `RWF ${event.price.toLocaleString()}`)
+      ? (event.price === 0 ? (isAr ? "مجاني" : "Free") : `RWF ${event.price.toLocaleString()}`)
       : "";
 
     try {
@@ -453,6 +464,13 @@ export default function EventDetailPage() {
     fetchStaffAccess();
   }, [id]);
 
+  // After an organization request is approved, its new tickets appear here.
+  const reloadTickets = async () => {
+    if (!id) return;
+    const { data, error } = await supabase.from("tickets").select("*").eq("event_id", id).order("created_at", { ascending: false });
+    if (!error) setTickets(data ?? []);
+  };
+
   const openTicketDetail = async (tk: TicketRow) => {
     setSelectedTicket(tk);
     setQrDataUrl(null);
@@ -477,6 +495,7 @@ export default function EventDetailPage() {
     const matchesSearch =
       tk.customer_name.toLowerCase().includes(search.toLowerCase()) ||
       (tk.customer_phone || "").includes(search) ||
+      (tk.customer_email || "").toLowerCase().includes(search.toLowerCase()) ||
       tk.id.toLowerCase().includes(search.toLowerCase());
     const matchesFilter =
       filter === "all" ||
@@ -491,7 +510,7 @@ export default function EventDetailPage() {
   const totalRevenueStr =
     totalRevenue === null
       ? "—"
-      : totalRevenue === 0
+      : event?.price === 0
         ? (isAr ? "مجاني" : "Free")
         : `RWF ${totalRevenue.toLocaleString()}`;
 
@@ -613,6 +632,15 @@ export default function EventDetailPage() {
             </dl>
           </div>
 
+          {isAdmin && (
+            <BookingRequestsPanel
+              eventId={event.id}
+              isAr={isAr}
+              userEmail={currentProfile?.email ?? undefined}
+              onTicketsCreated={reloadTickets}
+            />
+          )}
+
           <div className="grid gap-6 xl:grid-cols-[minmax(0,1fr)_320px] items-start">
             {/* Tickets */}
             <section className="bg-card border border-card-border rounded-lg overflow-hidden" aria-labelledby="tickets-heading">
@@ -676,6 +704,11 @@ export default function EventDetailPage() {
                           <td className="px-5 py-3 max-w-[220px]">
                             <p className="font-medium text-foreground truncate">{tk.customer_name}</p>
                             {tk.customer_phone && <p dir="ltr" className="text-xs text-muted-foreground truncate text-start">{tk.customer_phone}</p>}
+                            {tk.attendee_type && (
+                              <span className="mt-1 inline-block rounded border border-border px-1.5 py-px text-[10px] font-medium text-muted-foreground">
+                                {ATTENDEE_TYPE_LABELS[tk.attendee_type][isAr ? "ar" : "en"]}
+                              </span>
+                            )}
                           </td>
                           <td className="px-3 py-3 hidden md:table-cell font-mono text-xs text-muted-foreground">{shortTicketId(tk.id)}</td>
                           <td className="px-3 py-3 whitespace-nowrap">
@@ -842,6 +875,18 @@ export default function EventDetailPage() {
                         <p dir="ltr" className="text-sm font-medium text-foreground text-start">{selectedTicket.customer_phone}</p>
                       </div>
                     )}
+                    {selectedTicket.customer_email && (
+                      <div>
+                        <p className="text-[10px] font-semibold uppercase tracking-wider text-muted-foreground">{isAr ? "البريد الإلكتروني" : "Email"}</p>
+                        <p dir="ltr" className="text-sm font-medium text-foreground text-start break-all">{selectedTicket.customer_email}</p>
+                      </div>
+                    )}
+                    {selectedTicket.attendee_type && (
+                      <div>
+                        <p className="text-[10px] font-semibold uppercase tracking-wider text-muted-foreground">{isAr ? "نوع التذكرة" : "Ticket type"}</p>
+                        <p className="text-sm font-medium text-foreground">{ATTENDEE_TYPE_LABELS[selectedTicket.attendee_type][isAr ? "ar" : "en"]}</p>
+                      </div>
+                    )}
                     <div>
                       <p className="text-[10px] font-semibold uppercase tracking-wider text-muted-foreground">{isAr ? "السعر" : "Price"}</p>
                       <p className="text-sm font-medium text-foreground tabular-nums">{formatPrice(event.price) ?? "—"}</p>
@@ -876,7 +921,7 @@ export default function EventDetailPage() {
                   onClick={() => {
                     if (!selectedTicket) return;
                     setEmailTicket(selectedTicket);
-                    setEmailAddress("");
+                    setEmailAddress(selectedTicket.customer_email ?? "");
                     setEmailError(null);
                     setEmailSuccess(false);
                     setSelectedTicket(null);

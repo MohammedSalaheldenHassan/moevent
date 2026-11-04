@@ -14,8 +14,10 @@ import {
   Globe,
   Settings,
   ClipboardList,
+  Building2,
 } from "lucide-react";
-import { useState } from "react";
+import { useEffect, useState } from "react";
+import { supabase } from "@/lib/supabase";
 
 export function Sidebar() {
   const [location] = useLocation();
@@ -30,11 +32,27 @@ export function Sidebar() {
 
   const isAdmin = !profile || profile.role === "admin";
 
-  const navItems = [
+  // Pending organization requests, refreshed on every navigation.
+  const [pendingRequests, setPendingRequests] = useState(0);
+  useEffect(() => {
+    if (!isAdmin) return;
+    supabase
+      .from("booking_requests")
+      .select("id", { count: "exact", head: true })
+      .eq("status", "pending")
+      .then(({ count }) => setPendingRequests(count ?? 0));
+  }, [isAdmin, location]);
+
+  const navItems: { href: string; label: string; icon: React.ElementType; badge?: number }[] = [
     { href: "/", label: t.dashboard, icon: LayoutDashboard },
     { href: "/events", label: t.events, icon: CalendarDays },
     { href: "/issue-ticket", label: t.issueTicket, icon: Ticket },
-    ...(isAdmin ? [{ href: "/staff", label: t.staff, icon: Users }] : []),
+    ...(isAdmin
+      ? [
+          { href: "/requests", label: lang === "ar" ? "طلبات المؤسسات" : "Requests", icon: Building2, badge: pendingRequests },
+          { href: "/staff", label: t.staff, icon: Users },
+        ]
+      : []),
   ];
 
   const bottomNavItems = [
@@ -54,7 +72,7 @@ export function Sidebar() {
     return location.startsWith(href);
   };
 
-  const NavLink = ({ href, label, icon: Icon }: { href: string; label: string; icon: React.ElementType }) => {
+  const NavLink = ({ href, label, icon: Icon, badge }: { href: string; label: string; icon: React.ElementType; badge?: number }) => {
     const active = isActive(href);
     return (
       <Link href={href}>
@@ -69,7 +87,12 @@ export function Sidebar() {
           )}
         >
           <Icon className={cn("w-4 h-4 shrink-0", active ? "text-primary" : "")} strokeWidth={1.75} />
-          <span>{label}</span>
+          <span className="flex-1">{label}</span>
+          {!!badge && (
+            <span className="min-w-5 h-5 px-1.5 rounded-full bg-amber-500 text-white text-[11px] font-semibold flex items-center justify-center tabular-nums">
+              {badge}
+            </span>
+          )}
         </div>
       </Link>
     );

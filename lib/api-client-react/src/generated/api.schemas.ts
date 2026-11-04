@@ -8,3 +8,52 @@
 export interface HealthStatus {
   status: string;
 }
+
+export interface PublicStats {
+  /** Events whose date has passed (still in the database) */
+  eventsHeld: number;
+  /** Events dated today or later */
+  upcomingEvents: number;
+  /** All tickets, issued or booked */
+  ticketsBooked: number;
+  /** Tickets scanned at the gate */
+  checkedIn: number;
+}
+
+export type BookingRequestAttendeeType =
+  (typeof BookingRequestAttendeeType)[keyof typeof BookingRequestAttendeeType];
+
+export const BookingRequestAttendeeType = {
+  student: "student",
+  regular: "regular",
+  organization: "organization",
+} as const;
+
+export interface BookingRequest {
+  eventId: string;
+  attendeeType: BookingRequestAttendeeType;
+  name: string;
+  phone: string;
+  email: string;
+  /** @minimum 1 */
+  quantity: number;
+  /** Required for organization */
+  companyUrl?: string;
+  /** Cloudflare Turnstile token, when enabled */
+  captchaToken?: string;
+}
+
+export type BookingResultKind =
+  (typeof BookingResultKind)[keyof typeof BookingResultKind];
+
+export const BookingResultKind = {
+  tickets: "tickets",
+  request: "request",
+} as const;
+
+export interface BookingResult {
+  kind: BookingResultKind;
+  ticketIds?: string[];
+  emailed?: boolean;
+  requestId?: string;
+}

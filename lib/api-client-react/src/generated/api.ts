@@ -5,18 +5,26 @@
  * API specification
  * OpenAPI spec version: 0.1.0
  */
-import { useQuery } from "@tanstack/react-query";
+import { useMutation, useQuery } from "@tanstack/react-query";
 import type {
+  MutationFunction,
   QueryFunction,
   QueryKey,
+  UseMutationOptions,
+  UseMutationResult,
   UseQueryOptions,
   UseQueryResult,
 } from "@tanstack/react-query";
 
-import type { HealthStatus } from "./api.schemas";
+import type {
+  BookingRequest,
+  BookingResult,
+  HealthStatus,
+  PublicStats,
+} from "./api.schemas";
 
 import { customFetch } from "../custom-fetch";
-import type { ErrorType } from "../custom-fetch";
+import type { ErrorType, BodyType } from "../custom-fetch";
 
 type AwaitedInput<T> = PromiseLike<T> | T;
 
@@ -99,3 +107,166 @@ export function useHealthCheck<
 
   return { ...query, queryKey: queryOptions.queryKey };
 }
+
+/**
+ * Aggregate counts for the public site. No personal data. Cached on the server for about 5 minutes.
+ * @summary Public platform stats
+ */
+export const getGetPublicStatsUrl = () => {
+  return `/api/public/stats`;
+};
+
+export const getPublicStats = async (
+  options?: RequestInit,
+): Promise<PublicStats> => {
+  return customFetch<PublicStats>(getGetPublicStatsUrl(), {
+    ...options,
+    method: "GET",
+  });
+};
+
+export const getGetPublicStatsQueryKey = () => {
+  return [`/api/public/stats`] as const;
+};
+
+export const getGetPublicStatsQueryOptions = <
+  TData = Awaited<ReturnType<typeof getPublicStats>>,
+  TError = ErrorType<void>,
+>(options?: {
+  query?: UseQueryOptions<
+    Awaited<ReturnType<typeof getPublicStats>>,
+    TError,
+    TData
+  >;
+  request?: SecondParameter<typeof customFetch>;
+}) => {
+  const { query: queryOptions, request: requestOptions } = options ?? {};
+
+  const queryKey = queryOptions?.queryKey ?? getGetPublicStatsQueryKey();
+
+  const queryFn: QueryFunction<Awaited<ReturnType<typeof getPublicStats>>> = ({
+    signal,
+  }) => getPublicStats({ signal, ...requestOptions });
+
+  return { queryKey, queryFn, ...queryOptions } as UseQueryOptions<
+    Awaited<ReturnType<typeof getPublicStats>>,
+    TError,
+    TData
+  > & { queryKey: QueryKey };
+};
+
+export type GetPublicStatsQueryResult = NonNullable<
+  Awaited<ReturnType<typeof getPublicStats>>
+>;
+export type GetPublicStatsQueryError = ErrorType<void>;
+
+/**
+ * @summary Public platform stats
+ */
+
+export function useGetPublicStats<
+  TData = Awaited<ReturnType<typeof getPublicStats>>,
+  TError = ErrorType<void>,
+>(options?: {
+  query?: UseQueryOptions<
+    Awaited<ReturnType<typeof getPublicStats>>,
+    TError,
+    TData
+  >;
+  request?: SecondParameter<typeof customFetch>;
+}): UseQueryResult<TData, TError> & { queryKey: QueryKey } {
+  const queryOptions = getGetPublicStatsQueryOptions(options);
+
+  const query = useQuery(queryOptions) as UseQueryResult<TData, TError> & {
+    queryKey: QueryKey;
+  };
+
+  return { ...query, queryKey: queryOptions.queryKey };
+}
+
+/**
+ * The only way to book from the public site. Student / Regular bookings create tickets and email them; Organization bookings create a request an admin must approve. Rate-limited per IP and per email / phone, and protected by Cloudflare Turnstile when it is configured.
+ * @summary Book tickets (Student / Regular) or request an Organization booking
+ */
+export const getCreateBookingUrl = () => {
+  return `/api/public/bookings`;
+};
+
+export const createBooking = async (
+  bookingRequest: BookingRequest,
+  options?: RequestInit,
+): Promise<BookingResult> => {
+  return customFetch<BookingResult>(getCreateBookingUrl(), {
+    ...options,
+    method: "POST",
+    headers: { "Content-Type": "application/json", ...options?.headers },
+    body: JSON.stringify(bookingRequest),
+  });
+};
+
+export const getCreateBookingMutationOptions = <
+  TError = ErrorType<void>,
+  TContext = unknown,
+>(options?: {
+  mutation?: UseMutationOptions<
+    Awaited<ReturnType<typeof createBooking>>,
+    TError,
+    { data: BodyType<BookingRequest> },
+    TContext
+  >;
+  request?: SecondParameter<typeof customFetch>;
+}): UseMutationOptions<
+  Awaited<ReturnType<typeof createBooking>>,
+  TError,
+  { data: BodyType<BookingRequest> },
+  TContext
+> => {
+  const mutationKey = ["createBooking"];
+  const { mutation: mutationOptions, request: requestOptions } = options
+    ? options.mutation &&
+      "mutationKey" in options.mutation &&
+      options.mutation.mutationKey
+      ? options
+      : { ...options, mutation: { ...options.mutation, mutationKey } }
+    : { mutation: { mutationKey }, request: undefined };
+
+  const mutationFn: MutationFunction<
+    Awaited<ReturnType<typeof createBooking>>,
+    { data: BodyType<BookingRequest> }
+  > = (props) => {
+    const { data } = props ?? {};
+
+    return createBooking(data, requestOptions);
+  };
+
+  return { mutationFn, ...mutationOptions };
+};
+
+export type CreateBookingMutationResult = NonNullable<
+  Awaited<ReturnType<typeof createBooking>>
+>;
+export type CreateBookingMutationBody = BodyType<BookingRequest>;
+export type CreateBookingMutationError = ErrorType<void>;
+
+/**
+ * @summary Book tickets (Student / Regular) or request an Organization booking
+ */
+export const useCreateBooking = <
+  TError = ErrorType<void>,
+  TContext = unknown,
+>(options?: {
+  mutation?: UseMutationOptions<
+    Awaited<ReturnType<typeof createBooking>>,
+    TError,
+    { data: BodyType<BookingRequest> },
+    TContext
+  >;
+  request?: SecondParameter<typeof customFetch>;
+}): UseMutationResult<
+  Awaited<ReturnType<typeof createBooking>>,
+  TError,
+  { data: BodyType<BookingRequest> },
+  TContext
+> => {
+  return useMutation(getCreateBookingMutationOptions(options));
+};

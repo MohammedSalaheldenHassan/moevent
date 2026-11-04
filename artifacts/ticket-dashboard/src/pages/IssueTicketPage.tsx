@@ -7,11 +7,15 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { AlertCircle, Loader2, Printer, CheckCircle2, Ticket, CalendarDays, MapPin, QrCode, RotateCcw } from "lucide-react";
+import { AlertCircle, Loader2, Printer, CheckCircle2, Ticket, CalendarDays, MapPin, QrCode, RotateCcw, Crown, Mail } from "lucide-react";
 import { logActivity } from "@/lib/activityLogger";
 import { cn } from "@/lib/utils";
 import QRCode from "qrcode";
 import { printTicket, isImageUrl, shortTicketId as shortId } from "@/lib/printTicket";
+import { sendTicketsEmail } from "@/lib/sendTicketsEmail";
+
+// Same rule as the tickets_customer_email_check constraint.
+const isValidEmail = (v: string) => v.length <= 254 && /^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(v);
 
 interface Event {
   id: string;
@@ -21,18 +25,24 @@ interface Event {
   price: number | null;
 }
 
+// The dashboard issues VVIP tickets only; public bookings cover the other types.
 interface IssuedTicket {
   id: string;
   customer_name: string;
   customer_phone: string;
+  customer_email: string;
+  attendee_type: "vvip";
   event: Event;
   qrDataUrl: string;
+  email: "sending" | "sent" | "failed";
+  emailError?: string;
 }
 
 interface TicketView {
   event: Event | undefined;
   customerName: string;
   customerPhone: string;
+  customerEmail: string;
   id?: string;
   qrDataUrl?: string;
 }
@@ -47,7 +57,7 @@ export default function IssueTicketPage() {
 
   const [events, setEvents] = useState<Event[]>([]);
   const [eventsLoading, setEventsLoading] = useState(true);
-  const [form, setForm] = useState({ eventId: "", customerName: "", customerPhone: "" });
+  const [form, setForm] = useState({ eventId: "", customerName: "", customerPhone: "", customerEmail: "" });
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [issuedTicket, setIssuedTicket] = useState<IssuedTicket | null>(null);
@@ -101,8 +111,12 @@ export default function IssueTicketPage() {
   };
 
   const handleIssue = async () => {
-    if (!form.eventId || !form.customerName.trim() || !form.customerPhone.trim()) {
+    if (!form.eventId || !form.customerName.trim() || !form.customerPhone.trim() || !form.customerEmail.trim()) {
       setError(t.allFieldsRequired);
+      return;
+    }
+    if (!isValidEmail(form.customerEmail.trim())) {
+      setError(isAr ? "أدخل بريدًا إلكترونيًا صحيحًا." : "Enter a valid email address.");
       return;
     }
     setSaving(true);
@@ -114,9 +128,11 @@ export default function IssueTicketPage() {
           event_id: form.eventId,
           customer_name: form.customerName.trim(),
           customer_phone: form.customerPhone.trim(),
+          customer_email: form.customerEmail.trim(),
+          attendee_type: "vvip",
           is_scanned: false,
         })
-        .select("id, customer_name, customer_phone")
+        .select("id, customer_name, customer_phone, customer_email")
         .single();
 
       if (error) throw error;
@@ -128,14 +144,28 @@ export default function IssueTicketPage() {
         width: 320, margin: 1, color: { dark: "#111418", light: "#ffffff" },
       });
 
-      setIssuedTicket({ id: data.id, customer_name: data.customer_name, customer_phone: data.customer_phone, event, qrDataUrl });
-      setForm({ eventId: form.eventId, customerName: "", customerPhone: "" });
-      logActivity("ticket_issued", `${data.customer_name} — ${event.title}`, profile?.email ?? undefined);
+      const issued: IssuedTicket = {
+        id: data.id, customer_name: data.customer_name, customer_phone: data.customer_phone,
+        customer_email: data.customer_email, attendee_type: "vvip", event, qrDataUrl, email: "sending",
+      };
+      setIssuedTicket(issued);
+      setForm({ eventId: form.eventId, customerName: "", customerPhone: "", customerEmail: "" });
+      logActivity("ticket_issued", `VVIP · ${data.customer_name} — ${event.title}`, profile?.email ?? undefined);
+      // Like public bookings, the ticket goes straight to the guest's email.
+      void emailTicket(issued);
     } catch (err: unknown) {
       setError(err instanceof Error ? err.message : t.failedIssueTicket);
     } finally {
       setSaving(false);
     }
+  };
+
+  const emailTicket = async (ticket: IssuedTicket) => {
+    setIssuedTicket((cur) => (cur?.id === ticket.id ? { ...cur, email: "sending", emailError: undefined } : cur));
+    const result = await sendTicketsEmail([ticket.id]);
+    setIssuedTicket((cur) =>
+      cur?.id === ticket.id ? { ...cur, email: result.ok ? "sent" : "failed", emailError: result.message } : cur,
+    );
   };
 
   const formatPrice = (price: number | null) => {
@@ -160,8 +190,8 @@ export default function IssueTicketPage() {
   };
 
   const preview: TicketView = issuedTicket
-    ? { event: issuedTicket.event, customerName: issuedTicket.customer_name, customerPhone: issuedTicket.customer_phone, id: issuedTicket.id, qrDataUrl: issuedTicket.qrDataUrl }
-    : { event: selectedEvent, customerName: form.customerName.trim(), customerPhone: form.customerPhone.trim() };
+    ? { event: issuedTicket.event, customerName: issuedTicket.customer_name, customerPhone: issuedTicket.customer_phone, customerEmail: issuedTicket.customer_email, id: issuedTicket.id, qrDataUrl: issuedTicket.qrDataUrl }
+    : { event: selectedEvent, customerName: form.customerName.trim(), customerPhone: form.customerPhone.trim(), customerEmail: form.customerEmail.trim() };
 
   const SectionHeading = ({ step, title, hint }: { step: number; title: string; hint: string }) => (
     <div className="flex items-start gap-3">
@@ -179,8 +209,18 @@ export default function IssueTicketPage() {
     <div className="space-y-6">
       {/* Header */}
       <div className="border-b border-border pb-5">
-        <h1 className="text-2xl font-semibold tracking-tight text-foreground">{t.issueTicketTitle}</h1>
-        <p className="text-sm text-muted-foreground mt-1">{t.issueTicketSubtitle}</p>
+        <h1 className="text-2xl font-semibold tracking-tight text-foreground flex items-center gap-2.5">
+          {t.issueTicketTitle}
+          <span className="inline-flex items-center gap-1 rounded-md bg-amber-500/15 px-2 py-0.5 text-xs font-semibold text-amber-700 dark:text-amber-400">
+            <Crown className="w-3.5 h-3.5" />
+            VVIP
+          </span>
+        </h1>
+        <p className="text-sm text-muted-foreground mt-1">
+          {isAr
+            ? "تصدر من هنا تذاكر VVIP فقط. تُرسل التذكرة إلى بريد الضيف فور إصدارها. تذاكر الطلاب والعاديين والمؤسسات تُحجز من الموقع العام."
+            : "Issue VVIP tickets only. The ticket is emailed to the guest as soon as it's issued. Student, Regular and Organization tickets are booked on the public site."}
+        </p>
       </div>
 
       <div className="grid gap-6 lg:grid-cols-[minmax(0,1fr)_360px] items-start">
@@ -248,7 +288,7 @@ export default function IssueTicketPage() {
             <SectionHeading
               step={2}
               title={isAr ? "العميل" : "Customer"}
-              hint={isAr ? "يُطبع الاسم على التذكرة ويظهر عند المسح" : "The name is printed on the ticket and shown at the gate"}
+              hint={isAr ? "يُطبع الاسم على التذكرة، وتُرسل التذكرة إلى البريد" : "The name is printed on the ticket; the ticket is sent to the email"}
             />
             <div className="sm:ps-9 grid gap-4 sm:grid-cols-2">
               <div className="space-y-1.5">
@@ -277,6 +317,24 @@ export default function IssueTicketPage() {
                   dir="ltr"
                 />
               </div>
+              <div className="space-y-1.5 sm:col-span-2">
+                <Label htmlFor="customer-email" className="text-sm font-medium">{isAr ? "البريد الإلكتروني" : "Email"}</Label>
+                <Input
+                  id="customer-email"
+                  type="email"
+                  inputMode="email"
+                  placeholder="guest@example.com"
+                  value={form.customerEmail}
+                  onChange={(e) => updateForm({ customerEmail: e.target.value })}
+                  autoComplete="off"
+                  autoCapitalize="none"
+                  spellCheck={false}
+                  required
+                  maxLength={254}
+                  className="h-10"
+                  dir="ltr"
+                />
+              </div>
             </div>
           </div>
 
@@ -297,7 +355,7 @@ export default function IssueTicketPage() {
             <Button type="submit" disabled={saving} className="h-10 px-5">
               {saving
                 ? <><Loader2 className="w-4 h-4 animate-spin" />{t.issuingTicket}</>
-                : <><Ticket className="w-4 h-4" />{t.issueTicketBtn}</>
+                : <><Crown className="w-4 h-4" />{isAr ? "إصدار تذكرة VVIP" : "Issue VVIP ticket"}</>
               }
             </Button>
           </div>
@@ -328,8 +386,9 @@ export default function IssueTicketPage() {
                   )}
                   <span className="text-xs font-semibold text-foreground truncate">{brandName}</span>
                 </div>
-                <span className="text-[10px] font-semibold uppercase tracking-[0.12em] text-muted-foreground border border-border rounded px-1.5 py-0.5 shrink-0">
-                  {isAr ? "تذكرة دخول" : "Admit one"}
+                <span className="inline-flex items-center gap-1 text-[10px] font-semibold uppercase tracking-[0.12em] text-amber-700 dark:text-amber-400 bg-amber-500/10 border border-amber-500/30 rounded px-1.5 py-0.5 shrink-0">
+                  <Crown className="w-3 h-3" />
+                  VVIP
                 </span>
               </div>
               <p className={cn("text-lg font-semibold leading-snug tracking-tight", preview.event ? "text-foreground" : "text-muted-foreground/60")}>
@@ -368,6 +427,12 @@ export default function IssueTicketPage() {
                   </p>
                 </div>
                 <div>
+                  <p className="text-[10px] font-semibold uppercase tracking-wider text-muted-foreground">{isAr ? "البريد" : "Email"}</p>
+                  <p dir="ltr" className={cn("text-sm font-medium truncate text-start", preview.customerEmail ? "text-foreground" : "text-muted-foreground/60")}>
+                    {preview.customerEmail || "—"}
+                  </p>
+                </div>
+                <div>
                   <p className="text-[10px] font-semibold uppercase tracking-wider text-muted-foreground">{isAr ? "السعر" : "Price"}</p>
                   <p className="text-sm font-medium text-foreground tabular-nums">{formatPrice(preview.event?.price ?? null) ?? "—"}</p>
                 </div>
@@ -386,6 +451,41 @@ export default function IssueTicketPage() {
               {preview.id ? `${isAr ? "رقم التذكرة" : "Ticket"} ${shortId(preview.id)}` : "—"}
             </div>
           </div>
+
+          {issuedTicket && (
+            <div
+              role="status"
+              className={cn(
+                "flex items-start gap-2 rounded-md border px-3 py-2.5 text-sm",
+                issuedTicket.email === "sent" && "border-emerald-600/30 bg-emerald-600/5 text-emerald-700 dark:text-emerald-400",
+                issuedTicket.email === "sending" && "border-border text-muted-foreground",
+                issuedTicket.email === "failed" && "border-destructive/30 bg-destructive/5 text-destructive",
+              )}
+            >
+              {issuedTicket.email === "sending" ? (
+                <Loader2 className="w-4 h-4 shrink-0 mt-0.5 animate-spin" />
+              ) : issuedTicket.email === "sent" ? (
+                <CheckCircle2 className="w-4 h-4 shrink-0 mt-0.5" />
+              ) : (
+                <AlertCircle className="w-4 h-4 shrink-0 mt-0.5" />
+              )}
+              <div className="min-w-0 flex-1">
+                <p className="break-words">
+                  {issuedTicket.email === "sending"
+                    ? (isAr ? "جارٍ إرسال التذكرة بالبريد…" : "Emailing the ticket…")
+                    : issuedTicket.email === "sent"
+                      ? (isAr ? `أُرسلت التذكرة إلى ${issuedTicket.customer_email}` : `Ticket emailed to ${issuedTicket.customer_email}`)
+                      : (isAr ? `تعذّر إرسال البريد${issuedTicket.emailError ? ` (${issuedTicket.emailError})` : ""}.` : `The email couldn't be sent${issuedTicket.emailError ? ` (${issuedTicket.emailError})` : ""}.`)}
+                </p>
+                {issuedTicket.email === "failed" && (
+                  <button type="button" onClick={() => void emailTicket(issuedTicket)} className="mt-1 inline-flex items-center gap-1 text-xs font-medium underline underline-offset-2">
+                    <Mail className="w-3.5 h-3.5" />
+                    {isAr ? "إعادة المحاولة" : "Try again"}
+                  </button>
+                )}
+              </div>
+            </div>
+          )}
 
           {issuedTicket && (
             <div className="grid grid-cols-2 gap-2">

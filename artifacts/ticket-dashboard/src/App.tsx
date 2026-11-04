@@ -17,6 +17,7 @@ import IssueTicketPage from "@/pages/IssueTicketPage";
 import StaffPage from "@/pages/StaffPage";
 import SettingsPage from "@/pages/SettingsPage";
 import ActivityLogsPage from "@/pages/ActivityLogsPage";
+import RequestsPage from "@/pages/RequestsPage";
 import NotFound from "@/pages/not-found";
 import { Loader2 } from "lucide-react";
 import { useState, useEffect } from "react";
@@ -91,6 +92,7 @@ function ProtectedRoutes() {
         <Route path="/events" component={EventsPage} />
         <Route path="/events/:id" component={EventDetailPage} />
         <Route path="/issue-ticket" component={IssueTicketPage} />
+        <Route path="/requests" component={RequestsPage} />
         <Route path="/staff" component={StaffPage} />
         <Route path="/settings" component={SettingsPage} />
         <Route path="/logs" component={ActivityLogsPage} />

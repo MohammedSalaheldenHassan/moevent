@@ -8,8 +8,10 @@ import { logger } from "./lib/logger";
 
 const app: Express = express();
 
-// Render (and most hosts) sit behind one proxy; needed for per-IP rate limits.
-app.set("trust proxy", 1);
+// Number of reverse proxies in front of the API (Caddy/nginx = 1). Needed so
+// per-IP rate limits see the visitor's IP, not the proxy's. Never "true":
+// that would trust a spoofed X-Forwarded-For.
+app.set("trust proxy", Number(process.env["TRUST_PROXY_HOPS"] ?? 1));
 app.disable("x-powered-by");
 
 app.use(
@@ -38,10 +40,17 @@ const allowedOrigins = (process.env["CORS_ORIGINS"] ?? "")
   .split(",")
   .map((o) => o.trim().replace(/\/+$/, ""))
   .filter(Boolean);
+const isProduction = process.env["NODE_ENV"] === "production";
 if (allowedOrigins.length === 0) {
-  logger.warn("CORS_ORIGINS is not set; accepting requests from any origin");
+  // Production: same-origin only (site + dashboard are served behind the same
+  // proxy as /api). Development: any origin, for the Vite dev servers.
+  logger.warn(
+    isProduction
+      ? "CORS_ORIGINS is not set; cross-origin requests are refused"
+      : "CORS_ORIGINS is not set; accepting requests from any origin (development)",
+  );
 }
-app.use(cors({ origin: allowedOrigins.length > 0 ? allowedOrigins : true }));
+app.use(cors({ origin: allowedOrigins.length > 0 ? allowedOrigins : !isProduction }));
 
 const limiter = (limit: number) =>
   rateLimit({
@@ -52,7 +61,9 @@ const limiter = (limit: number) =>
     message: { error: "Too many requests. Please wait a few minutes and try again." },
   });
 app.use("/api", limiter(300));
-app.use(["/api/auth", "/api/staff", "/api/issue-ticket", "/api/cleanup/run", "/api/org"], limiter(60));
+app.use(["/api/auth", "/api/staff", "/api/issue-ticket", "/api/cleanup/run", "/api/org", "/api/tickets/send-email"], limiter(60));
+// Public bookings: a person books a few times at most; scripts get cut off.
+app.use("/api/public/bookings", limiter(10));
 
 // Logo uploads carry a base64 image; everything else is small JSON.
 app.use("/api/org/upload-logo", express.json({ limit: "10mb" }));

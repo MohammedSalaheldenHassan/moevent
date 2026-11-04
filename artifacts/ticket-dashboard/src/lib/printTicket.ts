@@ -4,6 +4,7 @@ export interface PrintableTicket {
   id: string;
   customer_name: string;
   customer_phone: string | null;
+  attendee_type?: string | null;
 }
 
 export interface PrintableEvent {
@@ -80,7 +81,7 @@ export function printTicket({
     <div class="top">
       <div class="brand">
         <div class="brand-name">${logo}<span>${esc(brandName)}</span></div>
-        <span class="admit">${isAr ? "تذكرة دخول" : "Admit one"}</span>
+        <span class="admit">${ticket.attendee_type === "vvip" ? "VVIP" : isAr ? "تذكرة دخول" : "Admit one"}</span>
       </div>
       <div class="event">${esc(event.title)}</div>
       <div class="meta">

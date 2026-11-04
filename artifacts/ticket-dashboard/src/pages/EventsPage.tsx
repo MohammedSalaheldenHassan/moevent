@@ -6,6 +6,8 @@ import { useAuth } from "@/contexts/useAuth";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
+import { Textarea } from "@/components/ui/textarea";
+import { LocationPicker, type LatLng } from "@/components/LocationPicker";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter } from "@/components/ui/dialog";
 import { useToast } from "@/hooks/use-toast";
 import { logActivity } from "@/lib/activityLogger";
@@ -37,6 +39,35 @@ interface TicketStats {
   scanned: number;
 }
 
+// Per-type ticket limits. Stored on events as capacity_<type> (total seats;
+// blank = unlimited, 0 = not offered) and max_per_booking_<type> (blank =
+// the public site's default of 6). Enforced by the database.
+const TICKET_TYPES = [
+  { key: "student", en: "Student", ar: "طالب" },
+  { key: "regular", en: "Regular", ar: "عادي" },
+  { key: "organization", en: "Organization", ar: "مؤسسة" },
+] as const;
+type TicketTypeKey = (typeof TICKET_TYPES)[number]["key"];
+type LimitFields = Record<`capacity_${TicketTypeKey}` | `max_per_booking_${TicketTypeKey}`, string>;
+
+const EMPTY_LIMITS: LimitFields = {
+  capacity_student: "", capacity_regular: "", capacity_organization: "",
+  max_per_booking_student: "", max_per_booking_regular: "", max_per_booking_organization: "",
+};
+const EMPTY_FORM = { title: "", date: "", location: "", price: "", description: "", ...EMPTY_LIMITS };
+
+const limitsFromEvent = (event: Event): LimitFields =>
+  Object.fromEntries(
+    Object.keys(EMPTY_LIMITS).map((k) => [k, event[k] != null ? String(event[k]) : ""]),
+  ) as LimitFields;
+
+/** "" -> null; otherwise a whole number >= min, or undefined when invalid. */
+const parseLimit = (v: string, min: number): number | null | undefined => {
+  if (!v.trim()) return null;
+  const n = Number(v);
+  return Number.isInteger(n) && n >= min && n <= 100000 ? n : undefined;
+};
+
 export default function EventsPage() {
   const { t, isRTL, lang } = useLocale();
   const { profile } = useAuth();
@@ -55,7 +86,13 @@ export default function EventsPage() {
   const [modalMode, setModalMode] = useState<ModalMode>("add");
   const [editingEvent, setEditingEvent] = useState<Event | null>(null);
   const [saving, setSaving] = useState(false);
-  const [form, setForm] = useState({ title: "", date: "", location: "", price: "" });
+  const [form, setForm] = useState(EMPTY_FORM);
+  // Venue pin (events.latitude / longitude), chosen on the map.
+  const [coords, setCoords] = useState<LatLng | null>(null);
+  const [mapOpen, setMapOpen] = useState(false);
+  // Address last filled in from the map, so it can be replaced when the pin
+  // moves without overwriting text the admin typed themselves.
+  const autoAddress = useRef<string | null>(null);
   const [formError, setFormError] = useState<string | null>(null);
 
   const [deleteTarget, setDeleteTarget] = useState<Event | null>(null);
@@ -154,7 +191,10 @@ export default function EventsPage() {
   const openAddModal = () => {
     setModalMode("add");
     setEditingEvent(null);
-    setForm({ title: "", date: "", location: "", price: "" });
+    setForm(EMPTY_FORM);
+    setCoords(null);
+    setMapOpen(false);
+    autoAddress.current = null;
     setFormError(null);
     setImageFile(null);
     setImagePreview(null);
@@ -170,7 +210,14 @@ export default function EventsPage() {
       date: event.event_date ?? "",
       location: event.location ?? "",
       price: event.price != null ? String(event.price) : "",
+      description: (event.description as string | null) ?? "",
+      ...limitsFromEvent(event),
     });
+    const lat = event.latitude as number | null | undefined;
+    const lng = event.longitude as number | null | undefined;
+    setCoords(lat != null && lng != null ? { lat, lng } : null);
+    setMapOpen(false);
+    autoAddress.current = null;
     setFormError(null);
     setImageFile(null);
     setImagePreview(null);
@@ -200,6 +247,28 @@ export default function EventsPage() {
       setFormError(isAr ? "السعر يجب أن يكون رقماً صحيحاً" : "Price must be a valid number");
       return;
     }
+    if (form.description.length > 5000) {
+      setFormError(isAr ? "الوصف طويل جداً (5000 حرف كحد أقصى)" : "Description is too long (5,000 characters max)");
+      return;
+    }
+    const limits: Record<string, number | null> = {};
+    for (const key of Object.keys(EMPTY_LIMITS) as (keyof LimitFields)[]) {
+      const isMax = key.startsWith("max_per_booking_");
+      const v = parseLimit(form[key], isMax ? 1 : 0);
+      if (v === undefined) {
+        setFormError(
+          isMax
+            ? (isAr ? "الحد الأقصى لكل حجز يجب أن يكون رقماً صحيحاً من 1 فأكثر" : "Max per booking must be a whole number of 1 or more")
+            : (isAr ? "عدد المقاعد يجب أن يكون رقماً صحيحاً من 0 فأكثر" : "Seats must be a whole number of 0 or more"),
+        );
+        return;
+      }
+      if (isMax && v != null && v > 1000) {
+        setFormError(isAr ? "الحد الأقصى لكل حجز هو 1000" : "Max per booking can't be more than 1,000");
+        return;
+      }
+      limits[key] = v;
+    }
     const today = new Date();
     today.setHours(0, 0, 0, 0);
     const dateChanged = modalMode === "add" || form.date !== (editingEvent?.event_date ?? "");
@@ -222,6 +291,10 @@ export default function EventsPage() {
         location: form.location.trim() || null,
         price: priceVal,
         image_url: resolvedImageUrl,
+        description: form.description.trim() || null,
+        latitude: coords?.lat ?? null,
+        longitude: coords?.lng ?? null,
+        ...limits,
       };
 
       if (modalMode === "add") {
@@ -668,11 +741,119 @@ export default function EventsPage() {
                 <Input
                   placeholder={t.locationPlaceholder}
                   value={form.location}
-                  onChange={(e) => setForm((f) => ({ ...f, location: e.target.value }))}
+                  onChange={(e) => {
+                    autoAddress.current = null;
+                    setForm((f) => ({ ...f, location: e.target.value }));
+                  }}
                   className="h-10"
                 />
               </div>
             </div>
+
+            {/* Venue on the map */}
+            <div className="space-y-2">
+              <button
+                type="button"
+                onClick={() => setMapOpen((o) => !o)}
+                aria-expanded={mapOpen}
+                className="inline-flex items-center gap-1.5 text-sm font-medium text-primary hover:underline"
+              >
+                <MapPin className="w-4 h-4" />
+                {coords
+                  ? (mapOpen ? (isAr ? "إخفاء الخريطة" : "Hide map") : (isAr ? "تعديل الموقع على الخريطة" : "Edit location on map"))
+                  : (mapOpen ? (isAr ? "إخفاء الخريطة" : "Hide map") : (isAr ? "اختيار الموقع من الخريطة" : "Choose location on map"))}
+                {coords && !mapOpen && (
+                  <span className="text-xs font-normal text-muted-foreground" dir="ltr">
+                    ({coords.lat.toFixed(4)}, {coords.lng.toFixed(4)})
+                  </span>
+                )}
+              </button>
+              {mapOpen && (
+                <LocationPicker
+                  value={coords}
+                  onChange={setCoords}
+                  isAr={isAr}
+                  onAddress={(address) => {
+                    // Fill the location text unless the admin typed their own.
+                    setForm((f) => {
+                      if (f.location.trim() && f.location !== autoAddress.current) return f;
+                      autoAddress.current = address;
+                      return { ...f, location: address };
+                    });
+                  }}
+                />
+              )}
+            </div>
+
+            {/* Description */}
+            <div className="space-y-1.5">
+              <Label htmlFor="event-description" className="text-sm font-medium">
+                {isAr ? "الوصف" : "Description"}
+                <span className="text-xs text-muted-foreground font-normal ms-1.5">{isAr ? "اختياري" : "Optional"}</span>
+              </Label>
+              <Textarea
+                id="event-description"
+                rows={4}
+                maxLength={5000}
+                placeholder={isAr ? "ما الذي يميز هذه الفعالية؟ البرنامج، الضيوف، ما يجب إحضاره…" : "What's this event about? Programme, guests, what to bring…"}
+                value={form.description}
+                onChange={(e) => setForm((f) => ({ ...f, description: e.target.value }))}
+              />
+            </div>
+
+            {/* Ticket limits per type */}
+            <fieldset className="space-y-2">
+              <legend className="text-sm font-medium">
+                {isAr ? "التذاكر حسب النوع" : "Tickets by type"}
+              </legend>
+              <p className="text-xs text-muted-foreground">
+                {isAr
+                  ? "اترك المقاعد فارغة لعدد غير محدود، أو 0 لإيقاف هذا النوع. اترك الحد الأقصى فارغاً لاستخدام الافتراضي (6)."
+                  : "Leave seats empty for unlimited, or 0 to turn a type off. Leave max per booking empty for the default (6)."}
+              </p>
+              <div className="rounded-md border border-border overflow-hidden">
+                <div className="grid grid-cols-[1fr_96px_96px] gap-2 px-3 py-2 bg-muted/40 text-[11px] font-medium uppercase tracking-wide text-muted-foreground">
+                  <span>{isAr ? "النوع" : "Type"}</span>
+                  <span>{isAr ? "المقاعد" : "Seats"}</span>
+                  <span>{isAr ? "لكل حجز" : "Per booking"}</span>
+                </div>
+                {TICKET_TYPES.map((tt) => {
+                  const capKey = `capacity_${tt.key}` as const;
+                  const maxKey = `max_per_booking_${tt.key}` as const;
+                  const label = isAr ? tt.ar : tt.en;
+                  return (
+                    <div key={tt.key} className="grid grid-cols-[1fr_96px_96px] gap-2 items-center px-3 py-2 border-t border-border">
+                      <span className="text-sm text-foreground">{label}</span>
+                      <Input
+                        type="number"
+                        min="0"
+                        step="1"
+                        inputMode="numeric"
+                        dir="ltr"
+                        placeholder="∞"
+                        aria-label={`${label} — ${isAr ? "المقاعد" : "seats"}`}
+                        value={form[capKey]}
+                        onChange={(e) => setForm((f) => ({ ...f, [capKey]: e.target.value }))}
+                        className="h-9"
+                      />
+                      <Input
+                        type="number"
+                        min="1"
+                        max="1000"
+                        step="1"
+                        inputMode="numeric"
+                        dir="ltr"
+                        placeholder="6"
+                        aria-label={`${label} — ${isAr ? "الحد الأقصى لكل حجز" : "max per booking"}`}
+                        value={form[maxKey]}
+                        onChange={(e) => setForm((f) => ({ ...f, [maxKey]: e.target.value }))}
+                        className="h-9"
+                      />
+                    </div>
+                  );
+                })}
+              </div>
+            </fieldset>
 
             {formError && (
               <div className="flex items-start gap-2 p-3 bg-destructive/10 border border-destructive/20 rounded-md text-sm text-destructive">
