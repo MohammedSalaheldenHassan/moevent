@@ -67,12 +67,11 @@ router.post("/issue-ticket", requireAdmin, async (req, res) => {
       qrBuffer,
     });
 
-    // 3. Send email over SMTP
+    // 3. Send the email
     const shortId = ticketId.slice(0, 8).toUpperCase();
 
     try {
-      await mailer.transport.sendMail({
-        from: mailer.from,
+      await mailer.send({
         to: customerEmail.trim(),
         subject: `Your ticket for ${eventName} – #${shortId}`,
         html: buildEmailHtml({ customerName, eventName, ticketIds: [ticketId] }),

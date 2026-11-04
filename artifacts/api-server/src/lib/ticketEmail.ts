@@ -242,23 +242,76 @@ export function buildEmailHtml({
 </html>`;
 }
 
-// ── SMTP transport ─────────────────────────────────────────────────────────────
-// Defaults to Gmail. SMTP_USER is the mailbox, SMTP_PASS its app password,
-// SMTP_FROM the display sender (e.g. "MoEvent <moevent.tickets@gmail.com>").
+// ── Mail transport ─────────────────────────────────────────────────────────────
+// Two options:
+//  • BREVO_API_KEY (+ MAIL_FROM): sends over HTTPS through Brevo's API. Use this
+//    on hosts that block outgoing SMTP (Railway Free/Hobby blocks ports 25/465/587).
+//  • SMTP_USER / SMTP_PASS (+ SMTP_FROM): plain SMTP, Gmail by default.
+// MAIL_FROM / SMTP_FROM look like "MoEvent <moevent.tickets@gmail.com>".
 
-export function getMailer() {
+export type MailMessage = {
+  to: string;
+  subject: string;
+  html: string;
+  attachments: { filename: string; content: Buffer; contentType: string }[];
+};
+
+export type Mailer = { send: (msg: MailMessage) => Promise<void> };
+
+function parseFrom(from: string): { name?: string; email: string } {
+  // Accepts "Name <a@b.com>", "Name a@b.com" or just "a@b.com".
+  const email = /[^\s<>"]+@[^\s<>"]+/.exec(from)?.[0] ?? from.trim();
+  const name = from.replace(email, "").replace(/[<>"]/g, "").trim();
+  return name ? { name, email } : { email };
+}
+
+export function getMailer(): Mailer | null {
+  const brevoKey = process.env["BREVO_API_KEY"]?.trim();
+  if (brevoKey) {
+    const from = process.env["MAIL_FROM"] || process.env["SMTP_FROM"] || process.env["SMTP_USER"];
+    if (!from) return null;
+    const sender = parseFrom(from);
+    return {
+      async send(msg) {
+        const res = await fetch("https://api.brevo.com/v3/smtp/email", {
+          method: "POST",
+          headers: { "api-key": brevoKey, "content-type": "application/json", accept: "application/json" },
+          body: JSON.stringify({
+            sender,
+            to: [{ email: msg.to }],
+            subject: msg.subject,
+            htmlContent: msg.html,
+            attachment: msg.attachments.map((a) => ({ name: a.filename, content: a.content.toString("base64") })),
+          }),
+          signal: AbortSignal.timeout(20_000),
+        });
+        if (!res.ok) {
+          const detail = (await res.text().catch(() => "")).slice(0, 300);
+          throw new Error(`Brevo API ${res.status}: ${detail}`);
+        }
+      },
+    };
+  }
+
   const user = process.env["SMTP_USER"];
   const pass = process.env["SMTP_PASS"];
   if (!user || !pass) return null;
   const port = Number(process.env["SMTP_PORT"] ?? 465);
+  const from = process.env["SMTP_FROM"] || user;
+  const transport = nodemailer.createTransport({
+    host: process.env["SMTP_HOST"] ?? "smtp.gmail.com",
+    port,
+    secure: port === 465,
+    auth: { user, pass },
+    // Fail fast instead of hanging a booking for minutes when SMTP is blocked.
+    connectionTimeout: 10_000,
+    greetingTimeout: 10_000,
+    socketTimeout: 20_000,
+  });
   return {
-    from: process.env["SMTP_FROM"] || user,
-    transport: nodemailer.createTransport({
-      host: process.env["SMTP_HOST"] ?? "smtp.gmail.com",
-      port,
-      secure: port === 465,
-      auth: { user, pass },
-    }),
+    async send(msg) {
+      await transport.sendMail({ from, ...msg });
+    },
   };
 }
 
@@ -294,8 +347,7 @@ export async function sendTicketsEmail({
   );
 
   const first = ticketIds[0]!.slice(0, 8).toUpperCase();
-  await mailer.transport.sendMail({
-    from: mailer.from,
+  await mailer.send({
     to,
     subject:
       ticketIds.length > 1
