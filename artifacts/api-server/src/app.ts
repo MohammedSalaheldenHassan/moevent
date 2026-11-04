@@ -42,13 +42,17 @@ const allowedOrigins = (process.env["CORS_ORIGINS"] ?? "")
   .filter(Boolean);
 const isProduction = process.env["NODE_ENV"] === "production";
 if (allowedOrigins.length === 0) {
-  // Production: same-origin only (site + dashboard are served behind the same
-  // proxy as /api). Development: any origin, for the Vite dev servers.
-  logger.warn(
-    isProduction
-      ? "CORS_ORIGINS is not set; cross-origin requests are refused"
-      : "CORS_ORIGINS is not set; accepting requests from any origin (development)",
-  );
+  // Production: refuse cross-origin calls rather than allow every website.
+  // On Railway the site and dashboard are separate origins, so CORS_ORIGINS
+  // must list them. Development: any origin, for the Vite dev servers.
+  if (isProduction) {
+    logger.error(
+      "CORS_ORIGINS is not set: browsers on other origins (the public site and dashboard on Railway) can't call this API. " +
+        "Set CORS_ORIGINS=https://<site-domain>,https://<dashboard-domain>",
+    );
+  } else {
+    logger.warn("CORS_ORIGINS is not set; accepting requests from any origin (development)");
+  }
 }
 app.use(cors({ origin: allowedOrigins.length > 0 ? allowedOrigins : !isProduction }));
 
