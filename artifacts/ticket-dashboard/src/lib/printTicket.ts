@@ -44,7 +44,7 @@ export function printTicket({
   if (!win) return;
   const isAr = lang === "ar";
   const esc = (v: string | null | undefined) => escapeHtml(v ?? "");
-  const logo = logoUrl && isImageUrl(logoUrl) ? `<img class="logo" src="${esc(logoUrl)}" alt="" />` : "";
+  const logo = `<img class="logo" src="${esc(logoUrl && isImageUrl(logoUrl) ? logoUrl : `${window.location.origin}/logo.png`)}" alt="" />`;
   const dateStr = event.event_date
     ? new Date(event.event_date).toLocaleDateString(isAr ? "ar" : "en-GB", { weekday: "long", day: "numeric", month: "long", year: "numeric" })
     : "";
@@ -62,11 +62,11 @@ export function printTicket({
 <head>
 <meta charset="utf-8" />
 <title>${th.label} ${isAr ? "تذكرة" : "ticket"} ${shortTicketId(ticket.id)}</title>
-<link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Sans:wght@400;500;600;700&family=IBM+Plex+Sans+Arabic:wght@400;500;600;700&family=IBM+Plex+Mono:wght@600&display=swap" rel="stylesheet">
+<link href="https://fonts.googleapis.com/css2?family=Montserrat:wght@400;500;600;700&family=Cairo:wght@400;500;600;700&display=swap" rel="stylesheet">
 <style>
   * { box-sizing: border-box; margin: 0; padding: 0; }
   html { -webkit-print-color-adjust: exact; print-color-adjust: exact; }
-  body { font-family: ${isAr ? "'IBM Plex Sans Arabic'" : "'IBM Plex Sans'"}, system-ui, sans-serif; color: #16161A; background: #EEEDE9; display: flex; justify-content: center; padding: 40px 16px; }
+  body { font-family: ${isAr ? "'Cairo'" : "'Montserrat'"}, system-ui, sans-serif; color: #0E2A4A; background: #F8F6F2; display: flex; justify-content: center; padding: 40px 16px; }
   .ticket { position: relative; width: 380px; background: #fff; border-radius: 16px; overflow: hidden; box-shadow: 0 1px 2px rgba(0,0,0,.06), 0 8px 28px rgba(0,0,0,.08); ${th.kind === "vvip" ? `outline: 1px solid ${th.accent}; outline-offset: -6px;` : ""} }
   .top { padding: 22px 24px 20px; color: #fff; background: ${header}; border-bottom: 4px solid ${th.accent}; }
   .brand { display: flex; align-items: center; justify-content: space-between; gap: 12px; margin-bottom: 18px; }
@@ -77,16 +77,16 @@ export function printTicket({
   .meta { margin-top: 8px; font-size: 12.5px; color: rgba(255,255,255,.78); line-height: 1.6; }
   .bottom { padding: 20px 24px 18px; display: flex; gap: 18px; align-items: flex-start; }
   .fields { flex: 1; min-width: 0; }
-  .label { font-size: 9.5px; font-weight: 700; letter-spacing: .1em; text-transform: uppercase; color: #85837D; margin-bottom: 2px; }
+  .label { font-size: 9.5px; font-weight: 700; letter-spacing: .1em; text-transform: uppercase; color: #5C6B7B; margin-bottom: 2px; }
   .value { font-size: 14px; font-weight: 600; margin-bottom: 12px; word-break: break-word; }
   .type { color: ${th.text}; }
   .qrbox { flex-shrink: 0; text-align: center; }
   .qr { width: 124px; height: 124px; background: #fff; border: 2px solid ${th.accent}; outline: 6px solid ${th.soft}; border-radius: 10px; padding: 6px; margin: 6px; }
-  .scan { margin-top: 6px; font-size: 8.5px; font-weight: 700; letter-spacing: .1em; color: #85837D; }
-  .stub { position: relative; display: flex; justify-content: space-between; align-items: center; gap: 12px; padding: 12px 24px 14px; border-top: 1.5px dashed #DCD9D2; background: ${th.soft}; }
-  .stub::before, .stub::after { content: ""; position: absolute; top: -9px; width: 16px; height: 16px; border-radius: 50%; background: #EEEDE9; }
+  .scan { margin-top: 6px; font-size: 8.5px; font-weight: 700; letter-spacing: .1em; color: #5C6B7B; }
+  .stub { position: relative; display: flex; justify-content: space-between; align-items: center; gap: 12px; padding: 12px 24px 14px; border-top: 1.5px dashed #E6D6C2; background: ${th.soft}; }
+  .stub::before, .stub::after { content: ""; position: absolute; top: -9px; width: 16px; height: 16px; border-radius: 50%; background: #F8F6F2; }
   .stub::before { left: -8px; } .stub::after { right: -8px; }
-  .id { font-family: 'IBM Plex Mono', monospace; font-size: 15px; font-weight: 600; letter-spacing: .06em; }
+  .id { font-family: ui-monospace, Menlo, Consolas, monospace; font-size: 15px; font-weight: 600; letter-spacing: .06em; }
   .tier { font-size: 13px; font-weight: 700; letter-spacing: .14em; color: ${th.text}; }
   @media print { body { background: #fff; padding: 0; } .ticket { box-shadow: none; border: 1px solid #ccc; } .stub::before, .stub::after { background: #fff; } }
 </style>

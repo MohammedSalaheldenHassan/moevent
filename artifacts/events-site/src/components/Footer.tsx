@@ -33,7 +33,8 @@ export function Footer() {
   const link = "inline-flex min-h-10 items-center text-sm text-ink-soft hover:text-ink hover:underline underline-offset-4";
 
   return (
-    <footer className="border-t border-line bg-surface">
+    <footer className="bg-surface">
+      <div className="h-8 bg-[url('/brand/pattern.svg')] bg-[length:auto_100%] bg-repeat-x opacity-80" aria-hidden="true" />
       <div className="mx-auto grid max-w-6xl gap-10 px-4 py-12 sm:grid-cols-2 sm:px-6 lg:grid-cols-[minmax(0,1.4fr)_repeat(3,minmax(0,1fr))]">
         <div>
           <Wordmark />
@@ -95,7 +96,7 @@ export function Footer() {
       <div className="border-t border-line">
         <div className="mx-auto flex max-w-6xl flex-wrap items-center justify-between gap-x-6 gap-y-1 px-4 py-3 text-xs text-muted sm:px-6">
           <p className="py-2">
-            © {new Date().getFullYear()} MoEvent. {t.rights}
+            © {new Date().getFullYear()} Nexus Youth. {t.rights}
           </p>
           <Link href="/privacy" className="inline-flex min-h-10 items-center hover:text-ink hover:underline underline-offset-4">
             {t.privacy}

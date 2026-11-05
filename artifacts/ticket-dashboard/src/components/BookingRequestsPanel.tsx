@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import { Link } from "wouter";
 import { supabase } from "@/lib/supabase";
 import { sendTicketsEmail } from "@/lib/sendTicketsEmail";
@@ -76,6 +76,44 @@ export function BookingRequestsPanel({
     load();
   }, [load]);
 
+  // Live updates: a request submitted on the public site appears here at once.
+  // Each panel needs its own channel, since the sidebar listens too.
+  const [live, setLive] = useState(false);
+  const [fresh, setFresh] = useState<ReadonlySet<string>>(new Set());
+  const freshTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
+  useEffect(() => {
+    const channel = supabase
+      .channel(`booking-requests-panel-${eventId ?? "all"}-${Date.now()}`)
+      .on(
+        "postgres_changes",
+        { event: "*", schema: "public", table: "booking_requests", ...(eventId ? { filter: `event_id=eq.${eventId}` } : {}) },
+        (payload) => {
+          if (payload.eventType === "INSERT") {
+            const id = (payload.new as { id: string }).id;
+            setFresh((cur) => new Set(cur).add(id));
+            if (freshTimer.current) clearTimeout(freshTimer.current);
+            freshTimer.current = setTimeout(() => setFresh(new Set()), 6000);
+          }
+          void load();
+        },
+      )
+      .subscribe((status) => {
+        setLive(status === "SUBSCRIBED");
+        // Catch anything missed while disconnected.
+        if (status === "SUBSCRIBED") void load();
+      });
+    // Phones and laptops drop the socket while asleep; refresh on return.
+    const onVisible = () => {
+      if (document.visibilityState === "visible") void load();
+    };
+    document.addEventListener("visibilitychange", onVisible);
+    return () => {
+      document.removeEventListener("visibilitychange", onVisible);
+      if (freshTimer.current) clearTimeout(freshTimer.current);
+      void supabase.removeChannel(channel);
+    };
+  }, [eventId, load]);
+
   const approve = async (r: BookingRequest) => {
     setBusy(r.id);
     setError(null);
@@ -142,6 +180,15 @@ export function BookingRequestsPanel({
         <h2 id="requests-heading" className="text-sm font-semibold text-foreground flex items-center gap-2">
           <Building2 className="w-4 h-4 text-muted-foreground" />
           {isAr ? "طلبات المؤسسات" : "Organization requests"}
+          {live && (
+            <span className="inline-flex items-center gap-1.5 rounded-full bg-emerald-600/10 px-2 py-0.5 text-[11px] font-medium text-emerald-700 dark:text-emerald-400">
+              <span className="relative flex w-1.5 h-1.5">
+                <span className="absolute inline-flex h-full w-full animate-ping rounded-full bg-emerald-500 opacity-75" />
+                <span className="relative inline-flex h-1.5 w-1.5 rounded-full bg-emerald-500" />
+              </span>
+              {isAr ? "مباشر" : "Live"}
+            </span>
+          )}
         </h2>
         {pending.length > 0 && (
           <span className="text-xs font-medium rounded px-2 py-0.5 bg-amber-500/10 text-amber-700 dark:text-amber-400 tabular-nums">
@@ -177,7 +224,13 @@ export function BookingRequestsPanel({
           {ordered.map((r) => {
             const s = STATUS[r.status];
             return (
-              <li key={r.id} className="px-5 py-4 flex flex-col gap-3 lg:flex-row lg:items-center lg:justify-between">
+              <li
+                key={r.id}
+                className={cn(
+                  "px-5 py-4 flex flex-col gap-3 lg:flex-row lg:items-center lg:justify-between transition-colors duration-700",
+                  fresh.has(r.id) && "bg-amber-500/10",
+                )}
+              >
                 <div className="min-w-0 space-y-1">
                   {!eventId && (
                     <Link href={`/events/${r.event_id}`} className="text-xs font-medium text-muted-foreground hover:text-foreground hover:underline">

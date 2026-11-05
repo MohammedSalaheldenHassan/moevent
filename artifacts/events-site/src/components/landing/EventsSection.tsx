@@ -132,7 +132,7 @@ export function EventsSection({
             title={t.loadError}
             body={error}
             action={
-              <button type="button" onClick={onRetry} className="h-10 rounded-md bg-btn px-4 text-sm font-medium text-on-btn hover:bg-accent hover:text-white">
+              <button type="button" onClick={onRetry} className="h-10 rounded-md bg-btn px-4 text-sm font-medium text-on-btn hover:bg-accent-hover hover:text-on-accent">
                 {t.retry}
               </button>
             }

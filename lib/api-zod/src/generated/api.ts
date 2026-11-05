@@ -33,6 +33,10 @@ export const GetPublicStatsResponse = zod.object({
  * @summary Book tickets (Student / Regular) or request an Organization booking
  */
 
+export const createBookingBodyUniversityMax = 120;
+
+export const createBookingBodyMajorMax = 120;
+
 export const CreateBookingBody = zod.object({
   eventId: zod.string().uuid(),
   attendeeType: zod.enum(["student", "regular", "organization"]),
@@ -41,6 +45,16 @@ export const CreateBookingBody = zod.object({
   email: zod.string(),
   quantity: zod.number().min(1),
   companyUrl: zod.string().optional().describe("Required for organization"),
+  university: zod
+    .string()
+    .max(createBookingBodyUniversityMax)
+    .optional()
+    .describe("Required for student"),
+  major: zod
+    .string()
+    .max(createBookingBodyMajorMax)
+    .optional()
+    .describe("Required for student"),
   captchaToken: zod
     .string()
     .optional()

@@ -39,6 +39,16 @@ export interface BookingRequest {
   quantity: number;
   /** Required for organization */
   companyUrl?: string;
+  /**
+   * Required for student
+   * @maxLength 120
+   */
+  university?: string;
+  /**
+   * Required for student
+   * @maxLength 120
+   */
+  major?: string;
   /** Cloudflare Turnstile token, when enabled */
   captchaToken?: string;
 }

@@ -126,6 +126,14 @@ components:
         companyUrl:
           type: string
           description: Required for organization
+        university:
+          type: string
+          maxLength: 120
+          description: Required for student
+        major:
+          type: string
+          maxLength: 120
+          description: Required for student
         captchaToken:
           type: string
           description: Cloudflare Turnstile token, when enabled

@@ -44,7 +44,7 @@ export function downloadIcs(e: PublicEvent, pageUrl: string): void {
   const ics = [
     "BEGIN:VCALENDAR",
     "VERSION:2.0",
-    "PRODID:-//MoEvent//Events//EN",
+    "PRODID:-//NexusYouth//Events//EN",
     "BEGIN:VEVENT",
     `UID:${e.id}@moevent`,
     `DTSTAMP:${new Date().toISOString().replace(/[-:]/g, "").slice(0, 15)}Z`,

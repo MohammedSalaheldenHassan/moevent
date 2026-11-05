@@ -4,7 +4,7 @@ import { ticketTheme, type TicketTheme } from "./ticketTheme";
 
 export { generateTicketPDF } from "./ticketPdf";
 
-const BRAND = () => process.env["BRAND_NAME"]?.trim() || "MoEvent";
+const BRAND = () => process.env["BRAND_NAME"]?.trim() || "Nexus Youth";
 
 export interface EmailEvent {
   id?: string;
@@ -68,15 +68,17 @@ export function buildEmailHtml({
   const maps = mapsUrl(event);
   const link = eventUrl(event);
   const year = new Date().getUTCFullYear();
-  const font = "-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,Helvetica,Arial,sans-serif";
-  const tierText = th.kind === "vvip" ? "#8A6D0E" : th.dark2;
+  const font = "Montserrat,-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,Helvetica,Arial,sans-serif";
+  const tierText = th.text;
+  const site = process.env["PUBLIC_SITE_URL"]?.trim().replace(/\/+$/, "");
+  const logo = site && /^https:\/\//.test(site) ? `${site}/brand/logo-email.png` : null;
 
   const preheader = `${many ? `Your ${tickets.length} tickets are` : "Your ticket is"} attached. Show the QR code at the entrance.`;
 
   const row = (label: string, value: string, extra = "") => `
               <tr>
-                <td style="padding:12px 0;border-bottom:1px solid #ECEAE5;font:600 11px/1.4 ${font};letter-spacing:.08em;text-transform:uppercase;color:#8A8882;width:38%;vertical-align:top;">${label}</td>
-                <td style="padding:12px 0;border-bottom:1px solid #ECEAE5;font:500 15px/1.45 ${font};color:#16161A;vertical-align:top;">${value}${extra}</td>
+                <td style="padding:12px 0;border-bottom:1px solid #EFE9DF;font:600 11px/1.4 ${font};letter-spacing:.08em;text-transform:uppercase;color:#5C6B7B;width:38%;vertical-align:top;">${label}</td>
+                <td style="padding:12px 0;border-bottom:1px solid #EFE9DF;font:500 15px/1.45 ${font};color:#0E2A4A;vertical-align:top;">${value}${extra}</td>
               </tr>`;
 
   const ticketRows = tickets
@@ -84,8 +86,8 @@ export function buildEmailHtml({
       const tt = ticketTheme(t.attendeeType);
       return `
               <tr>
-                <td style="padding:10px 14px;border-top:${i ? "1px solid #ECEAE5" : "0"};font:600 16px/1.3 'SFMono-Regular',Menlo,Consolas,monospace;letter-spacing:.06em;color:#16161A;">#${shortTicketId(t.id)}</td>
-                <td align="right" style="padding:10px 14px;border-top:${i ? "1px solid #ECEAE5" : "0"};">
+                <td style="padding:10px 14px;border-top:${i ? "1px solid #EFE9DF" : "0"};font:600 16px/1.3 'SFMono-Regular',Menlo,Consolas,monospace;letter-spacing:.06em;color:#0E2A4A;">#${shortTicketId(t.id)}</td>
+                <td align="right" style="padding:10px 14px;border-top:${i ? "1px solid #EFE9DF" : "0"};">
                   <span style="display:inline-block;padding:4px 10px;border-radius:999px;background:${tt.accent};color:${tt.onAccent};font:700 11px/1.2 ${font};letter-spacing:.12em;">${tt.premium ? "&#9733; " : ""}${tt.label}</span>
                 </td>
               </tr>`;
@@ -97,12 +99,12 @@ export function buildEmailHtml({
                 <td width="34" style="padding:6px 0;vertical-align:top;">
                   <div style="width:24px;height:24px;border-radius:12px;background:${th.soft};color:${tierText};font:700 12px/24px ${font};text-align:center;">${n}</div>
                 </td>
-                <td style="padding:6px 0;font:400 14px/1.55 ${font};color:#3D3C38;vertical-align:top;">${text}</td>
+                <td style="padding:6px 0;font:400 14px/1.55 ${font};color:#33475E;vertical-align:top;">${text}</td>
               </tr>`;
 
   const button = (href: string, label: string, primary: boolean) =>
     `<a href="${escapeHtml(href)}" target="_blank" style="display:inline-block;margin:4px 6px 4px 0;padding:12px 20px;border-radius:10px;font:600 14px/1 ${font};text-decoration:none;${
-      primary ? `background:${th.dark};color:#FFFFFF;` : `background:#FFFFFF;color:#16161A;border:1px solid #DAD8D2;`
+      primary ? `background:#0E2A4A;color:#FFFFFF;` : `background:#FFFFFF;color:#0E2A4A;border:1px solid #CFC4B2;`
     }">${label}</a>`;
 
   return `<!DOCTYPE html>
@@ -113,24 +115,25 @@ export function buildEmailHtml({
   <meta name="color-scheme" content="light only">
   <title>${many ? "Your tickets" : "Your ticket"} – ${title}</title>
 </head>
-<body style="margin:0;padding:0;background:#F2F1EE;-webkit-text-size-adjust:100%;">
+<body style="margin:0;padding:0;background:#F8F6F2;-webkit-text-size-adjust:100%;">
   <div style="display:none;max-height:0;overflow:hidden;opacity:0;color:transparent;">${escapeHtml(preheader)}</div>
-  <table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0" style="background:#F2F1EE;">
+  <table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0" style="background:#F8F6F2;">
     <tr>
       <td align="center" style="padding:28px 12px 40px;">
         <table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0" style="max-width:560px;">
 
           <!-- Brand -->
           <tr>
-            <td style="padding:0 6px 16px;font:700 15px/1 ${font};color:#16161A;">
-              <span style="display:inline-block;width:22px;height:22px;border-radius:6px;background:#E03A0C;color:#fff;font:800 13px/22px ${font};text-align:center;vertical-align:middle;">${brand.charAt(0)}</span>
-              <span style="vertical-align:middle;margin-left:6px;">${brand}</span>
+            <td style="padding:0 6px 16px;">
+              ${logo
+                ? `<img src="${escapeHtml(logo)}" width="146" height="36" alt="${brand}" style="display:block;border:0;">`
+                : `<span style="font:800 18px/1 ${font};color:#0E2A4A;">${brand}</span>`}
             </td>
           </tr>
 
           <!-- Card -->
           <tr>
-            <td style="background:#FFFFFF;border-radius:18px;overflow:hidden;border:1px solid #E4E2DC;">
+            <td style="background:#FFFFFF;border-radius:18px;overflow:hidden;border:1px solid #E8E1D6;">
               <table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0">
 
                 <!-- Hero -->
@@ -160,7 +163,7 @@ export function buildEmailHtml({
                 <!-- Ticket numbers -->
                 <tr>
                   <td style="padding:20px 28px 4px;">
-                    <p style="margin:0 0 8px;font:600 11px/1.4 ${font};letter-spacing:.08em;text-transform:uppercase;color:#8A8882;">${many ? "Your tickets" : "Your ticket"}</p>
+                    <p style="margin:0 0 8px;font:600 11px/1.4 ${font};letter-spacing:.08em;text-transform:uppercase;color:#5C6B7B;">${many ? "Your tickets" : "Your ticket"}</p>
                     <table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0" style="background:${th.soft};border-radius:12px;border-left:4px solid ${th.accent};">
                       ${ticketRows}
                     </table>
@@ -170,7 +173,7 @@ export function buildEmailHtml({
                 <!-- How to enter -->
                 <tr>
                   <td style="padding:22px 28px 6px;">
-                    <p style="margin:0 0 6px;font:700 16px/1.4 ${font};color:#16161A;">At the entrance</p>
+                    <p style="margin:0 0 6px;font:700 16px/1.4 ${font};color:#0E2A4A;">At the entrance</p>
                     <table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0">
                       ${step(1, `Open the attached PDF ${many ? "tickets" : "ticket"} &mdash; on your phone or printed.`)}
                       ${step(2, `Show the QR code to the staff at the door. ${many ? "Each guest needs their own ticket." : ""}`)}
@@ -188,7 +191,7 @@ export function buildEmailHtml({
                 </tr>` : ""}
 
                 <tr>
-                  <td style="padding:18px 28px 26px;font:400 13px/1.6 ${font};color:#8A8882;">
+                  <td style="padding:18px 28px 26px;font:400 13px/1.6 ${font};color:#5C6B7B;">
                     Can't attend or something's wrong? Just reply to this email and we'll help.
                   </td>
                 </tr>
@@ -198,7 +201,7 @@ export function buildEmailHtml({
 
           <!-- Footer -->
           <tr>
-            <td align="center" style="padding:18px 12px 0;font:400 12px/1.6 ${font};color:#A3A19A;">
+            <td align="center" style="padding:18px 12px 0;font:400 12px/1.6 ${font};color:#8C97A3;">
               You received this email because a ticket was booked with this address.<br>
               &copy; ${year} ${brand}
             </td>
@@ -216,7 +219,7 @@ export function buildEmailHtml({
 //  • BREVO_API_KEY (+ MAIL_FROM): sends over HTTPS through Brevo's API. Use this
 //    on hosts that block outgoing SMTP (Railway Free/Hobby blocks ports 25/465/587).
 //  • SMTP_USER / SMTP_PASS (+ SMTP_FROM): plain SMTP, Gmail by default.
-// MAIL_FROM / SMTP_FROM look like "MoEvent <moevent.tickets@gmail.com>".
+// MAIL_FROM / SMTP_FROM look like "Nexus Youth <tickets@gmail.com>".
 
 export type MailMessage = {
   to: string;

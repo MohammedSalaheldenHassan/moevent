@@ -34,7 +34,7 @@ function AppLayout({ children }: { children: React.ReactNode }) {
 
   // Update page title with system name
   useEffect(() => {
-    document.title = systemName || "TicketHub";
+    document.title = systemName || "Nexus Youth";
   }, [systemName]);
 
   return (

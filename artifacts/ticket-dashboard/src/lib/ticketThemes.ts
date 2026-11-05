@@ -22,22 +22,22 @@ export const TICKET_THEMES: Record<TicketKind, TicketTheme> = {
   student: {
     kind: "student", label: "STUDENT", name: { en: "Student", ar: "طالب" },
     tagline: { en: "Student admission", ar: "دخول طالب" },
-    dark: "#0B1F4D", dark2: "#1D4ED8", accent: "#3B82F6", onAccent: "#FFFFFF", soft: "#EAF1FF", text: "#1D4ED8", premium: false,
+    dark: "#0B3B3B", dark2: "#1F7A7A", accent: "#4FBDB3", onAccent: "#0B3B3B", soft: "#E2F1F0", text: "#1F7A7A", premium: false,
   },
   regular: {
     kind: "regular", label: "REGULAR", name: { en: "Regular", ar: "عادي" },
     tagline: { en: "General admission", ar: "دخول عام" },
-    dark: "#2B0F06", dark2: "#B2300A", accent: "#E03A0C", onAccent: "#FFFFFF", soft: "#FDEDE6", text: "#B2300A", premium: false,
+    dark: "#0E2A4A", dark2: "#1C4C80", accent: "#8DB4DB", onAccent: "#0E2A4A", soft: "#E8EEF5", text: "#1C4C80", premium: false,
   },
   organization: {
     kind: "organization", label: "ORGANIZATION", name: { en: "Organization", ar: "مؤسسة" },
     tagline: { en: "Organization admission", ar: "دخول مؤسسة" },
-    dark: "#042F2C", dark2: "#0F766E", accent: "#14B8A6", onAccent: "#042F2C", soft: "#E3F8F5", text: "#0F766E", premium: false,
+    dark: "#2A3A4A", dark2: "#4C6073", accent: "#E6D6C2", onAccent: "#2A3A4A", soft: "#F3ECE2", text: "#4C6073", premium: false,
   },
   vip: {
     kind: "vip", label: "VIP", name: { en: "VIP", ar: "VIP" },
     tagline: { en: "VIP access", ar: "دخول VIP" },
-    dark: "#1E0B45", dark2: "#6D28D9", accent: "#A78BFA", onAccent: "#1E0B45", soft: "#F1ECFE", text: "#6D28D9", premium: true,
+    dark: "#5A3113", dark2: "#C47A3F", accent: "#F2D7B8", onAccent: "#5A3113", soft: "#F7EBDF", text: "#9A5A26", premium: true,
   },
   vvip: {
     kind: "vvip", label: "VVIP", name: { en: "VVIP", ar: "VVIP" },
@@ -53,3 +53,61 @@ export function ticketTheme(type: string | null | undefined): TicketTheme {
 /** Types the dashboard can issue; the rest are booked on the public site. */
 export const ISSUABLE_TYPES = ["vip", "vvip"] as const;
 export type IssuableType = (typeof ISSUABLE_TYPES)[number];
+
+// ── Counts by ticket type ─────────────────────────────────────────────────────
+
+export const TYPE_ORDER: TicketKind[] = ["student", "regular", "organization", "vip", "vvip"];
+
+export const typeLabel = (type: TicketKind | null, lang: "en" | "ar") =>
+  type ? TICKET_THEMES[type].name[lang] : lang === "ar" ? "غير محدد" : "Not set";
+
+/** Admin-set seat limits on the event; null = no limit. VIP and VVIP never have one. */
+export interface EventCapacities {
+  capacity_student?: number | null;
+  capacity_regular?: number | null;
+  capacity_organization?: number | null;
+}
+
+export interface TypeSummaryRow {
+  type: TicketKind | null;
+  total: number;
+  scanned: number;
+  capacity: number | null;
+  left: number | null;
+}
+
+/**
+ * Every public type and every type actually sold; VIP / VVIP and untyped older
+ * tickets only appear once there's at least one.
+ */
+export function summarizeTypes(
+  tickets: { attendee_type: TicketKind | null; is_scanned: boolean | null }[],
+  event: EventCapacities,
+): { rows: TypeSummaryRow[]; total: number; scanned: number } {
+  const counts = new Map<TicketKind | null, { total: number; scanned: number }>();
+  for (const t of tickets) {
+    const c = counts.get(t.attendee_type) ?? { total: 0, scanned: 0 };
+    c.total += 1;
+    if (t.is_scanned) c.scanned += 1;
+    counts.set(t.attendee_type, c);
+  }
+  const capacityOf = (type: TicketKind | null): number | null =>
+    type === "student" ? event.capacity_student ?? null
+    : type === "regular" ? event.capacity_regular ?? null
+    : type === "organization" ? event.capacity_organization ?? null
+    : null;
+  const types: (TicketKind | null)[] = TYPE_ORDER.filter(
+    (t) => t === "student" || t === "regular" || t === "organization" || counts.has(t),
+  );
+  if (counts.has(null)) types.push(null);
+  const rows = types.map((type) => {
+    const c = counts.get(type) ?? { total: 0, scanned: 0 };
+    const capacity = capacityOf(type);
+    return { type, ...c, capacity, left: capacity == null ? null : Math.max(0, capacity - c.total) };
+  });
+  return {
+    rows,
+    total: tickets.length,
+    scanned: tickets.reduce((n, t) => n + (t.is_scanned ? 1 : 0), 0),
+  };
+}

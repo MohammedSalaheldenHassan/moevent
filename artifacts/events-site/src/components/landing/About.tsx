@@ -10,7 +10,7 @@ export function About() {
     <section id="about" aria-labelledby="about-title" className="mx-auto max-w-6xl px-4 pt-20 sm:px-6">
       <div className="grid gap-10 lg:grid-cols-[minmax(0,1fr)_minmax(0,1.1fr)] lg:gap-16">
         <div>
-          <p className="text-sm font-semibold text-accent">{t.aboutEyebrow}</p>
+          <p className="text-sm font-semibold text-copper-ink">{t.aboutEyebrow}</p>
           <h2 id="about-title" className="mt-1 text-2xl font-semibold tracking-tight sm:text-3xl">
             {t.aboutTitle}
           </h2>

@@ -16,7 +16,7 @@ export function SectionHeader({
   return (
     <div className="flex flex-col gap-4 sm:flex-row sm:items-end sm:justify-between">
       <div className="max-w-2xl">
-        {eyebrow && <p className="text-sm font-semibold text-accent">{eyebrow}</p>}
+        {eyebrow && <p className="text-sm font-semibold text-copper-ink">{eyebrow}</p>}
         <h2 id={id} className="mt-1 text-2xl font-semibold tracking-tight sm:text-3xl">
           {title}
         </h2>

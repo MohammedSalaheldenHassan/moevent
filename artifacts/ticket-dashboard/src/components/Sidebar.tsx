@@ -17,6 +17,7 @@ import {
   Building2,
 } from "lucide-react";
 import { useEffect, useState } from "react";
+import { useToast } from "@/hooks/use-toast";
 import { supabase } from "@/lib/supabase";
 
 export function Sidebar() {
@@ -26,6 +27,7 @@ export function Sidebar() {
   const { systemName, systemLogo } = useBranding();
   const [mobileOpen, setMobileOpen] = useState(false);
 
+  const { toast } = useToast();
   const displayName = systemName || t.appName;
   const displayLogo = systemLogo || "/logo.png";
   const isImageLogo = displayLogo.startsWith("data:") || displayLogo.startsWith("http") || displayLogo.startsWith("/");
@@ -42,6 +44,34 @@ export function Sidebar() {
       .eq("status", "pending")
       .then(({ count }) => setPendingRequests(count ?? 0));
   }, [isAdmin, location]);
+
+  // Live: update the badge and announce new requests on whichever page is open.
+  useEffect(() => {
+    if (!isAdmin) return;
+    const refresh = () => {
+      void supabase
+        .from("booking_requests")
+        .select("id", { count: "exact", head: true })
+        .eq("status", "pending")
+        .then(({ count }) => setPendingRequests(count ?? 0));
+    };
+    const channel = supabase
+      .channel(`booking-requests-sidebar-${Date.now()}`)
+      .on("postgres_changes", { event: "*", schema: "public", table: "booking_requests" }, (payload) => {
+        refresh();
+        if (payload.eventType === "INSERT") {
+          const r = payload.new as { customer_name?: string; quantity?: number };
+          toast({
+            title: lang === "ar" ? "طلب مؤسسة جديد" : "New organization request",
+            description: `${r.customer_name ?? ""} · ${r.quantity ?? 1} ${lang === "ar" ? "تذاكر" : (r.quantity === 1 ? "ticket" : "tickets")}`,
+          });
+        }
+      })
+      .subscribe();
+    return () => {
+      void supabase.removeChannel(channel);
+    };
+  }, [isAdmin, lang, toast]);
 
   const navItems: { href: string; label: string; icon: React.ElementType; badge?: number }[] = [
     { href: "/", label: t.dashboard, icon: LayoutDashboard },
@@ -86,10 +116,10 @@ export function Sidebar() {
               : "border-transparent text-sidebar-foreground/65 hover:text-sidebar-foreground hover:bg-sidebar-accent/60"
           )}
         >
-          <Icon className={cn("w-4 h-4 shrink-0", active ? "text-primary" : "")} strokeWidth={1.75} />
+          <Icon className={cn("w-4 h-4 shrink-0", active ? "text-sidebar-primary" : "")} strokeWidth={1.75} />
           <span className="flex-1">{label}</span>
           {!!badge && (
-            <span className="min-w-5 h-5 px-1.5 rounded-full bg-amber-500 text-white text-[11px] font-semibold flex items-center justify-center tabular-nums">
+            <span className="min-w-5 h-5 px-1.5 rounded-full bg-sidebar-primary text-sidebar-primary-foreground text-[11px] font-semibold flex items-center justify-center tabular-nums">
               {badge}
             </span>
           )}
@@ -113,7 +143,7 @@ export function Sidebar() {
             <img
               src={displayLogo}
               alt=""
-              className="w-8 h-8 rounded-md object-contain bg-black border border-sidebar-border shrink-0"
+              className="w-8 h-8 rounded-md object-contain border border-sidebar-border shrink-0"
             />
           ) : (
             <div className="w-8 h-8 rounded-md bg-primary text-primary-foreground flex items-center justify-center shrink-0">
