@@ -1,4 +1,5 @@
 import { useEffect, useRef, useState } from "react";
+import { ticketTheme, type TicketKind } from "@/lib/ticketThemes";
 import { useParams, useLocation } from "wouter";
 import { supabase } from "@/lib/supabase";
 import { getApiBase, getApiAuthHeaders } from "@/lib/apiBase";
@@ -34,7 +35,7 @@ interface TicketRow {
   customer_phone: string | null;
   // Set by the public booking site; null for tickets issued here.
   customer_email: string | null;
-  attendee_type: "student" | "regular" | "organization" | "vvip" | null;
+  attendee_type: TicketKind | null;
   is_scanned: boolean;
   created_at: string;
 }
@@ -43,6 +44,7 @@ const ATTENDEE_TYPE_LABELS = {
   student: { en: "Student", ar: "طالب" },
   regular: { en: "Regular", ar: "عادي" },
   organization: { en: "Organization", ar: "مؤسسة" },
+  vip: { en: "VIP", ar: "VIP" },
   vvip: { en: "VVIP", ar: "VVIP" },
 } as const;
 
@@ -705,7 +707,10 @@ export default function EventDetailPage() {
                             <p className="font-medium text-foreground truncate">{tk.customer_name}</p>
                             {tk.customer_phone && <p dir="ltr" className="text-xs text-muted-foreground truncate text-start">{tk.customer_phone}</p>}
                             {tk.attendee_type && (
-                              <span className="mt-1 inline-block rounded border border-border px-1.5 py-px text-[10px] font-medium text-muted-foreground">
+                              <span
+                                className="mt-1 inline-block rounded-full px-2 py-px text-[10px] font-semibold"
+                                style={{ background: ticketTheme(tk.attendee_type).soft, color: ticketTheme(tk.attendee_type).text }}
+                              >
                                 {ATTENDEE_TYPE_LABELS[tk.attendee_type][isAr ? "ar" : "en"]}
                               </span>
                             )}
@@ -884,7 +889,7 @@ export default function EventDetailPage() {
                     {selectedTicket.attendee_type && (
                       <div>
                         <p className="text-[10px] font-semibold uppercase tracking-wider text-muted-foreground">{isAr ? "نوع التذكرة" : "Ticket type"}</p>
-                        <p className="text-sm font-medium text-foreground">{ATTENDEE_TYPE_LABELS[selectedTicket.attendee_type][isAr ? "ar" : "en"]}</p>
+                        <p className="text-sm font-semibold" style={{ color: ticketTheme(selectedTicket.attendee_type).text }}>{ATTENDEE_TYPE_LABELS[selectedTicket.attendee_type][isAr ? "ar" : "en"]}</p>
                       </div>
                     )}
                     <div>

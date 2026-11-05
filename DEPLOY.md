@@ -32,6 +32,7 @@ Set these under each service's **Variables** tab. `https://…` values are your 
 | `BREVO_API_KEY` / `MAIL_FROM` | **Use this on Railway Free/Hobby, which blocks SMTP.** Brevo (free, 300 emails/day) → *SMTP & API → API keys*; `MAIL_FROM` = `MoEvent <address@gmail.com>`, an address verified under *Senders*. |
 | `SMTP_USER` / `SMTP_PASS` / `SMTP_FROM` | Only on a plan that allows SMTP (Railway Pro): Gmail address, its 16-character **App password**, and `MoEvent <address@gmail.com>` |
 | `TURNSTILE_SECRET_KEY` | Turnstile secret key (see step 3), recommended |
+| `PUBLIC_SITE_URL` | Optional: the site's URL (e.g. `https://ssos-ticket.up.railway.app`). Adds a **View event** button to ticket emails. |
 | `TRUST_PROXY_HOPS` | `1` (the default; Railway puts one proxy in front of the service) |
 
 Railway sets `PORT` itself.

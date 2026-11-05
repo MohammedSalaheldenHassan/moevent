@@ -9,6 +9,16 @@ const router: IRouter = Router();
 
 const UUID = /^[0-9a-f-]{36}$/i;
 
+interface EventRel {
+  id?: string;
+  title?: string;
+  event_date?: string | null;
+  location?: string | null;
+  price?: number | null;
+  latitude?: number | null;
+  longitude?: number | null;
+}
+
 interface TicketForEmail {
   id: string;
   customer_name: string | null;
@@ -16,7 +26,7 @@ interface TicketForEmail {
   attendee_type: string | null;
   created_at: string;
   event_id: string;
-  events: { title?: string } | { title?: string }[] | null;
+  events: EventRel | EventRel[] | null;
 }
 
 function getAdminClient() {
@@ -44,7 +54,7 @@ async function emailTickets(ids: string[]): Promise<{ sent: number; failed: numb
   const supabase = getAdminClient();
   const { data, error } = await supabase
     .from("tickets")
-    .select("id, customer_name, customer_email, attendee_type, created_at, event_id, events(title)")
+    .select("id, customer_name, customer_email, attendee_type, created_at, event_id, events(id, title, event_date, location, price, latitude, longitude)")
     .in("id", ids);
   if (error) throw new Error(error.message);
 
@@ -71,13 +81,21 @@ async function emailTickets(ids: string[]): Promise<{ sent: number; failed: numb
   for (const tickets of groups.values()) {
     const first = tickets[0]!;
     const rel = first.events;
-    const eventName = String((Array.isArray(rel) ? rel[0]?.title : rel?.title) ?? "Event");
+    const ev = (Array.isArray(rel) ? rel[0] : rel) ?? {};
     try {
       await sendTicketsEmail({
         to: first.customer_email!,
         customerName: String(first.customer_name ?? ""),
-        eventName,
-        ticketIds: tickets.map((t) => t.id),
+        event: {
+          id: ev.id ?? first.event_id,
+          title: String(ev.title ?? "Event"),
+          date: ev.event_date ?? null,
+          location: ev.location ?? null,
+          price: ev.price ?? null,
+          latitude: ev.latitude ?? null,
+          longitude: ev.longitude ?? null,
+        },
+        tickets: tickets.map((t) => ({ id: t.id, attendeeType: t.attendee_type })),
       });
       sent += tickets.length;
     } catch (err) {

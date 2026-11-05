@@ -7,12 +7,13 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { AlertCircle, Loader2, Printer, CheckCircle2, Ticket, CalendarDays, MapPin, QrCode, RotateCcw, Crown, Mail } from "lucide-react";
+import { AlertCircle, Loader2, Printer, CheckCircle2, CalendarDays, MapPin, QrCode, RotateCcw, Crown, Mail, Star } from "lucide-react";
 import { logActivity } from "@/lib/activityLogger";
 import { cn } from "@/lib/utils";
 import QRCode from "qrcode";
 import { printTicket, isImageUrl, shortTicketId as shortId } from "@/lib/printTicket";
 import { sendTicketsEmail } from "@/lib/sendTicketsEmail";
+import { ISSUABLE_TYPES, TICKET_THEMES, type IssuableType } from "@/lib/ticketThemes";
 
 // Same rule as the tickets_customer_email_check constraint.
 const isValidEmail = (v: string) => v.length <= 254 && /^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(v);
@@ -25,13 +26,13 @@ interface Event {
   price: number | null;
 }
 
-// The dashboard issues VVIP tickets only; public bookings cover the other types.
+// The dashboard issues VIP and VVIP tickets; public bookings cover the other types.
 interface IssuedTicket {
   id: string;
   customer_name: string;
   customer_phone: string;
   customer_email: string;
-  attendee_type: "vvip";
+  attendee_type: IssuableType;
   event: Event;
   qrDataUrl: string;
   email: "sending" | "sent" | "failed";
@@ -58,6 +59,7 @@ export default function IssueTicketPage() {
   const [events, setEvents] = useState<Event[]>([]);
   const [eventsLoading, setEventsLoading] = useState(true);
   const [form, setForm] = useState({ eventId: "", customerName: "", customerPhone: "", customerEmail: "" });
+  const [ticketType, setTicketType] = useState<IssuableType>("vip");
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [issuedTicket, setIssuedTicket] = useState<IssuedTicket | null>(null);
@@ -129,7 +131,7 @@ export default function IssueTicketPage() {
           customer_name: form.customerName.trim(),
           customer_phone: form.customerPhone.trim(),
           customer_email: form.customerEmail.trim(),
-          attendee_type: "vvip",
+          attendee_type: ticketType,
           is_scanned: false,
         })
         .select("id, customer_name, customer_phone, customer_email")
@@ -146,11 +148,11 @@ export default function IssueTicketPage() {
 
       const issued: IssuedTicket = {
         id: data.id, customer_name: data.customer_name, customer_phone: data.customer_phone,
-        customer_email: data.customer_email, attendee_type: "vvip", event, qrDataUrl, email: "sending",
+        customer_email: data.customer_email, attendee_type: ticketType, event, qrDataUrl, email: "sending",
       };
       setIssuedTicket(issued);
       setForm({ eventId: form.eventId, customerName: "", customerPhone: "", customerEmail: "" });
-      logActivity("ticket_issued", `VVIP · ${data.customer_name} — ${event.title}`, profile?.email ?? undefined);
+      logActivity("ticket_issued", `${TICKET_THEMES[ticketType].label} · ${data.customer_name} — ${event.title}`, profile?.email ?? undefined);
       // Like public bookings, the ticket goes straight to the guest's email.
       void emailTicket(issued);
     } catch (err: unknown) {
@@ -193,6 +195,9 @@ export default function IssueTicketPage() {
     ? { event: issuedTicket.event, customerName: issuedTicket.customer_name, customerPhone: issuedTicket.customer_phone, customerEmail: issuedTicket.customer_email, id: issuedTicket.id, qrDataUrl: issuedTicket.qrDataUrl }
     : { event: selectedEvent, customerName: form.customerName.trim(), customerPhone: form.customerPhone.trim(), customerEmail: form.customerEmail.trim() };
 
+  // Theme of the ticket shown in the preview.
+  const pth = TICKET_THEMES[issuedTicket?.attendee_type ?? ticketType];
+
   const SectionHeading = ({ step, title, hint }: { step: number; title: string; hint: string }) => (
     <div className="flex items-start gap-3">
       <span className="w-6 h-6 rounded-full border border-border text-xs font-medium text-muted-foreground flex items-center justify-center shrink-0 tabular-nums">
@@ -211,15 +216,11 @@ export default function IssueTicketPage() {
       <div className="border-b border-border pb-5">
         <h1 className="text-2xl font-semibold tracking-tight text-foreground flex items-center gap-2.5">
           {t.issueTicketTitle}
-          <span className="inline-flex items-center gap-1 rounded-md bg-amber-500/15 px-2 py-0.5 text-xs font-semibold text-amber-700 dark:text-amber-400">
-            <Crown className="w-3.5 h-3.5" />
-            VVIP
-          </span>
         </h1>
         <p className="text-sm text-muted-foreground mt-1">
           {isAr
-            ? "تصدر من هنا تذاكر VVIP فقط. تُرسل التذكرة إلى بريد الضيف فور إصدارها. تذاكر الطلاب والعاديين والمؤسسات تُحجز من الموقع العام."
-            : "Issue VVIP tickets only. The ticket is emailed to the guest as soon as it's issued. Student, Regular and Organization tickets are booked on the public site."}
+            ? "تصدر من هنا تذاكر VIP و VVIP. تُرسل التذكرة إلى بريد الضيف فور إصدارها. تذاكر الطلاب والعاديين والمؤسسات تُحجز من الموقع العام."
+            : "Issue VIP and VVIP tickets. The ticket is emailed to the guest as soon as it's issued. Student, Regular and Organization tickets are booked on the public site."}
         </p>
       </div>
 
@@ -287,6 +288,57 @@ export default function IssueTicketPage() {
           <div className="border-t border-border p-5 sm:p-6 space-y-4">
             <SectionHeading
               step={2}
+              title={isAr ? "نوع التذكرة" : "Ticket type"}
+              hint={isAr ? "لكل نوع تصميم ولون خاص على التذكرة والبريد" : "Each type has its own design on the ticket and the email"}
+            />
+            <div role="radiogroup" aria-label={isAr ? "نوع التذكرة" : "Ticket type"} className="sm:ps-9 grid gap-3 grid-cols-2">
+              {ISSUABLE_TYPES.map((type) => {
+                const th = TICKET_THEMES[type];
+                const active = ticketType === type;
+                const Icon = type === "vvip" ? Crown : Star;
+                return (
+                  <button
+                    key={type}
+                    type="button"
+                    role="radio"
+                    aria-checked={active}
+                    onClick={() => { setTicketType(type); setError(null); if (issuedTicket) setIssuedTicket(null); }}
+                    className={cn(
+                      "relative overflow-hidden rounded-lg border-2 text-start transition-all focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring",
+                      active ? "shadow-md" : "border-border opacity-80 hover:opacity-100",
+                    )}
+                    style={active ? { borderColor: th.accent } : undefined}
+                  >
+                    <div className="px-3.5 py-3" style={{ backgroundImage: `linear-gradient(135deg, ${th.dark}, ${th.dark2})` }}>
+                      <span
+                        className="inline-flex items-center gap-1 rounded-full px-2 py-0.5 text-[10px] font-bold tracking-[0.14em]"
+                        style={{ background: th.accent, color: th.onAccent }}
+                      >
+                        <Icon className="w-3 h-3" fill="currentColor" />
+                        {th.label}
+                      </span>
+                      <p className="mt-2 text-sm font-semibold text-white">{th.tagline[isAr ? "ar" : "en"]}</p>
+                    </div>
+                    <div className="flex items-center justify-between gap-2 bg-card px-3.5 py-2">
+                      <span className="text-xs text-muted-foreground">
+                        {type === "vvip" ? (isAr ? "أسود وذهبي" : "Black & gold") : (isAr ? "بنفسجي ملكي" : "Royal violet")}
+                      </span>
+                      <span
+                        className={cn("w-4 h-4 rounded-full border-2 flex items-center justify-center", !active && "border-border")}
+                        style={active ? { borderColor: th.accent } : undefined}
+                      >
+                        {active && <span className="w-2 h-2 rounded-full" style={{ background: th.accent }} />}
+                      </span>
+                    </div>
+                  </button>
+                );
+              })}
+            </div>
+          </div>
+
+          <div className="border-t border-border p-5 sm:p-6 space-y-4">
+            <SectionHeading
+              step={3}
               title={isAr ? "العميل" : "Customer"}
               hint={isAr ? "يُطبع الاسم على التذكرة، وتُرسل التذكرة إلى البريد" : "The name is printed on the ticket; the ticket is sent to the email"}
             />
@@ -355,7 +407,7 @@ export default function IssueTicketPage() {
             <Button type="submit" disabled={saving} className="h-10 px-5">
               {saving
                 ? <><Loader2 className="w-4 h-4 animate-spin" />{t.issuingTicket}</>
-                : <><Crown className="w-4 h-4" />{isAr ? "إصدار تذكرة VVIP" : "Issue VVIP ticket"}</>
+                : <>{ticketType === "vvip" ? <Crown className="w-4 h-4" /> : <Star className="w-4 h-4" />}{isAr ? `إصدار تذكرة ${TICKET_THEMES[ticketType].label}` : `Issue ${TICKET_THEMES[ticketType].label} ticket`}</>
               }
             </Button>
           </div>
@@ -375,26 +427,38 @@ export default function IssueTicketPage() {
             )}
           </div>
 
-          <div className={cn("bg-card border border-card-border rounded-lg overflow-hidden", !issuedTicket && "opacity-95")}>
-            <div className="p-5">
+          <div
+            className={cn("bg-card border-2 rounded-xl overflow-hidden", !issuedTicket && "opacity-95")}
+            style={{ borderColor: pth.accent }}
+          >
+            <div
+              className="relative p-5 text-white"
+              style={{
+                backgroundImage: pth.premium
+                  ? `repeating-linear-gradient(135deg, transparent 0 10px, ${pth.accent}1f 10px 11px), linear-gradient(135deg, ${pth.dark}, ${pth.dark2})`
+                  : `linear-gradient(135deg, ${pth.dark}, ${pth.dark2})`,
+                borderBottom: `4px solid ${pth.accent}`,
+              }}
+            >
               <div className="flex items-center justify-between gap-3 mb-4">
                 <div className="flex items-center gap-2 min-w-0">
-                  {systemLogo && isImageUrl(systemLogo) ? (
+                  {systemLogo && isImageUrl(systemLogo) && (
                     <img src={systemLogo} alt="" className="w-6 h-6 rounded object-contain bg-black shrink-0" />
-                  ) : (
-                    <Ticket className="w-4 h-4 text-muted-foreground shrink-0" />
                   )}
-                  <span className="text-xs font-semibold text-foreground truncate">{brandName}</span>
+                  <span className="text-[11px] font-bold uppercase tracking-[0.2em] truncate" style={{ color: pth.accent }}>{brandName}</span>
                 </div>
-                <span className="inline-flex items-center gap-1 text-[10px] font-semibold uppercase tracking-[0.12em] text-amber-700 dark:text-amber-400 bg-amber-500/10 border border-amber-500/30 rounded px-1.5 py-0.5 shrink-0">
-                  <Crown className="w-3 h-3" />
-                  VVIP
+                <span
+                  className="inline-flex items-center gap-1 text-[10px] font-bold tracking-[0.14em] rounded-full px-2.5 py-1 shrink-0"
+                  style={{ background: pth.accent, color: pth.onAccent }}
+                >
+                  {pth.kind === "vvip" ? <Crown className="w-3 h-3" fill="currentColor" /> : <Star className="w-3 h-3" fill="currentColor" />}
+                  {pth.label}
                 </span>
               </div>
-              <p className={cn("text-lg font-semibold leading-snug tracking-tight", preview.event ? "text-foreground" : "text-muted-foreground/60")}>
+              <p className={cn("text-lg font-semibold leading-snug tracking-tight", !preview.event && "text-white/60")}>
                 {preview.event?.title ?? (isAr ? "اسم الفعالية" : "Event name")}
               </p>
-              <div className="mt-2 space-y-1 text-xs text-muted-foreground">
+              <div className="mt-2 space-y-1 text-xs text-white/75">
                 <p className="flex items-center gap-1.5">
                   <CalendarDays className="w-3.5 h-3.5 shrink-0" strokeWidth={1.75} />
                   {preview.event?.event_date ? formatDate(preview.event.event_date, true) : "—"}
@@ -404,12 +468,6 @@ export default function IssueTicketPage() {
                   {preview.event?.location || "—"}
                 </p>
               </div>
-            </div>
-
-            {/* Tear line */}
-            <div className="relative mx-3 border-t-[1.5px] border-dashed border-border">
-              <span className="absolute -top-2 -start-5 w-4 h-4 rounded-full bg-background border border-card-border" />
-              <span className="absolute -top-2 -end-5 w-4 h-4 rounded-full bg-background border border-card-border" />
             </div>
 
             <div className="p-5 flex gap-4 items-start">
@@ -438,7 +496,7 @@ export default function IssueTicketPage() {
                 </div>
               </div>
               {preview.qrDataUrl ? (
-                <img src={preview.qrDataUrl} alt={isAr ? "رمز QR للتذكرة" : "Ticket QR code"} className="w-28 h-28 rounded-md border border-border p-1 bg-white shrink-0" />
+                <img src={preview.qrDataUrl} alt={isAr ? "رمز QR للتذكرة" : "Ticket QR code"} className="w-28 h-28 rounded-lg border-2 p-1.5 bg-white shrink-0" style={{ borderColor: pth.accent }} />
               ) : (
                 <div className="w-28 h-28 rounded-md border border-dashed border-border flex flex-col items-center justify-center gap-1 text-muted-foreground/60 shrink-0">
                   <QrCode className="w-6 h-6" strokeWidth={1.5} />
@@ -447,8 +505,11 @@ export default function IssueTicketPage() {
               )}
             </div>
 
-            <div className="border-t border-border px-5 py-2.5 text-center font-mono text-[11px] tracking-wider text-muted-foreground">
-              {preview.id ? `${isAr ? "رقم التذكرة" : "Ticket"} ${shortId(preview.id)}` : "—"}
+            <div className="relative border-t-[1.5px] border-dashed border-border px-5 py-2.5 flex items-center justify-between gap-3" style={{ background: pth.soft }}>
+              <span className="font-mono text-xs font-semibold tracking-wider text-neutral-900">
+                {preview.id ? `#${shortId(preview.id)}` : "#————————"}
+              </span>
+              <span className="text-[11px] font-bold tracking-[0.14em]" style={{ color: pth.text }}>{pth.label}</span>
             </div>
           </div>
 
