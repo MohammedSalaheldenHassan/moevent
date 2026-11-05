@@ -1,9 +1,8 @@
 import { Router } from "express";
-import QRCode from "qrcode";
 import { createClient } from "@supabase/supabase-js";
 import { getSupabaseProjectUrl } from "../lib/supabaseProjectUrl";
 import { requireAdmin } from "../middlewares/requireAdmin";
-import { buildEmailHtml, generateTicketPDF, getMailer } from "../lib/ticketEmail";
+import { getMailer, sendTicketsEmail } from "../lib/ticketEmail";
 
 const router = Router();
 
@@ -37,51 +36,31 @@ router.post("/issue-ticket", requireAdmin, async (req, res) => {
   try {
     const { data: ticket, error: ticketErr } = await supabase
       .from("tickets")
-      .select("id, customer_name, events(title)")
+      .select("id, customer_name, attendee_type, events(id, title, event_date, location, price, latitude, longitude)")
       .eq("id", ticketId)
       .maybeSingle();
     if (ticketErr || !ticket) {
       res.status(404).json({ error: "Ticket not found" });
       return;
     }
-    const customerName = String(ticket.customer_name ?? "");
-    const eventRel = ticket.events as { title?: string } | { title?: string }[] | null;
-    const eventName = String((Array.isArray(eventRel) ? eventRel[0]?.title : eventRel?.title) ?? "Event");
-
-    // 1. Generate QR code as PNG buffer
-    const qrBuffer = await QRCode.toBuffer(
-      JSON.stringify({ ticketId, event: eventName, customer: customerName }),
-      {
-        width: 200,
-        margin: 1,
-        color: { dark: "#000000", light: "#FFFFFF" },
-        errorCorrectionLevel: "M",
-      },
-    );
-
-    // 2. Generate PDF
-    const pdfBuffer = await generateTicketPDF({
-      customerName,
-      ticketId,
-      eventName,
-      qrBuffer,
-    });
-
-    // 3. Send the email
-    const shortId = ticketId.slice(0, 8).toUpperCase();
+    type Ev = { id?: string; title?: string; event_date?: string | null; location?: string | null; price?: number | null; latitude?: number | null; longitude?: number | null };
+    const rel = ticket.events as Ev | Ev[] | null;
+    const ev: Ev = (Array.isArray(rel) ? rel[0] : rel) ?? {};
 
     try {
-      await mailer.send({
+      await sendTicketsEmail({
         to: customerEmail.trim(),
-        subject: `Your ticket for ${eventName} – #${shortId}`,
-        html: buildEmailHtml({ customerName, eventName, ticketIds: [ticketId] }),
-        attachments: [
-          {
-            filename: `ticket-${shortId}.pdf`,
-            content: pdfBuffer,
-            contentType: "application/pdf",
-          },
-        ],
+        customerName: String(ticket.customer_name ?? ""),
+        event: {
+          id: ev.id,
+          title: String(ev.title ?? "Event"),
+          date: ev.event_date ?? null,
+          location: ev.location ?? null,
+          price: ev.price ?? null,
+          latitude: ev.latitude ?? null,
+          longitude: ev.longitude ?? null,
+        },
+        tickets: [{ id: ticketId, attendeeType: (ticket.attendee_type as string | null) ?? null }],
       });
     } catch (emailError) {
       console.warn("[issue-ticket] email delivery failed:", emailError instanceof Error ? emailError.message : emailError);

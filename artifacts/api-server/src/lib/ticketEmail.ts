@@ -1,185 +1,27 @@
-import PDFDocument from "pdfkit";
-import QRCode from "qrcode";
 import nodemailer from "nodemailer";
+import { formatEventDate, formatPrice, generateTicketPDF, shortTicketId } from "./ticketPdf";
+import { ticketTheme, type TicketTheme } from "./ticketTheme";
 
-// ── PDF builder ────────────────────────────────────────────────────────────────
+export { generateTicketPDF } from "./ticketPdf";
 
-export function generateTicketPDF({
-  customerName,
-  ticketId,
-  eventName,
-  qrBuffer,
-}: {
-  customerName: string;
-  ticketId: string;
-  eventName: string;
-  qrBuffer: Buffer;
-}): Promise<Buffer> {
-  return new Promise((resolve, reject) => {
-    const chunks: Buffer[] = [];
+const BRAND = () => process.env["BRAND_NAME"]?.trim() || "MoEvent";
 
-    const doc = new PDFDocument({
-      size: "A5",
-      margin: 0,
-      info: {
-        Title: `Ticket – ${eventName}`,
-        Author: "MO Event System",
-      },
-    });
-
-    doc.on("data", (chunk: Buffer) => chunks.push(chunk));
-    doc.on("end", () => resolve(Buffer.concat(chunks)));
-    doc.on("error", reject);
-
-    const { width, height } = doc.page;
-
-    const PURPLE = "#8B5CF6";
-    const DARK_BG = "#0F0F1A";
-    const CARD_BG = "#1A1A2E";
-    const PANEL_BG = "#0F0F1A";
-    const WHITE = "#FFFFFF";
-    const DIM = "#A0A0B8";
-    const BORDER = "#2A2A4A";
-
-    // ── Full background ──────────────────────────────────────────
-    doc.rect(0, 0, width, height).fill(DARK_BG);
-
-    // ── Top accent bar ───────────────────────────────────────────
-    doc.rect(0, 0, width, 5).fill(PURPLE);
-
-    // ── Header card ──────────────────────────────────────────────
-    doc.rect(0, 5, width, 88).fill(CARD_BG);
-
-    doc
-      .fontSize(9)
-      .fillColor(PURPLE)
-      .font("Helvetica-Bold")
-      .text("MO EVENT SYSTEM", 0, 18, { align: "center", width });
-
-    // Purple underline below brand
-    const centerX = width / 2;
-    doc
-      .moveTo(centerX - 45, 32)
-      .lineTo(centerX + 45, 32)
-      .strokeColor(PURPLE)
-      .lineWidth(0.8)
-      .stroke();
-
-    // Event name (wraps if long)
-    doc
-      .fontSize(15)
-      .fillColor(WHITE)
-      .font("Helvetica-Bold")
-      .text(eventName, 24, 42, {
-        align: "center",
-        width: width - 48,
-        ellipsis: true,
-        lineBreak: false,
-      });
-
-    // ── Dashed separator ─────────────────────────────────────────
-    const dashY = 97;
-    const totalDashes = 38;
-    const dashW = width / totalDashes;
-    for (let i = 0; i < totalDashes; i++) {
-      if (i % 2 === 0) doc.rect(i * dashW, dashY, dashW * 0.65, 1.5).fill(BORDER);
-    }
-
-    // ── QR code section ──────────────────────────────────────────
-    const qrSize = 158;
-    const qrX = (width - qrSize) / 2;
-    const qrY = 112;
-
-    // Glow box
-    doc
-      .roundedRect(qrX - 12, qrY - 12, qrSize + 24, qrSize + 24, 10)
-      .fill("#17172B");
-    doc
-      .roundedRect(qrX - 10, qrY - 10, qrSize + 20, qrSize + 20, 8)
-      .strokeColor(PURPLE)
-      .lineWidth(1.2)
-      .stroke();
-
-    doc.image(qrBuffer, qrX, qrY, { width: qrSize, height: qrSize });
-
-    doc
-      .fontSize(8)
-      .fillColor(DIM)
-      .font("Helvetica")
-      .text("SCAN TO VERIFY", 0, qrY + qrSize + 16, {
-        align: "center",
-        width,
-        characterSpacing: 1.5,
-      });
-
-    // ── Solid divider ─────────────────────────────────────────────
-    const divY = qrY + qrSize + 34;
-    doc
-      .moveTo(24, divY)
-      .lineTo(width - 24, divY)
-      .strokeColor(BORDER)
-      .lineWidth(0.8)
-      .stroke();
-
-    // ── Customer info ─────────────────────────────────────────────
-    const infoY = divY + 14;
-
-    doc.fontSize(7.5).fillColor(DIM).font("Helvetica").text("CUSTOMER NAME", 30, infoY, {
-      characterSpacing: 0.8,
-    });
-    doc
-      .fontSize(12)
-      .fillColor(WHITE)
-      .font("Helvetica-Bold")
-      .text(customerName, 30, infoY + 11, {
-        width: width - 60,
-        lineBreak: false,
-        ellipsis: true,
-      });
-
-    doc.fontSize(7.5).fillColor(DIM).font("Helvetica").text("TICKET ID", 30, infoY + 34, {
-      characterSpacing: 0.8,
-    });
-    doc
-      .fontSize(11)
-      .fillColor(PURPLE)
-      .font("Helvetica-Bold")
-      .text(`#${ticketId.slice(0, 8).toUpperCase()}`, 30, infoY + 45);
-
-    // ── Valid badge ───────────────────────────────────────────────
-    const badgeY = infoY + 72;
-    doc.roundedRect(30, badgeY, 108, 22, 11).fill("#1A1A35");
-    doc
-      .roundedRect(30, badgeY, 108, 22, 11)
-      .strokeColor(PURPLE)
-      .lineWidth(0.9)
-      .stroke();
-    doc
-      .fontSize(8.5)
-      .fillColor(PURPLE)
-      .font("Helvetica-Bold")
-      .text("✓  VALID TICKET", 30, badgeY + 6, { align: "center", width: 108 });
-
-    // ── Bottom footer bar ─────────────────────────────────────────
-    doc.rect(0, height - 28, width, 28).fill(PANEL_BG);
-    doc.rect(0, height - 30, width, 1.5).fill(PURPLE);
-
-    doc
-      .fontSize(7)
-      .fillColor("#4A4A6A")
-      .font("Helvetica")
-      .text(
-        `Powered by MO Event System  •  ${ticketId}`,
-        0,
-        height - 17,
-        { align: "center", width, characterSpacing: 0.3 },
-      );
-
-    doc.end();
-  });
+export interface EmailEvent {
+  id?: string;
+  title: string;
+  date: string | null;
+  location: string | null;
+  price: number | null;
+  latitude?: number | null;
+  longitude?: number | null;
 }
 
-// ── Email HTML builder ─────────────────────────────────────────────────────────
+export interface EmailTicket {
+  id: string;
+  attendeeType: string | null;
+}
+
+// ── Email HTML ─────────────────────────────────────────────────────────────────
 
 export function escapeHtml(value: string): string {
   return value
@@ -190,54 +32,181 @@ export function escapeHtml(value: string): string {
     .replace(/'/g, "&#39;");
 }
 
+function mapsUrl(e: EmailEvent): string | null {
+  if (e.latitude != null && e.longitude != null) {
+    return `https://www.google.com/maps/search/?api=1&query=${e.latitude},${e.longitude}`;
+  }
+  return e.location ? `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(e.location)}` : null;
+}
+
+function eventUrl(e: EmailEvent): string | null {
+  const site = process.env["PUBLIC_SITE_URL"]?.trim().replace(/\/+$/, "");
+  return site && e.id && /^https:\/\//.test(site) ? `${site}/events/${encodeURIComponent(e.id)}` : null;
+}
+
+/**
+ * Table-based, inline-styled HTML so it renders the same in Gmail, Outlook and
+ * Apple Mail. Coloured by the booking's ticket type.
+ */
 export function buildEmailHtml({
   customerName,
-  eventName,
-  ticketIds,
+  event,
+  tickets,
 }: {
   customerName: string;
-  eventName: string;
-  ticketIds: string[];
+  event: EmailEvent;
+  tickets: EmailTicket[];
 }): string {
-  const shortId = ticketIds.map((id) => `#${id.slice(0, 8).toUpperCase()}`).join("<br>");
-  const many = ticketIds.length > 1;
-  customerName = escapeHtml(customerName);
-  eventName = escapeHtml(eventName);
+  const brand = escapeHtml(BRAND());
+  const th: TicketTheme = ticketTheme(tickets[0]?.attendeeType);
+  const many = tickets.length > 1;
+  const name = escapeHtml(customerName.trim().split(/\s+/)[0] || customerName);
+  const title = escapeHtml(event.title);
+  const date = escapeHtml(formatEventDate(event.date));
+  const venue = escapeHtml(event.location ?? "");
+  const price = escapeHtml(formatPrice(event.price));
+  const maps = mapsUrl(event);
+  const link = eventUrl(event);
+  const year = new Date().getUTCFullYear();
+  const font = "-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,Helvetica,Arial,sans-serif";
+  const tierText = th.kind === "vvip" ? "#8A6D0E" : th.dark2;
+
+  const preheader = `${many ? `Your ${tickets.length} tickets are` : "Your ticket is"} attached. Show the QR code at the entrance.`;
+
+  const row = (label: string, value: string, extra = "") => `
+              <tr>
+                <td style="padding:12px 0;border-bottom:1px solid #ECEAE5;font:600 11px/1.4 ${font};letter-spacing:.08em;text-transform:uppercase;color:#8A8882;width:38%;vertical-align:top;">${label}</td>
+                <td style="padding:12px 0;border-bottom:1px solid #ECEAE5;font:500 15px/1.45 ${font};color:#16161A;vertical-align:top;">${value}${extra}</td>
+              </tr>`;
+
+  const ticketRows = tickets
+    .map((t, i) => {
+      const tt = ticketTheme(t.attendeeType);
+      return `
+              <tr>
+                <td style="padding:10px 14px;border-top:${i ? "1px solid #ECEAE5" : "0"};font:600 16px/1.3 'SFMono-Regular',Menlo,Consolas,monospace;letter-spacing:.06em;color:#16161A;">#${shortTicketId(t.id)}</td>
+                <td align="right" style="padding:10px 14px;border-top:${i ? "1px solid #ECEAE5" : "0"};">
+                  <span style="display:inline-block;padding:4px 10px;border-radius:999px;background:${tt.accent};color:${tt.onAccent};font:700 11px/1.2 ${font};letter-spacing:.12em;">${tt.premium ? "&#9733; " : ""}${tt.label}</span>
+                </td>
+              </tr>`;
+    })
+    .join("");
+
+  const step = (n: number, text: string) => `
+              <tr>
+                <td width="34" style="padding:6px 0;vertical-align:top;">
+                  <div style="width:24px;height:24px;border-radius:12px;background:${th.soft};color:${tierText};font:700 12px/24px ${font};text-align:center;">${n}</div>
+                </td>
+                <td style="padding:6px 0;font:400 14px/1.55 ${font};color:#3D3C38;vertical-align:top;">${text}</td>
+              </tr>`;
+
+  const button = (href: string, label: string, primary: boolean) =>
+    `<a href="${escapeHtml(href)}" target="_blank" style="display:inline-block;margin:4px 6px 4px 0;padding:12px 20px;border-radius:10px;font:600 14px/1 ${font};text-decoration:none;${
+      primary ? `background:${th.dark};color:#FFFFFF;` : `background:#FFFFFF;color:#16161A;border:1px solid #DAD8D2;`
+    }">${label}</a>`;
+
   return `<!DOCTYPE html>
 <html lang="en">
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width,initial-scale=1">
-  <title>Your Ticket – ${eventName}</title>
+  <meta name="color-scheme" content="light only">
+  <title>${many ? "Your tickets" : "Your ticket"} – ${title}</title>
 </head>
-<body style="margin:0;padding:0;background:#0F0F1A;font-family:system-ui,-apple-system,sans-serif;">
-  <div style="max-width:520px;margin:40px auto;background:#1A1A2E;border-radius:16px;overflow:hidden;border:1px solid #2A2A4A;">
-    <!-- Header -->
-    <div style="background:linear-gradient(135deg,#6D28D9,#8B5CF6);padding:30px 28px;text-align:center;">
-      <p style="color:rgba(255,255,255,0.75);font-size:11px;font-weight:700;letter-spacing:3px;margin:0 0 10px;text-transform:uppercase;">MO Event System</p>
-      <h1 style="color:#fff;font-size:24px;margin:0;font-weight:800;">Your Ticket is Ready! 🎫</h1>
-    </div>
-    <!-- Body -->
-    <div style="padding:30px 28px;">
-      <p style="color:#A0A0B8;font-size:15px;margin:0 0 22px;line-height:1.6;">
-        Hi <strong style="color:#fff;">${customerName}</strong>, your ${many ? `${ticketIds.length} tickets` : "ticket"} for
-        <strong style="color:#8B5CF6;">${eventName}</strong> ${many ? "have" : "has"} been confirmed.
-      </p>
-      <!-- Ticket ID card -->
-      <div style="background:#0F0F1A;border:1px solid #2A2A4A;border-left:3px solid #8B5CF6;border-radius:10px;padding:16px 20px;margin-bottom:22px;">
-        <p style="color:#6B6B8A;font-size:10px;font-weight:700;letter-spacing:1.5px;margin:0 0 6px;text-transform:uppercase;">${many ? "Ticket IDs" : "Ticket ID"}</p>
-        <p style="color:#8B5CF6;font-size:20px;font-weight:800;margin:0;font-family:monospace;">${shortId}</p>
-      </div>
-      <p style="color:#6B6B8A;font-size:13px;margin:0;line-height:1.6;">
-        📎 ${many ? "Your PDF tickets are" : "Your PDF ticket is"} attached to this email.<br>
-        Please present ${many ? "each one" : "it"} (printed or on your phone) at the event entrance.
-      </p>
-    </div>
-    <!-- Footer -->
-    <div style="background:#0F0F1A;border-top:1px solid #2A2A4A;padding:16px 28px;text-align:center;">
-      <p style="color:#3A3A5A;font-size:11px;margin:0;">© 2025 MO Event System. All rights reserved.</p>
-    </div>
-  </div>
+<body style="margin:0;padding:0;background:#F2F1EE;-webkit-text-size-adjust:100%;">
+  <div style="display:none;max-height:0;overflow:hidden;opacity:0;color:transparent;">${escapeHtml(preheader)}</div>
+  <table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0" style="background:#F2F1EE;">
+    <tr>
+      <td align="center" style="padding:28px 12px 40px;">
+        <table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0" style="max-width:560px;">
+
+          <!-- Brand -->
+          <tr>
+            <td style="padding:0 6px 16px;font:700 15px/1 ${font};color:#16161A;">
+              <span style="display:inline-block;width:22px;height:22px;border-radius:6px;background:#E03A0C;color:#fff;font:800 13px/22px ${font};text-align:center;vertical-align:middle;">${brand.charAt(0)}</span>
+              <span style="vertical-align:middle;margin-left:6px;">${brand}</span>
+            </td>
+          </tr>
+
+          <!-- Card -->
+          <tr>
+            <td style="background:#FFFFFF;border-radius:18px;overflow:hidden;border:1px solid #E4E2DC;">
+              <table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0">
+
+                <!-- Hero -->
+                <tr>
+                  <td style="background-color:${th.dark};background-image:linear-gradient(135deg,${th.dark} 0%,${th.dark2} 100%);padding:30px 28px 28px;border-bottom:4px solid ${th.accent};">
+                    <span style="display:inline-block;padding:5px 12px;border-radius:999px;background:${th.accent};color:${th.onAccent};font:700 11px/1.2 ${font};letter-spacing:.16em;">${th.premium ? "&#9733; " : ""}${th.label}</span>
+                    <h1 style="margin:18px 0 6px;font:700 26px/1.25 ${font};color:#FFFFFF;letter-spacing:-.01em;">You're in, ${name}!</h1>
+                    <p style="margin:0;font:400 15px/1.5 ${font};color:rgba(255,255,255,.82);">
+                      ${many ? `Your <strong style="color:#fff;">${tickets.length} tickets</strong> for` : "Your ticket for"} <strong style="color:#fff;">${title}</strong> ${many ? "are" : "is"} confirmed.
+                    </p>
+                  </td>
+                </tr>
+
+                <!-- Details -->
+                <tr>
+                  <td style="padding:10px 28px 4px;">
+                    <table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0">
+                      ${row("Event", `<strong>${title}</strong>`)}
+                      ${date ? row("Date", date) : ""}
+                      ${venue ? row("Venue", venue, maps ? `<br><a href="${escapeHtml(maps)}" target="_blank" style="font:600 13px/1.8 ${font};color:${tierText};text-decoration:none;">Open in Maps &rarr;</a>` : "") : ""}
+                      ${row("Ticket type", `<span style="color:${tierText};font-weight:700;">${escapeHtml(th.tagline)}</span>`)}
+                      ${price ? row(many ? "Price each" : "Price", price) : ""}
+                    </table>
+                  </td>
+                </tr>
+
+                <!-- Ticket numbers -->
+                <tr>
+                  <td style="padding:20px 28px 4px;">
+                    <p style="margin:0 0 8px;font:600 11px/1.4 ${font};letter-spacing:.08em;text-transform:uppercase;color:#8A8882;">${many ? "Your tickets" : "Your ticket"}</p>
+                    <table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0" style="background:${th.soft};border-radius:12px;border-left:4px solid ${th.accent};">
+                      ${ticketRows}
+                    </table>
+                  </td>
+                </tr>
+
+                <!-- How to enter -->
+                <tr>
+                  <td style="padding:22px 28px 6px;">
+                    <p style="margin:0 0 6px;font:700 16px/1.4 ${font};color:#16161A;">At the entrance</p>
+                    <table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0">
+                      ${step(1, `Open the attached PDF ${many ? "tickets" : "ticket"} &mdash; on your phone or printed.`)}
+                      ${step(2, `Show the QR code to the staff at the door. ${many ? "Each guest needs their own ticket." : ""}`)}
+                      ${step(3, "Keep it private: each QR code admits one person, once.")}
+                    </table>
+                  </td>
+                </tr>
+
+                ${maps || link ? `
+                <!-- Actions -->
+                <tr>
+                  <td style="padding:14px 28px 6px;">
+                    ${link ? button(link, "View event", true) : ""}${maps ? button(maps, "Get directions", !link) : ""}
+                  </td>
+                </tr>` : ""}
+
+                <tr>
+                  <td style="padding:18px 28px 26px;font:400 13px/1.6 ${font};color:#8A8882;">
+                    Can't attend or something's wrong? Just reply to this email and we'll help.
+                  </td>
+                </tr>
+              </table>
+            </td>
+          </tr>
+
+          <!-- Footer -->
+          <tr>
+            <td align="center" style="padding:18px 12px 0;font:400 12px/1.6 ${font};color:#A3A19A;">
+              You received this email because a ticket was booked with this address.<br>
+              &copy; ${year} ${brand}
+            </td>
+          </tr>
+        </table>
+      </td>
+    </tr>
+  </table>
 </body>
 </html>`;
 }
@@ -315,45 +284,57 @@ export function getMailer(): Mailer | null {
   };
 }
 
+// ── Send ───────────────────────────────────────────────────────────────────────
+
 /**
- * Emails one booking's tickets in a single message: one PDF (with its QR)
- * per ticket. The QR payload matches what the gate app reads.
+ * Emails one booking's tickets in a single message: one PDF (with its QR) per
+ * ticket, each designed for its ticket type.
  */
 export async function sendTicketsEmail({
   to,
   customerName,
-  eventName,
-  ticketIds,
+  event,
+  tickets,
 }: {
   to: string;
   customerName: string;
-  eventName: string;
-  ticketIds: string[];
+  event: EmailEvent;
+  tickets: EmailTicket[];
 }): Promise<void> {
   const mailer = getMailer();
   if (!mailer) throw new Error("Email sending is not configured on the server");
+  if (tickets.length === 0) return;
 
+  const brandName = BRAND();
   const attachments = await Promise.all(
-    ticketIds.map(async (ticketId) => {
-      const qrBuffer = await QRCode.toBuffer(JSON.stringify({ ticketId, event: eventName, customer: customerName }), {
-        width: 200,
-        margin: 1,
-        color: { dark: "#000000", light: "#FFFFFF" },
-        errorCorrectionLevel: "M",
+    tickets.map(async (t, i) => {
+      const theme = ticketTheme(t.attendeeType);
+      const content = await generateTicketPDF({
+        ticketId: t.id,
+        customerName,
+        event: { title: event.title, date: event.date, location: event.location, price: event.price },
+        theme,
+        index: i + 1,
+        count: tickets.length,
+        brandName,
       });
-      const content = await generateTicketPDF({ customerName, ticketId, eventName, qrBuffer });
-      return { filename: `ticket-${ticketId.slice(0, 8).toUpperCase()}.pdf`, content, contentType: "application/pdf" };
+      return {
+        filename: `${theme.label.toLowerCase()}-ticket-${shortTicketId(t.id)}.pdf`,
+        content,
+        contentType: "application/pdf",
+      };
     }),
   );
 
-  const first = ticketIds[0]!.slice(0, 8).toUpperCase();
+  const th = ticketTheme(tickets[0]!.attendeeType);
+  const first = shortTicketId(tickets[0]!.id);
   await mailer.send({
     to,
     subject:
-      ticketIds.length > 1
-        ? `Your ${ticketIds.length} tickets for ${eventName} – #${first}`
-        : `Your ticket for ${eventName} – #${first}`,
-    html: buildEmailHtml({ customerName, eventName, ticketIds }),
+      tickets.length > 1
+        ? `Your ${tickets.length} ${th.label} tickets for ${event.title} – #${first}`
+        : `Your ${th.label} ticket for ${event.title} – #${first}`,
+    html: buildEmailHtml({ customerName, event, tickets }),
     attachments,
   });
 }

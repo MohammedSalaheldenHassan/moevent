@@ -1,4 +1,7 @@
 // Opens a print window with a single ticket. Shared by Issue Ticket and Event Detail.
+// Styled per ticket type (lib/ticketThemes.ts), like the emailed PDF.
+
+import { ticketTheme } from "./ticketThemes";
 
 export interface PrintableTicket {
   id: string;
@@ -47,33 +50,45 @@ export function printTicket({
     : "";
   const priceStr = event.price == null ? "" : event.price === 0 ? (isAr ? "مجاني" : "Free") : `RWF ${event.price.toLocaleString()}`;
 
+  const th = ticketTheme(ticket.attendee_type);
+  const L = isAr ? "ar" : "en";
+  const star = th.premium ? "&#9733; " : "";
+  const header = th.premium
+    ? `repeating-linear-gradient(135deg, transparent 0 11px, ${th.accent}24 11px 12px), linear-gradient(135deg, ${th.dark}, ${th.dark2})`
+    : `linear-gradient(135deg, ${th.dark}, ${th.dark2})`;
+
   win.document.write(`<!DOCTYPE html>
 <html dir="${isAr ? "rtl" : "ltr"}" lang="${lang}">
 <head>
 <meta charset="utf-8" />
-<title>${isAr ? "تذكرة" : "Ticket"} ${shortTicketId(ticket.id)}</title>
-<link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Sans:wght@400;500;600&family=IBM+Plex+Sans+Arabic:wght@400;500;600&family=IBM+Plex+Mono:wght@500&display=swap" rel="stylesheet">
+<title>${th.label} ${isAr ? "تذكرة" : "ticket"} ${shortTicketId(ticket.id)}</title>
+<link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Sans:wght@400;500;600;700&family=IBM+Plex+Sans+Arabic:wght@400;500;600;700&family=IBM+Plex+Mono:wght@600&display=swap" rel="stylesheet">
 <style>
   * { box-sizing: border-box; margin: 0; padding: 0; }
-  body { font-family: ${isAr ? "'IBM Plex Sans Arabic'" : "'IBM Plex Sans'"}, system-ui, sans-serif; color: #111418; background: #f4f3f0; display: flex; justify-content: center; padding: 40px 16px; }
-  .ticket { width: 360px; background: #fff; border: 1px solid #dcdad5; border-radius: 10px; overflow: hidden; }
-  .top { padding: 22px 24px 20px; }
+  html { -webkit-print-color-adjust: exact; print-color-adjust: exact; }
+  body { font-family: ${isAr ? "'IBM Plex Sans Arabic'" : "'IBM Plex Sans'"}, system-ui, sans-serif; color: #16161A; background: #EEEDE9; display: flex; justify-content: center; padding: 40px 16px; }
+  .ticket { position: relative; width: 380px; background: #fff; border-radius: 16px; overflow: hidden; box-shadow: 0 1px 2px rgba(0,0,0,.06), 0 8px 28px rgba(0,0,0,.08); ${th.kind === "vvip" ? `outline: 1px solid ${th.accent}; outline-offset: -6px;` : ""} }
+  .top { padding: 22px 24px 20px; color: #fff; background: ${header}; border-bottom: 4px solid ${th.accent}; }
   .brand { display: flex; align-items: center; justify-content: space-between; gap: 12px; margin-bottom: 18px; }
-  .brand-name { display: flex; align-items: center; gap: 8px; font-size: 13px; font-weight: 600; }
-  .logo { width: 26px; height: 26px; border-radius: 5px; object-fit: contain; background: #000; }
-  .admit { font-size: 10px; font-weight: 600; letter-spacing: .12em; text-transform: uppercase; color: #6b6a66; border: 1px solid #dcdad5; border-radius: 4px; padding: 3px 7px; }
-  .event { font-size: 20px; font-weight: 600; line-height: 1.25; letter-spacing: -.01em; }
-  .meta { margin-top: 8px; font-size: 12.5px; color: #5d5c58; line-height: 1.6; }
-  .tear { position: relative; border-top: 1.5px dashed #cfccc6; margin: 0 14px; }
-  .tear::before, .tear::after { content: ""; position: absolute; top: -9px; width: 16px; height: 16px; border-radius: 50%; background: #f4f3f0; border: 1px solid #dcdad5; }
-  .tear::before { left: -23px; } .tear::after { right: -23px; }
-  .bottom { padding: 20px 24px 22px; display: flex; gap: 18px; align-items: flex-start; }
+  .brand-name { display: flex; align-items: center; gap: 8px; font-size: 11px; font-weight: 700; letter-spacing: .2em; text-transform: uppercase; color: ${th.accent}; }
+  .logo { width: 24px; height: 24px; border-radius: 5px; object-fit: contain; background: #000; }
+  .badge { font-size: 10.5px; font-weight: 700; letter-spacing: .14em; color: ${th.onAccent}; background: ${th.accent}; border-radius: 999px; padding: 4px 11px; white-space: nowrap; }
+  .event { font-size: 21px; font-weight: 700; line-height: 1.25; letter-spacing: -.01em; }
+  .meta { margin-top: 8px; font-size: 12.5px; color: rgba(255,255,255,.78); line-height: 1.6; }
+  .bottom { padding: 20px 24px 18px; display: flex; gap: 18px; align-items: flex-start; }
   .fields { flex: 1; min-width: 0; }
-  .label { font-size: 10px; font-weight: 600; letter-spacing: .08em; text-transform: uppercase; color: #8a8984; margin-bottom: 2px; }
-  .value { font-size: 14px; font-weight: 500; margin-bottom: 12px; word-break: break-word; }
-  .qr { width: 118px; height: 118px; border: 1px solid #e6e4df; border-radius: 6px; padding: 4px; }
-  .id { font-family: 'IBM Plex Mono', monospace; font-size: 11px; color: #5d5c58; text-align: center; padding: 10px 24px 14px; border-top: 1px solid #eeece8; letter-spacing: .06em; }
-  @media print { body { background: #fff; padding: 0; } .ticket { border-color: #bbb; } .tear::before, .tear::after { background: #fff; } }
+  .label { font-size: 9.5px; font-weight: 700; letter-spacing: .1em; text-transform: uppercase; color: #85837D; margin-bottom: 2px; }
+  .value { font-size: 14px; font-weight: 600; margin-bottom: 12px; word-break: break-word; }
+  .type { color: ${th.text}; }
+  .qrbox { flex-shrink: 0; text-align: center; }
+  .qr { width: 124px; height: 124px; background: #fff; border: 2px solid ${th.accent}; outline: 6px solid ${th.soft}; border-radius: 10px; padding: 6px; margin: 6px; }
+  .scan { margin-top: 6px; font-size: 8.5px; font-weight: 700; letter-spacing: .1em; color: #85837D; }
+  .stub { position: relative; display: flex; justify-content: space-between; align-items: center; gap: 12px; padding: 12px 24px 14px; border-top: 1.5px dashed #DCD9D2; background: ${th.soft}; }
+  .stub::before, .stub::after { content: ""; position: absolute; top: -9px; width: 16px; height: 16px; border-radius: 50%; background: #EEEDE9; }
+  .stub::before { left: -8px; } .stub::after { right: -8px; }
+  .id { font-family: 'IBM Plex Mono', monospace; font-size: 15px; font-weight: 600; letter-spacing: .06em; }
+  .tier { font-size: 13px; font-weight: 700; letter-spacing: .14em; color: ${th.text}; }
+  @media print { body { background: #fff; padding: 0; } .ticket { box-shadow: none; border: 1px solid #ccc; } .stub::before, .stub::after { background: #fff; } }
 </style>
 </head>
 <body>
@@ -81,7 +96,7 @@ export function printTicket({
     <div class="top">
       <div class="brand">
         <div class="brand-name">${logo}<span>${esc(brandName)}</span></div>
-        <span class="admit">${ticket.attendee_type === "vvip" ? "VVIP" : isAr ? "تذكرة دخول" : "Admit one"}</span>
+        <span class="badge">${star}${th.label}</span>
       </div>
       <div class="event">${esc(event.title)}</div>
       <div class="meta">
@@ -89,17 +104,21 @@ export function printTicket({
         ${event.location ? `<div>${esc(event.location)}</div>` : ""}
       </div>
     </div>
-    <div class="tear"></div>
     <div class="bottom">
       <div class="fields">
         <div class="label">${isAr ? "اسم الحامل" : "Ticket holder"}</div>
         <div class="value">${esc(ticket.customer_name)}</div>
+        <div class="label">${isAr ? "نوع التذكرة" : "Ticket type"}</div>
+        <div class="value type">${esc(th.tagline[L])}</div>
         ${ticket.customer_phone ? `<div class="label">${isAr ? "الهاتف" : "Phone"}</div><div class="value" dir="ltr">${esc(ticket.customer_phone)}</div>` : ""}
         ${priceStr ? `<div class="label">${isAr ? "السعر" : "Price"}</div><div class="value">${esc(priceStr)}</div>` : ""}
       </div>
-      ${qrDataUrl ? `<img class="qr" src="${qrDataUrl}" alt="QR" />` : ""}
+      ${qrDataUrl ? `<div class="qrbox"><img class="qr" src="${qrDataUrl}" alt="QR" /><div class="scan">${isAr ? "امسح عند الدخول" : "SCAN AT THE ENTRANCE"}</div></div>` : ""}
     </div>
-    <div class="id">${isAr ? "رقم التذكرة" : "Ticket"} ${shortTicketId(ticket.id)}</div>
+    <div class="stub">
+      <span class="id">#${shortTicketId(ticket.id)}</span>
+      <span class="tier">${star}${th.label}</span>
+    </div>
   </div>
 </body>
 </html>`);

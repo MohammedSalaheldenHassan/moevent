@@ -132,7 +132,7 @@ router.post("/public/bookings", async (req, res) => {
     // Event must exist and not be over (dates are stored as 00:00 UTC).
     const { data: event, error: eventErr } = await db
       .from("events")
-      .select("id, title, event_date")
+      .select("id, title, event_date, location, price, latitude, longitude")
       .eq("id", input.eventId)
       .maybeSingle();
     if (eventErr) throw new Error(eventErr.message);
@@ -208,7 +208,20 @@ router.post("/public/bookings", async (req, res) => {
 
     let emailed = false;
     try {
-      await sendTicketsEmail({ to: input.email, customerName: input.name, eventName: String(event.title), ticketIds: ids });
+      await sendTicketsEmail({
+        to: input.email,
+        customerName: input.name,
+        event: {
+          id: String(event.id),
+          title: String(event.title),
+          date: (event.event_date as string | null) ?? null,
+          location: (event.location as string | null) ?? null,
+          price: (event.price as number | null) ?? null,
+          latitude: (event.latitude as number | null) ?? null,
+          longitude: (event.longitude as number | null) ?? null,
+        },
+        tickets: ids.map((id) => ({ id, attendeeType: input.attendeeType })),
+      });
       await db.from("tickets").update({ is_emailed: true }).in("id", ids);
       emailed = true;
     } catch (err) {
