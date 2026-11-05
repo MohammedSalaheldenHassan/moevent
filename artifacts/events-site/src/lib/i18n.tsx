@@ -205,6 +205,7 @@ const en = {
   footerLinks: "Quick links",
   footerContact: "Contact",
   footerFollow: "Follow us",
+  privacy: "Privacy Policy",
   whatsapp: "WhatsApp",
 };
 
@@ -412,6 +413,7 @@ const ar: Dict = {
   footerLinks: "روابط سريعة",
   footerContact: "تواصل معنا",
   footerFollow: "تابعنا",
+  privacy: "سياسة الخصوصية",
   whatsapp: "واتساب",
 };
 

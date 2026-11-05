@@ -1,3 +1,4 @@
+import { Link } from "wouter";
 import { Facebook, Instagram, Mail, MessageCircle, Phone, Twitter } from "lucide-react";
 import { useLocale } from "@/lib/i18n";
 import { useSectionLink, type SectionId } from "@/lib/sections";
@@ -92,9 +93,14 @@ export function Footer() {
       </div>
 
       <div className="border-t border-line">
-        <p className="mx-auto max-w-6xl px-4 py-5 text-xs text-muted sm:px-6">
-          © {new Date().getFullYear()} MoEvent. {t.rights}
-        </p>
+        <div className="mx-auto flex max-w-6xl flex-wrap items-center justify-between gap-x-6 gap-y-1 px-4 py-3 text-xs text-muted sm:px-6">
+          <p className="py-2">
+            © {new Date().getFullYear()} MoEvent. {t.rights}
+          </p>
+          <Link href="/privacy" className="inline-flex min-h-10 items-center hover:text-ink hover:underline underline-offset-4">
+            {t.privacy}
+          </Link>
+        </div>
       </div>
     </footer>
   );
