@@ -23,7 +23,7 @@ export function HowItWorks() {
                 )}
                 <div className="relative flex size-12 items-center justify-center rounded-full border border-line-strong bg-surface text-ink">
                   <Icon className="size-5" strokeWidth={1.75} aria-hidden="true" />
-                  <span className="absolute -end-1 -top-1 flex size-5 items-center justify-center rounded-full bg-accent text-[11px] font-semibold text-white">
+                  <span className="absolute -end-1 -top-1 flex size-5 items-center justify-center rounded-full bg-accent text-[11px] font-semibold text-on-accent">
                     {i + 1}
                   </span>
                 </div>

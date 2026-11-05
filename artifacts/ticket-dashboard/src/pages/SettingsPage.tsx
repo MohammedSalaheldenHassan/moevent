@@ -349,7 +349,7 @@ export default function SettingsPage() {
               <Label className="font-medium text-sm">{isAr ? "اسم النظام" : "System Name"}</Label>
               <div className="flex gap-2">
                 <Input
-                  placeholder={isAr ? "مثال: MoEvent" : "e.g. MoEvent"}
+                  placeholder={isAr ? "مثال: Nexus Youth" : "e.g. Nexus Youth"}
                   value={nameInputBrand}
                   onChange={(e) => setNameInputBrand(e.target.value)}
                   className="h-11 rounded-md flex-1"

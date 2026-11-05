@@ -321,7 +321,7 @@ export default function IssueTicketPage() {
                     </div>
                     <div className="flex items-center justify-between gap-2 bg-card px-3.5 py-2">
                       <span className="text-xs text-muted-foreground">
-                        {type === "vvip" ? (isAr ? "أسود وذهبي" : "Black & gold") : (isAr ? "بنفسجي ملكي" : "Royal violet")}
+                        {type === "vvip" ? (isAr ? "أسود وذهبي" : "Black & gold") : (isAr ? "نحاسي" : "Copper")}
                       </span>
                       <span
                         className={cn("w-4 h-4 rounded-full border-2 flex items-center justify-center", !active && "border-border")}

@@ -66,7 +66,7 @@ function buildTicketHTML(opts: TicketPdfOptions): string {
       ">
         ${logoHtml}
         <div style="color:rgba(255,255,255,0.75);font-size:11px;font-weight:600;letter-spacing:1.5px;text-transform:uppercase;margin-bottom:8px;">
-          ${systemName || "TicketHub"}
+          ${systemName || "Nexus Youth"}
         </div>
         <div style="color:#fff;font-size:18px;font-weight:700;line-height:1.35;margin-bottom:10px;">
           ${eventTitle}

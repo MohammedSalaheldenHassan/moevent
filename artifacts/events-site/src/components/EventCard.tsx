@@ -42,7 +42,7 @@ export function EventCard({ event, wide = false }: { event: PublicEvent; wide?: 
   return (
     <Link
       href={`/events/${event.id}`}
-      className={`group flex h-full flex-col overflow-hidden rounded-xl border border-line bg-surface transition-[border-color,box-shadow] hover:border-line-strong hover:shadow-[0_12px_32px_-20px_rgba(17,17,17,0.35)] ${
+      className={`group flex h-full flex-col overflow-hidden rounded-xl border border-line bg-surface transition-[border-color,box-shadow] hover:border-line-strong hover:shadow-[0_12px_32px_-20px_rgba(14,42,74,0.35)] ${
         wide ? "md:flex-row" : ""
       }`}
     >
@@ -89,7 +89,7 @@ export function EventCard({ event, wide = false }: { event: PublicEvent; wide?: 
         <div className={`mt-auto flex items-center justify-between gap-3 border-t border-line pt-4 ${wide ? "md:mt-8" : "mt-5"}`}>
           <span className={`font-semibold ${wide ? "md:text-lg" : ""} ${event.price === 0 ? "text-ok" : ""}`}>{formatPrice(event.price)}</span>
           <span
-            className={`inline-flex items-center rounded-md bg-btn px-4 text-sm font-semibold text-on-btn transition-colors group-hover:bg-accent group-hover:text-white ${
+            className={`inline-flex items-center rounded-md bg-btn px-4 text-sm font-semibold text-on-btn transition-colors group-hover:bg-accent-hover group-hover:text-on-accent ${
               wide ? "h-11 md:px-6" : "h-10"
             }`}
           >

@@ -6,10 +6,10 @@ const translations = {
   en: {
     dir: "ltr" as const,
     lang: "en",
-    font: "'IBM Plex Sans', system-ui, sans-serif",
+    font: "'Montserrat Variable', 'Cairo Variable', system-ui, sans-serif",
 
     // App
-    appName: "MoEvent",
+    appName: "Nexus Youth",
     appTagline: "Event operations",
 
     // Auth
@@ -163,10 +163,10 @@ const translations = {
   ar: {
     dir: "rtl" as const,
     lang: "ar",
-    font: "'IBM Plex Sans Arabic', system-ui, sans-serif",
+    font: "'Cairo Variable', 'Montserrat Variable', system-ui, sans-serif",
 
     // App
-    appName: "MoEvent",
+    appName: "Nexus Youth",
     appTagline: "إدارة الفعاليات",
 
     // Auth

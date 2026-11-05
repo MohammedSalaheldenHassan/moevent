@@ -84,8 +84,8 @@ export function Navbar() {
         {t.skipToContent}
       </a>
 
-      <div className="mx-auto flex h-16 max-w-6xl items-center justify-between gap-4 px-4 sm:px-6">
-        <Link href="/" aria-label="MoEvent" className="flex h-10 shrink-0 items-center rounded">
+      <div className="mx-auto flex h-16 max-w-6xl items-center justify-between gap-2 px-4 sm:gap-4 sm:px-6">
+        <Link href="/" aria-label="Nexus Youth" className="flex h-10 shrink-0 items-center rounded">
           <Wordmark />
         </Link>
 
@@ -111,7 +111,7 @@ export function Navbar() {
           <a
             href="/#events"
             onClick={go("events")}
-            className="hidden h-10 items-center rounded-md bg-btn px-4 text-sm font-semibold text-on-btn transition-colors hover:bg-accent hover:text-white sm:inline-flex"
+            className="hidden h-10 items-center rounded-md bg-btn px-4 text-sm font-semibold text-on-btn transition-colors hover:bg-accent-hover hover:text-on-accent sm:inline-flex"
           >
             {t.browseEvents}
           </a>
@@ -150,7 +150,7 @@ export function Navbar() {
             <a
               href="/#events"
               onClick={go("events")}
-              className="inline-flex h-12 items-center justify-center rounded-md bg-btn text-base font-semibold text-on-btn hover:bg-accent hover:text-white"
+              className="inline-flex h-12 items-center justify-center rounded-md bg-btn text-base font-semibold text-on-btn hover:bg-accent-hover hover:text-on-accent"
             >
               {t.browseEvents}
             </a>

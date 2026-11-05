@@ -37,6 +37,11 @@ export function qrPayload(ticketId: string, eventTitle: string, customerName: st
 // emoji can't print as garbage. (Arabic names need an embedded font.)
 const latin = (s: string) => s.replace(/[^ -~ -ÿ–—‘’“”•…]/g, "").trim();
 
+// The Nexus Youth mark (viewBox 40 20 795 475), same as the site's logo.
+const MARK_LEFT = "M47 488 232 218C268 160 330 126 392 126 460 126 525 160 566 216 470 215 400 250 355 320L240 488Z";
+const MARK_RIGHT = "M458 300C490 265 530 245 570 245 610 245 645 262 668 292L828 488H613Z";
+const MARK_FLAG = "M632 30 822 135 632 232Z";
+
 function star(doc: PDFKit.PDFDocument, cx: number, cy: number, r: number) {
   const pts: [number, number][] = [];
   for (let i = 0; i < 10; i++) {
@@ -69,10 +74,10 @@ export async function generateTicketPDF(input: PdfTicketInput): Promise<Buffer> 
 
     const W = doc.page.width;
     const H = doc.page.height;
-    const PAGE = "#EEEDE9";
-    const INK = "#16161A";
-    const MUTED = "#85837D";
-    const LINE = "#E2E0DA";
+    const PAGE = "#F8F6F2";
+    const INK = "#0E2A4A";
+    const MUTED = "#5C6B7B";
+    const LINE = "#E6D6C2";
 
     const cx = 22;
     const cy = 22;
@@ -94,23 +99,33 @@ export async function generateTicketPDF(input: PdfTicketInput): Promise<Buffer> 
     grad.stop(0, th.dark).stop(1, th.dark2);
     doc.rect(cx, cy, cw, headerH).fill(grad);
 
-    // Fine diagonal lines on premium tiers.
-    if (th.premium) {
-      doc.save();
-      doc.rect(cx, cy, cw, headerH).clip();
-      doc.lineWidth(0.6).strokeColor(th.accent).strokeOpacity(0.14);
-      for (let x = cx - headerH; x < cx + cw; x += 11) {
-        doc.moveTo(x, cy + headerH).lineTo(x + headerH, cy).stroke();
-      }
-      doc.restore();
-    }
+    // The brand's pyramid motif rising from the header's far corner.
+    doc.save();
+    doc.fillOpacity(th.premium ? 0.2 : 0.1).fillColor(th.accent);
+    const base = cy + headerH - 4;
+    const headerEnd = cx + cw;
+    doc.polygon([headerEnd - 150, base], [headerEnd - 88, base - 92], [headerEnd - 26, base]).fill();
+    doc.polygon([headerEnd - 72, base], [headerEnd - 12, base - 66], [headerEnd + 48, base]).fill();
+    doc.restore();
+
     // Accent rule at the bottom of the header
     doc.rect(cx, perf1 - 4, cw, 4).fill(th.accent);
     doc.restore();
 
-    // Brand
-    doc.font("Helvetica-Bold").fontSize(8.5).fillColor(th.accent).fillOpacity(1)
-      .text(latin(brandName).toUpperCase(), cx + 22, cy + 24, { characterSpacing: 2.4, lineBreak: false });
+    // Brand: the mark, then the name stacked like the logo.
+    doc.fillOpacity(1);
+    const markH = 26;
+    const markK = markH / 475;
+    doc.save();
+    doc.translate(cx + 22, cy + 18).scale(markK).translate(-40, -20);
+    doc.path(MARK_LEFT).fill("#F8F6F2");
+    doc.path(MARK_RIGHT).fill("#F8F6F2");
+    doc.path(MARK_FLAG).fill(th.kind === "vip" ? "#F2D7B8" : "#C47A3F");
+    doc.restore();
+    const [first, ...rest] = latin(brandName).split(" ");
+    const nameX = cx + 22 + 795 * markK + 9;
+    doc.font("Helvetica-Bold").fontSize(9.5).fillColor("#FFFFFF").text(first ?? "", nameX, cy + 19, { lineBreak: false });
+    doc.font("Helvetica").fontSize(9.5).fillColor("#FFFFFF").text(rest.join(" "), nameX, cy + 31, { lineBreak: false });
 
     // Tier badge
     doc.font("Helvetica-Bold").fontSize(9.5);
@@ -167,7 +182,7 @@ export async function generateTicketPDF(input: PdfTicketInput): Promise<Buffer> 
     field("TICKET HOLDER", latin(input.customerName), qy, { lines: 2 });
     field("DATE", dateStr.replace(/^\w+, /, ""), qy + 50);
     field("VENUE", latin(event.location ?? ""), qy + 92, { lines: 2 });
-    field("TICKET TYPE", th.tagline, qy + 148, { color: th.kind === "vvip" ? "#9A7A12" : th.dark2 });
+    field("TICKET TYPE", th.tagline, qy + 148, { color: th.text });
 
     // QR panel
     doc.roundedRect(qx, qy, qrBox, qrBox, 12).fill(th.soft);
@@ -199,9 +214,9 @@ export async function generateTicketPDF(input: PdfTicketInput): Promise<Buffer> 
     const right = count > 1 ? `TICKET ${input.index ?? 1} OF ${count}` : "ADMIT ONE";
     doc.font("Helvetica-Bold").fontSize(7).fillColor(MUTED)
       .text(right, cx + cw - 22 - 140, sy, { width: 140, align: "right", characterSpacing: 1.1 });
-    doc.font("Helvetica-Bold").fontSize(13).fillColor(th.kind === "vvip" ? "#9A7A12" : th.dark2)
+    doc.font("Helvetica-Bold").fontSize(13).fillColor(th.text)
       .text(th.label, cx + cw - 22 - 140, sy + 12, { width: 140, align: "right", characterSpacing: 1.4 });
-    doc.font("Helvetica").fontSize(6.5).fillColor("#A9A79F")
+    doc.font("Helvetica").fontSize(6.5).fillColor("#8C97A3")
       .text(`${latin(brandName)}  •  ${ticketId}`, cx, cy + ch - 20, { width: cw, align: "center", characterSpacing: 0.3, lineBreak: false });
 
     // Thin gold inner frame for VVIP

@@ -48,6 +48,8 @@ interface BookingInput {
   email: string;
   quantity: number;
   companyUrl: string | null;
+  university: string | null;
+  major: string | null;
   captchaToken: string | null;
 }
 
@@ -63,6 +65,8 @@ function parse(body: unknown): BookingInput | string {
   const quantity = b["quantity"];
   const companyUrl = str(b["companyUrl"]) || null;
   const captchaToken = str(b["captchaToken"]) || null;
+  const university = str(b["university"]).replace(/\s+/g, " ");
+  const major = str(b["major"]).replace(/\s+/g, " ");
 
   if (!UUID.test(eventId)) return "A valid eventId is required";
   if (!TYPES.has(attendeeType)) return "attendeeType must be student, regular or organization";
@@ -79,6 +83,11 @@ function parse(body: unknown): BookingInput | string {
       return "A valid company website (https://…) is required for organizations";
     }
   }
+  if (attendeeType === "student") {
+    if (university.length < 2 || university.length > 120) return "University is required for student tickets (up to 120 characters)";
+    if (major.length < 2 || major.length > 120) return "Major is required for student tickets (up to 120 characters)";
+    if (/[\u0000-\u001f\u007f]/.test(university + major)) return "University or major contains invalid characters";
+  }
   return {
     eventId,
     attendeeType: attendeeType as BookingInput["attendeeType"],
@@ -87,6 +96,8 @@ function parse(body: unknown): BookingInput | string {
     email,
     quantity,
     companyUrl: attendeeType === "organization" ? companyUrl : null,
+    university: attendeeType === "student" ? university : null,
+    major: attendeeType === "student" ? major : null,
     captchaToken,
   };
 }
@@ -199,6 +210,8 @@ router.post("/public/bookings", async (req, res) => {
         customer_phone: input.phone,
         customer_email: input.email,
         attendee_type: input.attendeeType,
+        customer_university: input.university,
+        customer_major: input.major,
         is_scanned: false,
         is_emailed: false,
         payment_status: "pending",

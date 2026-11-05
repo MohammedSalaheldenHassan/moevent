@@ -38,7 +38,7 @@ function NotFound() {
     <div className="mx-auto max-w-md px-4 pt-24 text-center">
       <p className="font-mono text-sm text-muted">404</p>
       <h1 className="mt-2 text-2xl font-semibold tracking-tight">{t.pageNotFound}</h1>
-      <Link href="/" className="mt-6 inline-flex h-11 items-center rounded-md bg-btn px-5 font-medium text-on-btn hover:bg-accent hover:text-white">
+      <Link href="/" className="mt-6 inline-flex h-11 items-center rounded-md bg-btn px-5 font-medium text-on-btn hover:bg-accent-hover hover:text-on-accent">
         {t.goHome}
       </Link>
     </div>

@@ -12,13 +12,16 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } f
 import {
   ChevronRight, ChevronLeft, CalendarDays, MapPin, Ticket,
   Search, CheckCircle2, AlertCircle, Loader2,
-  Printer, Users, UserPlus, Trash2, MessageCircle, Mail, Plus,
+  Printer, Users, UserPlus, Trash2, MessageCircle, Mail, Plus, Download,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { printTicket, isImageUrl, shortTicketId } from "@/lib/printTicket";
 import QRCode from "qrcode";
 import { generateTicketPdf } from "@/lib/ticketPdf";
 import { BookingRequestsPanel } from "@/components/BookingRequestsPanel";
+import { TicketTypeBreakdown } from "@/components/TicketTypeBreakdown";
+import { fetchAllRows } from "@/lib/fetchAllRows";
+import { exportEventWorkbook } from "@/lib/exportEvent";
 
 interface Event {
   id: string;
@@ -27,6 +30,9 @@ interface Event {
   location: string | null;
   price: number | null;
   image_url: string | null;
+  capacity_student: number | null;
+  capacity_regular: number | null;
+  capacity_organization: number | null;
 }
 
 interface TicketRow {
@@ -36,6 +42,9 @@ interface TicketRow {
   // Set by the public booking site; null for tickets issued here.
   customer_email: string | null;
   attendee_type: TicketKind | null;
+  // Student tickets only.
+  customer_university: string | null;
+  customer_major: string | null;
   is_scanned: boolean;
   created_at: string;
 }
@@ -225,6 +234,17 @@ const DIAL_CODES = [
   { code: "+263", flag: "🇿🇼", name: "Zimbabwe" },
 ];
 
+const fetchEventTickets = (eventId: string) =>
+  fetchAllRows<TicketRow>((from, to) =>
+    supabase
+      .from("tickets")
+      .select("*")
+      .eq("event_id", eventId)
+      .order("created_at", { ascending: false })
+      .order("id", { ascending: true })
+      .range(from, to),
+  );
+
 export default function EventDetailPage() {
   const params = useParams<{ id: string }>();
   const id = params?.id;
@@ -241,6 +261,21 @@ export default function EventDetailPage() {
   const [error, setError] = useState<string | null>(null);
   const [search, setSearch] = useState("");
   const [filter, setFilter] = useState<Filter>("all");
+  const [exporting, setExporting] = useState(false);
+  const [exportError, setExportError] = useState<string | null>(null);
+
+  const handleExport = async () => {
+    if (!event) return;
+    setExporting(true);
+    setExportError(null);
+    try {
+      await exportEventWorkbook(event, isAr);
+    } catch (err) {
+      setExportError(err instanceof Error ? err.message : t.somethingWrong);
+    } finally {
+      setExporting(false);
+    }
+  };
 
   const [selectedTicket, setSelectedTicket] = useState<TicketRow | null>(null);
   const [qrDataUrl, setQrDataUrl] = useState<string | null>(null);
@@ -295,7 +330,7 @@ export default function EventDetailPage() {
         eventLocation: event.location,
         eventPrice: event.price,
         qrDataUrl: ticketQr,
-        systemName: systemName || "TicketHub",
+        systemName: systemName || "Nexus Youth",
         systemLogo: systemLogo || "",
         isAr,
       });
@@ -449,13 +484,12 @@ export default function EventDetailPage() {
     const load = async () => {
       try {
         const [eventRes, ticketsRes] = await Promise.all([
-          supabase.from("events").select("id, title, event_date, location, price, image_url").eq("id", id).single(),
-          supabase.from("tickets").select("*").eq("event_id", id).order("created_at", { ascending: false }),
+          supabase.from("events").select("id, title, event_date, location, price, image_url, capacity_student, capacity_regular, capacity_organization").eq("id", id).single(),
+          fetchEventTickets(id),
         ]);
         if (eventRes.error) throw eventRes.error;
-        if (ticketsRes.error) throw ticketsRes.error;
         setEvent(eventRes.data as Event);
-        setTickets(ticketsRes.data ?? []);
+        setTickets(ticketsRes);
       } catch (err: unknown) {
         setError(err instanceof Error ? err.message : t.somethingWrong);
       } finally {
@@ -469,8 +503,7 @@ export default function EventDetailPage() {
   // After an organization request is approved, its new tickets appear here.
   const reloadTickets = async () => {
     if (!id) return;
-    const { data, error } = await supabase.from("tickets").select("*").eq("event_id", id).order("created_at", { ascending: false });
-    if (!error) setTickets(data ?? []);
+    setTickets(await fetchEventTickets(id).catch(() => tickets));
   };
 
   const openTicketDetail = async (tk: TicketRow) => {
@@ -611,10 +644,18 @@ export default function EventDetailPage() {
                     )}
                   </div>
                 </div>
-                <Button onClick={() => navigate("/issue-ticket")} className="shrink-0 self-start">
-                  <Plus className="w-4 h-4" />
-                  {t.issueTicket}
-                </Button>
+                <div className="flex flex-wrap gap-2 shrink-0 self-start">
+                  {isAdmin && (
+                    <Button variant="outline" onClick={() => void handleExport()} disabled={exporting}>
+                      {exporting ? <Loader2 className="w-4 h-4 animate-spin" /> : <Download className="w-4 h-4" />}
+                      {isAr ? "تصدير Excel" : "Export to Excel"}
+                    </Button>
+                  )}
+                  <Button onClick={() => navigate("/issue-ticket")}>
+                    <Plus className="w-4 h-4" />
+                    {t.issueTicket}
+                  </Button>
+                </div>
               </div>
             </div>
 
@@ -633,6 +674,14 @@ export default function EventDetailPage() {
               ))}
             </dl>
           </div>
+
+          {exportError && (
+            <p role="alert" className="rounded-md border border-destructive/30 bg-destructive/5 px-3 py-2 text-sm text-destructive">
+              {isAr ? `تعذّر التصدير: ${exportError}` : `The export failed: ${exportError}`}
+            </p>
+          )}
+
+          <TicketTypeBreakdown tickets={tickets} event={event} isAr={isAr} />
 
           {isAdmin && (
             <BookingRequestsPanel
@@ -890,6 +939,18 @@ export default function EventDetailPage() {
                       <div>
                         <p className="text-[10px] font-semibold uppercase tracking-wider text-muted-foreground">{isAr ? "نوع التذكرة" : "Ticket type"}</p>
                         <p className="text-sm font-semibold" style={{ color: ticketTheme(selectedTicket.attendee_type).text }}>{ATTENDEE_TYPE_LABELS[selectedTicket.attendee_type][isAr ? "ar" : "en"]}</p>
+                      </div>
+                    )}
+                    {selectedTicket.customer_university && (
+                      <div>
+                        <p className="text-[10px] font-semibold uppercase tracking-wider text-muted-foreground">{isAr ? "الجامعة" : "University"}</p>
+                        <p className="text-sm font-medium text-foreground break-words">{selectedTicket.customer_university}</p>
+                      </div>
+                    )}
+                    {selectedTicket.customer_major && (
+                      <div>
+                        <p className="text-[10px] font-semibold uppercase tracking-wider text-muted-foreground">{isAr ? "التخصص" : "Major"}</p>
+                        <p className="text-sm font-medium text-foreground break-words">{selectedTicket.customer_major}</p>
                       </div>
                     )}
                     <div>

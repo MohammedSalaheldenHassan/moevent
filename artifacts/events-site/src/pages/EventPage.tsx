@@ -256,12 +256,15 @@ function BookingPanel({ event }: { event: PublicEvent }) {
   const [attendeeType, setAttendeeType] = useState<AttendeeType | null>(null);
   const [qty, setQty] = useState(1);
   const [companyUrl, setCompanyUrl] = useState("");
+  const [university, setUniversity] = useState("");
+  const [major, setMajor] = useState("");
   const [errors, setErrors] = useState<{
-    type?: string; company?: string; name?: string; phone?: string; email?: string; form?: string;
+    type?: string; company?: string; university?: string; major?: string; name?: string; phone?: string; email?: string; form?: string;
   }>({});
   const [submitting, setSubmitting] = useState(false);
   const [booked, setBooked] = useState<Booked | null>(null);
   const isOrg = attendeeType === "organization";
+  const isStudent = attendeeType === "student";
   const [captchaToken, setCaptchaToken] = useState<string | null>(null);
   const turnstileRef = useRef<TurnstileHandle>(null);
 
@@ -290,12 +293,14 @@ function BookingPanel({ event }: { event: PublicEvent }) {
     if (!attendeeType) next.type = t.attendeeTypeRequired;
     const company = isOrg ? normalizeCompanyUrl(companyUrl) : null;
     if (isOrg && !company) next.company = t.companyUrlInvalid;
+    if (isStudent && !university.trim()) next.university = t.universityRequired;
+    if (isStudent && !major.trim()) next.major = t.majorRequired;
     if (!name.trim()) next.name = t.nameRequired;
     if (!isValidPhone(phone)) next.phone = t.phoneInvalid;
     if (!isValidEmail(email.trim())) next.email = t.emailInvalid;
     setErrors(next);
     // Focus the first invalid field, in form order.
-    const firstBad = (["type", "company", "name", "phone", "email"] as const).find((k) => next[k]);
+    const firstBad = (["type", "company", "university", "major", "name", "phone", "email"] as const).find((k) => next[k]);
     if (firstBad || !attendeeType) {
       document.getElementById(firstBad === "type" ? `type-${ATTENDEE_TYPES[0]}` : firstBad!)?.focus();
       return;
@@ -318,6 +323,7 @@ function BookingPanel({ event }: { event: PublicEvent }) {
         ...contact,
         quantity: qty,
         ...(isOrg && company ? { companyUrl: company } : {}),
+        ...(isStudent ? { university: university.trim(), major: major.trim() } : {}),
         ...(captchaToken ? { captchaToken } : {}),
       });
       if (result.kind === "request" && result.requestId) {
@@ -454,6 +460,50 @@ function BookingPanel({ event }: { event: PublicEvent }) {
           </div>
         )}
 
+        {isStudent && (
+          <div className="fade-in grid gap-4 sm:grid-cols-2 lg:grid-cols-1">
+            <div>
+              <label htmlFor="university" className="block text-sm font-medium">
+                {t.university}
+              </label>
+              <input
+                id="university"
+                autoComplete="organization"
+                value={university}
+                onChange={(e) => setUniversity(e.target.value)}
+                maxLength={120}
+                aria-invalid={!!errors.university}
+                aria-describedby={errors.university ? "university-err" : undefined}
+                className={`mt-1.5 ${input(!!errors.university)}`}
+              />
+              {errors.university && (
+                <p id="university-err" className="mt-1 text-xs text-danger">
+                  {errors.university}
+                </p>
+              )}
+            </div>
+            <div>
+              <label htmlFor="major" className="block text-sm font-medium">
+                {t.major}
+              </label>
+              <input
+                id="major"
+                value={major}
+                onChange={(e) => setMajor(e.target.value)}
+                maxLength={120}
+                aria-invalid={!!errors.major}
+                aria-describedby={errors.major ? "major-err" : undefined}
+                className={`mt-1.5 ${input(!!errors.major)}`}
+              />
+              {errors.major && (
+                <p id="major-err" className="mt-1 text-xs text-danger">
+                  {errors.major}
+                </p>
+              )}
+            </div>
+          </div>
+        )}
+
         <div className="flex items-center justify-between gap-4">
           <span>
             <span id="qty-label" className="block text-sm font-medium">
@@ -567,7 +617,7 @@ function BookingPanel({ event }: { event: PublicEvent }) {
       <button
         type="submit"
         disabled={submitting}
-        className="mt-4 flex h-12 w-full items-center justify-center rounded-md bg-accent text-base font-semibold text-white transition-colors hover:bg-accent-hover disabled:cursor-wait disabled:opacity-70"
+        className="mt-4 flex h-12 w-full items-center justify-center rounded-md bg-accent text-base font-semibold text-on-accent transition-colors hover:bg-accent-hover disabled:cursor-wait disabled:opacity-70"
       >
         {submitting ? t.submitting : isOrg ? t.submitRequest(qty) : t.submit(qty)}
       </button>
@@ -595,9 +645,9 @@ export default function EventPage({ id }: { id: string }) {
   const [panelVisible, setPanelVisible] = useState(true);
 
   useEffect(() => {
-    if (event) document.title = `${event.title} · MoEvent`;
+    if (event) document.title = `${event.title} · Nexus Youth`;
     return () => {
-      document.title = "MoEvent — Events & Tickets";
+      document.title = "Nexus Youth — Events & Tickets";
     };
   }, [event]);
 
@@ -617,7 +667,7 @@ export default function EventPage({ id }: { id: string }) {
       <div className="mx-auto max-w-md px-4 pt-20 text-center">
         <h1 className="text-2xl font-semibold tracking-tight">{error ? t.loadError : t.notFound}</h1>
         <p className="mt-2 text-muted">{error ?? t.notFoundBody}</p>
-        <Link href="/" className="mt-6 inline-flex h-11 items-center rounded-md bg-btn px-5 font-medium text-on-btn hover:bg-accent hover:text-white">
+        <Link href="/" className="mt-6 inline-flex h-11 items-center rounded-md bg-btn px-5 font-medium text-on-btn hover:bg-accent-hover hover:text-on-accent">
           {t.goHome}
         </Link>
       </div>
@@ -647,6 +697,11 @@ export default function EventPage({ id }: { id: string }) {
               <h1 className="mt-3 text-[1.75rem] font-semibold leading-tight tracking-tight [overflow-wrap:anywhere] min-[400px]:text-3xl sm:text-4xl lg:text-[2.6rem]">
                 {event.title}
               </h1>
+
+              {/* Plain text from the dashboard; keep the admin's line breaks. */}
+              {event.description?.trim() && (
+                <p className="mt-4 max-w-prose whitespace-pre-line text-lg leading-relaxed text-ink-soft">{event.description.trim()}</p>
+              )}
 
               <ul className="mt-6 grid gap-3 sm:grid-cols-3">
                 <Fact
@@ -689,16 +744,6 @@ export default function EventPage({ id }: { id: string }) {
               className="mt-8 aspect-[16/9] max-h-[min(70svh,480px)] w-full rounded-xl border border-line"
             />
 
-            {event.description?.trim() && (
-              <section aria-labelledby="about-event" className="mt-10">
-                <h2 id="about-event" className="text-xl font-semibold tracking-tight">
-                  {t.aboutEvent}
-                </h2>
-                {/* Plain text from the dashboard; keep the admin's line breaks. */}
-                <p className="mt-3 max-w-prose whitespace-pre-line leading-relaxed text-ink-soft">{event.description.trim()}</p>
-              </section>
-            )}
-
             {(event.location || hasPin) && (
               <section id="location" aria-labelledby="location-title" className="mt-10 scroll-mt-24">
                 <h2 id="location-title" className="text-xl font-semibold tracking-tight">
@@ -735,7 +780,7 @@ export default function EventPage({ id }: { id: string }) {
                 <div className="text-center">
                   <h2 className="text-lg font-semibold">{t.endedTitle}</h2>
                   <p className="mt-1 text-sm text-muted">{t.endedBody}</p>
-                  <Link href="/" className="mt-5 inline-flex h-11 w-full items-center justify-center rounded-md bg-btn font-medium text-on-btn hover:bg-accent hover:text-white">
+                  <Link href="/" className="mt-5 inline-flex h-11 w-full items-center justify-center rounded-md bg-btn font-medium text-on-btn hover:bg-accent-hover hover:text-on-accent">
                     {t.seeUpcoming}
                   </Link>
                 </div>
@@ -762,7 +807,7 @@ export default function EventPage({ id }: { id: string }) {
             <a
               href="#book"
               tabIndex={panelVisible ? -1 : 0}
-              className="flex h-11 shrink-0 items-center rounded-md bg-accent px-6 font-semibold text-white hover:bg-accent-hover"
+              className="flex h-11 shrink-0 items-center rounded-md bg-accent px-6 font-semibold text-on-accent hover:bg-accent-hover"
             >
               {t.bookCta}
             </a>

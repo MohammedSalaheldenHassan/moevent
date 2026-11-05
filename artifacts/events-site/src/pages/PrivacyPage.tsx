@@ -23,7 +23,7 @@ function content(lang: Lang, email: string): { title: string; intro: string; upd
       title: "سياسة الخصوصية",
       updated: "آخر تحديث",
       intro:
-        "توضّح هذه السياسة البيانات التي تجمعها MoEvent وكيف نستخدمها، سواء عند حجز التذاكر على هذا الموقع أو عند استخدام فريق العمل لتطبيق MES لمسح التذاكر عند المدخل.",
+        "توضّح هذه السياسة البيانات التي تجمعها Nexus Youth وكيف نستخدمها، سواء عند حجز التذاكر على هذا الموقع أو عند استخدام فريق العمل لتطبيق MES لمسح التذاكر عند المدخل.",
       sections: [
         {
           id: "booking",
@@ -33,6 +33,7 @@ function content(lang: Lang, email: string): { title: string; intro: string; upd
             [
               "الاسم، ورقم الهاتف، والبريد الإلكتروني.",
               "نوع التذكرة (طالب، عادي، مؤسسة) وعدد التذاكر.",
+              "لتذاكر الطلاب: اسم الجامعة والتخصص.",
               "لحجوزات المؤسسات: رابط موقع المؤسسة، ليراجع فريقنا الطلب قبل الموافقة عليه.",
             ],
             "نستخدم هذه البيانات لإصدار تذاكرك وإرسالها إلى بريدك الإلكتروني مع رمز QR، وللتواصل معك بشأن الحجز، وللتحقق من التذكرة عند الدخول. لا نستخدمها للتسويق.",
@@ -114,7 +115,7 @@ function content(lang: Lang, email: string): { title: string; intro: string; upd
     title: "Privacy Policy",
     updated: "Last updated",
     intro:
-      "This policy explains what MoEvent collects and how we use it, both when you book tickets on this website and when event staff use the MES app to scan tickets at the door.",
+      "This policy explains what Nexus Youth collects and how we use it, both when you book tickets on this website and when event staff use the MES app to scan tickets at the door.",
     sections: [
       {
         id: "booking",
@@ -124,6 +125,7 @@ function content(lang: Lang, email: string): { title: string; intro: string; upd
           [
             "Your name, phone number and email address.",
             "The ticket type (student, regular or organization) and how many tickets.",
+            "For student tickets: your university and major.",
             "For organization bookings: the organization's website, so our team can review the request before approving it.",
           ],
           "We use these details to issue your tickets and email them to you with a QR code, to contact you about your booking, and to check your ticket at the door. We do not use them for marketing.",
@@ -207,9 +209,9 @@ export default function PrivacyPage() {
   const c = content(lang, email);
 
   useEffect(() => {
-    document.title = `${c.title} · MoEvent`;
+    document.title = `${c.title} · Nexus Youth`;
     return () => {
-      document.title = "MoEvent — Events & Tickets";
+      document.title = "Nexus Youth — Events & Tickets";
     };
   }, [c.title]);
 

@@ -1,3 +1,5 @@
+import { fetchAllRows } from "@/lib/fetchAllRows";
+import { TYPE_ORDER, ticketTheme, typeLabel, type TicketKind } from "@/lib/ticketThemes";
 import { useEffect, useRef, useState } from "react";
 import { useLocation } from "wouter";
 import { supabase } from "@/lib/supabase";
@@ -37,6 +39,7 @@ type StatusFilter = "all" | "upcoming" | "past";
 interface TicketStats {
   sold: number;
   scanned: number;
+  byType: Partial<Record<TicketKind, number>>;
 }
 
 // Per-type ticket limits. Stored on events as capacity_<type> (total seats;
@@ -169,12 +172,21 @@ export default function EventsPage() {
       // Sold / checked-in counts per event (one query for all events)
       const ids = (data ?? []).map((e: Event) => e.id);
       if (ids.length > 0) {
-        const { data: tickets } = await supabase.from("tickets").select("event_id, is_scanned").in("event_id", ids);
+        type Row = { event_id: string; is_scanned: boolean | null; attendee_type: TicketKind | null };
+        const tickets = await fetchAllRows<Row>((from, to) =>
+          supabase
+            .from("tickets")
+            .select("event_id, is_scanned, attendee_type")
+            .in("event_id", ids)
+            .order("id", { ascending: true })
+            .range(from, to),
+        );
         const stats: Record<string, TicketStats> = {};
-        for (const tk of (tickets ?? []) as { event_id: string; is_scanned: boolean | null }[]) {
-          const st = (stats[tk.event_id] ??= { sold: 0, scanned: 0 });
+        for (const tk of tickets) {
+          const st = (stats[tk.event_id] ??= { sold: 0, scanned: 0, byType: {} });
           st.sold += 1;
           if (tk.is_scanned) st.scanned += 1;
+          if (tk.attendee_type) st.byType[tk.attendee_type] = (st.byType[tk.attendee_type] ?? 0) + 1;
         }
         setTicketStats(stats);
       }
@@ -524,7 +536,7 @@ export default function EventsPage() {
           {visible.map((event) => {
             const status = statusOf(event.event_date);
             const price = formatPrice(event.price as number | null);
-            const stats = ticketStats[event.id] ?? { sold: 0, scanned: 0 };
+            const stats = ticketStats[event.id] ?? { sold: 0, scanned: 0, byType: {} };
             const open = () => navigate(`/events/${event.id}`);
 
             return (
@@ -625,6 +637,24 @@ export default function EventsPage() {
                       <dd className="font-medium text-foreground tabular-nums truncate">{price ?? "—"}</dd>
                     </div>
                   </dl>
+
+                  {/* Sold by ticket type */}
+                  {stats.sold > 0 && (
+                    <ul className="mt-3 flex flex-wrap gap-1.5" aria-label={isAr ? "التذاكر حسب النوع" : "Tickets by type"}>
+                      {TYPE_ORDER.filter((type) => stats.byType[type]).map((type) => {
+                        const th = ticketTheme(type);
+                        return (
+                          <li
+                            key={type}
+                            className="rounded-full px-2 py-0.5 text-[11px] font-semibold tabular-nums"
+                            style={{ background: th.soft, color: th.text }}
+                          >
+                            {typeLabel(type, isAr ? "ar" : "en")} {stats.byType[type]}
+                          </li>
+                        );
+                      })}
+                    </ul>
+                  )}
                 </div>
               </article>
             );

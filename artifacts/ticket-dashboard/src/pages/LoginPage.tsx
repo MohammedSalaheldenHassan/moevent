@@ -31,7 +31,7 @@ export default function LoginPage() {
   };
 
   const logo = isImageLogo ? (
-    <img src={displayLogo} alt="" className="w-10 h-10 rounded-md object-contain bg-black border border-white/10" />
+    <img src={displayLogo} alt="" className="w-10 h-10 rounded-md object-contain border border-white/10" />
   ) : (
     <div className="w-10 h-10 rounded-md bg-primary text-primary-foreground flex items-center justify-center">
       <Ticket className="w-5 h-5" />
@@ -41,12 +41,15 @@ export default function LoginPage() {
   return (
     <div className="min-h-screen grid lg:grid-cols-[minmax(0,5fr)_minmax(0,7fr)] bg-background">
       {/* Brand panel */}
-      <aside className="hidden lg:flex flex-col justify-between bg-[hsl(220_15%_11%)] text-white px-12 py-10">
+      <aside className="hidden lg:flex flex-col justify-between relative overflow-hidden bg-[#0E2A4A] text-white px-12 py-10">
         <div className="flex items-center gap-3">
           {logo}
           <span className="font-semibold tracking-tight">{displayName}</span>
         </div>
         <div className="max-w-sm">
+          <p className={`text-xs font-semibold text-[#D9954F] mb-3 ${isAr ? "" : "uppercase tracking-[0.2em]"}`}>
+            {isAr ? "خطوتك التالية بعد التخرّج" : "Navigate next steps after graduation"}
+          </p>
           <p className="text-2xl font-semibold leading-snug tracking-tight">
             {isAr ? "إدارة الفعاليات والتذاكر والدخول من مكان واحد." : "Events, tickets and gate entry, managed in one place."}
           </p>
@@ -56,7 +59,10 @@ export default function LoginPage() {
               : "This console is for administrators. Gate staff use the scanning app."}
           </p>
         </div>
-        <p className="text-xs text-white/40">&copy; {new Date().getFullYear()} {displayName}</p>
+        <div>
+          <p className="text-xs text-white/50">&copy; {new Date().getFullYear()} {displayName}</p>
+          <div className="absolute inset-x-0 bottom-0 h-10 bg-[url('/brand/pattern.svg')] bg-[length:auto_100%] bg-repeat-x opacity-90" aria-hidden="true" />
+        </div>
       </aside>
 
       {/* Form */}
