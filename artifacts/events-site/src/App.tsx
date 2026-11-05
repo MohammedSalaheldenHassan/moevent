@@ -7,6 +7,7 @@ import { Navbar } from "@/components/Navbar";
 import { Footer } from "@/components/Footer";
 import HomePage from "@/pages/HomePage";
 import EventPage from "@/pages/EventPage";
+import PrivacyPage from "@/pages/PrivacyPage";
 
 // In dev /api is proxied to the Express server; a deployed site points at the
 // API host (e.g. https://api.up.railway.app). Generated URLs already start with
@@ -56,6 +57,7 @@ export default function App() {
             <main id="main" tabIndex={-1} className="flex-1 pb-16 outline-none sm:pb-24">
               <Switch>
                 <Route path="/" component={HomePage} />
+                <Route path="/privacy" component={PrivacyPage} />
                 <Route path="/events/:id">{(params) => <EventPage id={params.id} />}</Route>
                 <Route component={NotFound} />
               </Switch>
