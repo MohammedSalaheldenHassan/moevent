@@ -13,7 +13,7 @@ export function WhenTag({ event }: { event: PublicEvent }) {
   return (
     <span
       className={`inline-flex h-6 w-fit items-center rounded px-2 text-xs font-medium ${
-        soon ? "bg-accent-soft text-accent" : "bg-bg text-ink-soft"
+        soon ? "bg-accent-soft text-copper-ink" : "bg-bg text-ink-soft"
       }`}
     >
       {relativeDay(days)}
@@ -26,7 +26,7 @@ function DateBadge({ iso }: { iso: string }) {
   const p = dateParts(iso);
   return (
     <div className="flex w-14 flex-col items-center rounded-md bg-surface py-1.5 leading-none shadow-sm">
-      <span className="text-[11px] font-semibold uppercase tracking-wide text-accent">{p.month}</span>
+      <span className="text-[11px] font-semibold uppercase tracking-wide text-copper-ink">{p.month}</span>
       <span className="mt-1 text-2xl font-semibold tracking-tight">{p.day}</span>
     </div>
   );

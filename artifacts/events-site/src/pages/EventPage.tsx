@@ -410,7 +410,7 @@ function BookingPanel({ event }: { event: PublicEvent }) {
                   {remaining != null && (
                     <span
                       className={`shrink-0 rounded px-1.5 py-0.5 text-xs font-medium ${
-                        soldOut ? "bg-bg text-muted" : remaining <= 10 ? "bg-accent-soft text-accent" : "bg-bg text-ink-soft"
+                        soldOut ? "bg-bg text-muted" : remaining <= 10 ? "bg-accent-soft text-copper-ink" : "bg-bg text-ink-soft"
                       }`}
                     >
                       {soldOut ? t.soldOut : t.seatsLeft(remaining)}
@@ -430,7 +430,7 @@ function BookingPanel({ event }: { event: PublicEvent }) {
         {isOrg && (
           <div className="fade-in space-y-4">
             <p className="flex items-start gap-2 rounded-md border border-line bg-bg px-3 py-2.5 text-xs text-ink-soft">
-              <CircleAlert className="mt-px size-4 shrink-0 text-accent" aria-hidden="true" />
+              <CircleAlert className="mt-px size-4 shrink-0 text-copper-ink" aria-hidden="true" />
               {t.orgNotice}
             </p>
             <div>
@@ -716,7 +716,7 @@ export default function EventPage({ id }: { id: string }) {
                   value={event.location || t.venueTba}
                   sub={
                     event.location || hasPin ? (
-                      <a href="#location" className="font-medium text-accent hover:underline">
+                      <a href="#location" className="font-medium text-copper-ink hover:underline">
                         {t.seeOnMap}
                       </a>
                     ) : undefined

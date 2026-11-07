@@ -34,7 +34,7 @@ export function Footer() {
 
   return (
     <footer className="bg-surface">
-      <div className="h-8 bg-[url('/brand/pattern.svg')] bg-[length:auto_100%] bg-repeat-x opacity-80" aria-hidden="true" />
+      <div className="h-10 bg-[url('/brand/motif.png')] bg-[length:auto_100%] bg-repeat-x" aria-hidden="true" />
       <div className="mx-auto grid max-w-6xl gap-10 px-4 py-12 sm:grid-cols-2 sm:px-6 lg:grid-cols-[minmax(0,1.4fr)_repeat(3,minmax(0,1fr))]">
         <div>
           <Wordmark />

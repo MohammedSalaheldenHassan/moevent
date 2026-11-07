@@ -66,7 +66,7 @@ export function printTicket({
 <style>
   * { box-sizing: border-box; margin: 0; padding: 0; }
   html { -webkit-print-color-adjust: exact; print-color-adjust: exact; }
-  body { font-family: ${isAr ? "'Cairo'" : "'Montserrat'"}, system-ui, sans-serif; color: #0E2A4A; background: #F8F6F2; display: flex; justify-content: center; padding: 40px 16px; }
+  body { font-family: ${isAr ? "'Cairo'" : "'Montserrat'"}, system-ui, sans-serif; color: #001F3B; background: #FEF9EF; display: flex; justify-content: center; padding: 40px 16px; }
   .ticket { position: relative; width: 380px; background: #fff; border-radius: 16px; overflow: hidden; box-shadow: 0 1px 2px rgba(0,0,0,.06), 0 8px 28px rgba(0,0,0,.08); ${th.kind === "vvip" ? `outline: 1px solid ${th.accent}; outline-offset: -6px;` : ""} }
   .top { padding: 22px 24px 20px; color: #fff; background: ${header}; border-bottom: 4px solid ${th.accent}; }
   .brand { display: flex; align-items: center; justify-content: space-between; gap: 12px; margin-bottom: 18px; }
@@ -84,7 +84,7 @@ export function printTicket({
   .qr { width: 124px; height: 124px; background: #fff; border: 2px solid ${th.accent}; outline: 6px solid ${th.soft}; border-radius: 10px; padding: 6px; margin: 6px; }
   .scan { margin-top: 6px; font-size: 8.5px; font-weight: 700; letter-spacing: .1em; color: #5C6B7B; }
   .stub { position: relative; display: flex; justify-content: space-between; align-items: center; gap: 12px; padding: 12px 24px 14px; border-top: 1.5px dashed #E6D6C2; background: ${th.soft}; }
-  .stub::before, .stub::after { content: ""; position: absolute; top: -9px; width: 16px; height: 16px; border-radius: 50%; background: #F8F6F2; }
+  .stub::before, .stub::after { content: ""; position: absolute; top: -9px; width: 16px; height: 16px; border-radius: 50%; background: #FEF9EF; }
   .stub::before { left: -8px; } .stub::after { right: -8px; }
   .id { font-family: ui-monospace, Menlo, Consolas, monospace; font-size: 15px; font-weight: 600; letter-spacing: .06em; }
   .tier { font-size: 13px; font-weight: 700; letter-spacing: .14em; color: ${th.text}; }

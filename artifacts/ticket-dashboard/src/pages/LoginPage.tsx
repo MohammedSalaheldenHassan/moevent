@@ -41,7 +41,7 @@ export default function LoginPage() {
   return (
     <div className="min-h-screen grid lg:grid-cols-[minmax(0,5fr)_minmax(0,7fr)] bg-background">
       {/* Brand panel */}
-      <aside className="hidden lg:flex flex-col justify-between relative overflow-hidden bg-[#0E2A4A] text-white px-12 py-10">
+      <aside className="hidden lg:flex flex-col justify-between relative overflow-hidden bg-[#001F3B] text-white px-12 py-10">
         <div className="flex items-center gap-3">
           {logo}
           <span className="font-semibold tracking-tight">{displayName}</span>
@@ -61,7 +61,7 @@ export default function LoginPage() {
         </div>
         <div>
           <p className="text-xs text-white/50">&copy; {new Date().getFullYear()} {displayName}</p>
-          <div className="absolute inset-x-0 bottom-0 h-10 bg-[url('/brand/pattern.svg')] bg-[length:auto_100%] bg-repeat-x opacity-90" aria-hidden="true" />
+          <div className="absolute inset-x-0 bottom-0 h-10 bg-[url('/brand/motif.png')] bg-[length:auto_100%] bg-repeat-x opacity-90" aria-hidden="true" />
         </div>
       </aside>
 

@@ -1,8 +1,8 @@
-import { PhoneCall, QrCode, Search, UserRound } from "lucide-react";
+import { Mail, QrCode, Search, UserRound } from "lucide-react";
 import { useLocale } from "@/lib/i18n";
 import { SectionHeader } from "./SectionHeader";
 
-const ICONS = [Search, UserRound, PhoneCall, QrCode];
+const ICONS = [Search, UserRound, Mail, QrCode];
 
 export function HowItWorks() {
   const { t } = useLocale();

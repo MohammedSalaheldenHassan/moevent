@@ -74,50 +74,50 @@
   --elevate-1: rgba(0,0,0, .03);
   --elevate-2: rgba(0,0,0, .08);
 
-  --background: 39 30% 96%;
-  --foreground: 212 68% 17%;
+  --background: 40 86% 97%;
+  --foreground: 209 100% 12%;
 
   --border: 37 28% 88%;
   --input: 37 25% 84%;
-  --ring: 212 68% 17%;
+  --ring: 209 100% 12%;
 
   --card: 0 0% 100%;
-  --card-foreground: 212 68% 17%;
+  --card-foreground: 209 100% 12%;
   --card-border: 37 28% 88%;
 
   --popover: 0 0% 100%;
-  --popover-foreground: 212 68% 17%;
+  --popover-foreground: 209 100% 12%;
   --popover-border: 37 25% 86%;
 
-  --primary: 212 68% 17%;
+  --primary: 209 100% 12%;
   --primary-foreground: 0 0% 100%;
 
   --secondary: 37 30% 93%;
-  --secondary-foreground: 212 68% 17%;
+  --secondary-foreground: 209 100% 12%;
 
   --muted: 37 30% 93%;
   --muted-foreground: 212 15% 42%;
 
   --accent: 37 40% 92%;
-  --accent-foreground: 212 68% 17%;
+  --accent-foreground: 209 100% 12%;
 
   --destructive: 0 62% 44%;
   --destructive-foreground: 0 0% 100%;
 
-  --chart-1: 212 68% 17%;
-  --chart-2: 180 59% 30%;
-  --chart-3: 27 53% 51%;
+  --chart-1: 209 100% 12%;
+  --chart-2: 184 53% 25%;
+  --chart-3: 26 74% 53%;
   --chart-4: 33 40% 83%;
   --chart-5: 212 40% 45%;
 
-  --sidebar: 212 68% 17%;
+  --sidebar: 209 100% 12%;
   --sidebar-foreground: 39 30% 96%;
-  --sidebar-border: 212 50% 24%;
-  --sidebar-primary: 27 53% 51%;
-  --sidebar-primary-foreground: 212 68% 12%;
-  --sidebar-accent: 212 50% 24%;
+  --sidebar-border: 209 70% 20%;
+  --sidebar-primary: 26 74% 53%;
+  --sidebar-primary-foreground: 209 100% 12%;
+  --sidebar-accent: 209 70% 19%;
   --sidebar-accent-foreground: 0 0% 100%;
-  --sidebar-ring: 27 53% 51%;
+  --sidebar-ring: 26 74% 53%;
 
   --app-font-sans: 'Montserrat Variable', 'Cairo Variable', system-ui, sans-serif;
   --app-font-arabic: 'Cairo Variable', 'Montserrat Variable', system-ui, sans-serif;
@@ -158,23 +158,23 @@
   --elevate-1: rgba(255,255,255, .04);
   --elevate-2: rgba(255,255,255, .09);
 
-  --background: 212 70% 8%;
+  --background: 209 100% 8%;
   --foreground: 39 30% 96%;
 
   --border: 212 45% 20%;
   --input: 212 45% 24%;
-  --ring: 28 64% 58%;
+  --ring: 28 80% 57%;
 
-  --card: 212 62% 12%;
+  --card: 209 90% 12%;
   --card-foreground: 39 30% 96%;
   --card-border: 212 45% 20%;
 
-  --popover: 212 62% 12%;
+  --popover: 209 90% 12%;
   --popover-foreground: 39 30% 96%;
   --popover-border: 212 45% 22%;
 
-  --primary: 28 64% 58%;
-  --primary-foreground: 212 68% 12%;
+  --primary: 28 80% 57%;
+  --primary-foreground: 209 100% 12%;
 
   --secondary: 212 50% 18%;
   --secondary-foreground: 39 30% 96%;
@@ -188,20 +188,20 @@
   --destructive: 0 60% 50%;
   --destructive-foreground: 0 0% 100%;
 
-  --chart-1: 28 64% 58%;
+  --chart-1: 28 80% 57%;
   --chart-2: 175 45% 52%;
   --chart-3: 33 40% 80%;
   --chart-4: 212 45% 60%;
   --chart-5: 27 53% 45%;
 
-  --sidebar: 212 72% 7%;
+  --sidebar: 209 100% 7%;
   --sidebar-foreground: 39 30% 92%;
   --sidebar-border: 212 45% 16%;
-  --sidebar-primary: 28 64% 58%;
+  --sidebar-primary: 28 80% 57%;
   --sidebar-primary-foreground: 212 68% 12%;
   --sidebar-accent: 212 50% 15%;
   --sidebar-accent-foreground: 0 0% 100%;
-  --sidebar-ring: 28 64% 58%;
+  --sidebar-ring: 28 80% 57%;
 
   --shadow-2xs: 0px 1px 2px 0px rgba(0,0,0,0.20);
   --shadow-xs: 0px 1px 3px 0px rgba(0,0,0,0.25);
