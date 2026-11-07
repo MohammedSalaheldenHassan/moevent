@@ -1,6 +1,7 @@
 import PDFDocument from "pdfkit";
 import QRCode from "qrcode";
 import type { TicketTheme } from "./ticketTheme";
+import { MARK_LIGHT_PNG } from "./brandMark";
 
 export interface PdfTicketInput {
   ticketId: string;
@@ -37,11 +38,6 @@ export function qrPayload(ticketId: string, eventTitle: string, customerName: st
 // emoji can't print as garbage. (Arabic names need an embedded font.)
 const latin = (s: string) => s.replace(/[^ -~ -ÿ–—‘’“”•…]/g, "").trim();
 
-// The Nexus Youth mark (viewBox 40 20 795 475), same as the site's logo.
-const MARK_LEFT = "M47 488 232 218C268 160 330 126 392 126 460 126 525 160 566 216 470 215 400 250 355 320L240 488Z";
-const MARK_RIGHT = "M458 300C490 265 530 245 570 245 610 245 645 262 668 292L828 488H613Z";
-const MARK_FLAG = "M632 30 822 135 632 232Z";
-
 function star(doc: PDFKit.PDFDocument, cx: number, cy: number, r: number) {
   const pts: [number, number][] = [];
   for (let i = 0; i < 10; i++) {
@@ -74,8 +70,8 @@ export async function generateTicketPDF(input: PdfTicketInput): Promise<Buffer> 
 
     const W = doc.page.width;
     const H = doc.page.height;
-    const PAGE = "#F8F6F2";
-    const INK = "#0E2A4A";
+    const PAGE = "#FEF9EF";
+    const INK = "#001F3B";
     const MUTED = "#5C6B7B";
     const LINE = "#E6D6C2";
 
@@ -114,16 +110,11 @@ export async function generateTicketPDF(input: PdfTicketInput): Promise<Buffer> 
 
     // Brand: the mark, then the name stacked like the logo.
     doc.fillOpacity(1);
-    const markH = 26;
-    const markK = markH / 475;
-    doc.save();
-    doc.translate(cx + 22, cy + 18).scale(markK).translate(-40, -20);
-    doc.path(MARK_LEFT).fill("#F8F6F2");
-    doc.path(MARK_RIGHT).fill("#F8F6F2");
-    doc.path(MARK_FLAG).fill(th.kind === "vip" ? "#F2D7B8" : "#C47A3F");
-    doc.restore();
+    const markH = 24;
+    const markW = (640 / 384) * markH;
+    doc.image(MARK_LIGHT_PNG, cx + 22, cy + 19, { width: markW, height: markH });
     const [first, ...rest] = latin(brandName).split(" ");
-    const nameX = cx + 22 + 795 * markK + 9;
+    const nameX = cx + 22 + markW + 7;
     doc.font("Helvetica-Bold").fontSize(9.5).fillColor("#FFFFFF").text(first ?? "", nameX, cy + 19, { lineBreak: false });
     doc.font("Helvetica").fontSize(9.5).fillColor("#FFFFFF").text(rest.join(" "), nameX, cy + 31, { lineBreak: false });
 

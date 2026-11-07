@@ -1,84 +1,133 @@
-import { ArrowDown, Check, Clock, QrCode } from "lucide-react";
+import { useRef, type PointerEvent } from "react";
+import { ArrowDown, Ticket } from "lucide-react";
 import { useLocale } from "@/lib/i18n";
-import { useSectionLink } from "@/lib/sections";
-import { BrandMark } from "@/components/Logo";
+import { prefersReducedMotion, useSectionLink } from "@/lib/sections";
+import type { PublicEvent } from "@/lib/events";
+import { Countdown } from "./Countdown";
 
-/** Brand visual: the Meroë pyramids (Sudanese roots) with the pass you end up with. */
-function BrandVisual() {
-  const { t } = useLocale();
-
-  return (
-    <div className="relative mx-auto w-full max-w-lg pb-8 pt-6" aria-hidden="true">
-      <img
-        src="/brand/pyramids.webp"
-        alt=""
-        width={1135}
-        height={664}
-        className="aspect-[4/3] w-full rounded-2xl object-cover object-[70%_center] shadow-[0_30px_60px_-30px_rgba(14,42,74,0.6)] rtl:-scale-x-100"
-      />
-
-      <div className="absolute bottom-0 end-3 flex w-[min(17rem,78%)] items-center gap-3 rounded-xl bg-panel p-3 text-white shadow-xl ring-1 ring-white/10 sm:end-5">
-        <span className="flex size-12 shrink-0 items-center justify-center rounded-lg bg-white p-2">
-          <QrCode className="size-full text-[#0e2a4a]" strokeWidth={1.75} />
-        </span>
-        <span className="min-w-0">
-          <BrandMark tone="light" className="mb-1 h-4 w-auto" />
-          <span className="block truncate text-sm font-semibold">{t.heroPass}</span>
-          <span className="block truncate text-xs text-white/65">{t.heroScan}</span>
-        </span>
-      </div>
-
-      <div className="absolute start-3 top-0 flex items-center gap-2 rounded-lg border border-line bg-surface px-3 py-2 text-sm font-medium shadow-lg sm:start-5">
-        <span className="flex size-6 items-center justify-center rounded-full bg-ok-soft text-ok">
-          <Check className="size-3.5" strokeWidth={3} />
-        </span>
-        {t.chipNoAccount}
-      </div>
-      <div className="absolute bottom-24 start-3 hidden items-center gap-2 rounded-lg border border-line bg-surface px-3 py-2 text-sm font-medium shadow-lg min-[480px]:flex sm:start-5">
-        <span className="flex size-6 items-center justify-center rounded-full bg-copper-soft text-copper-ink">
-          <Clock className="size-3.5" strokeWidth={2.5} />
-        </span>
-        {t.chipFast}
-      </div>
-    </div>
-  );
-}
-
-export function Hero() {
-  const { t, isAr } = useLocale();
+/**
+ * Campaign hero: "Let us light your path". A flashlight at the bottom throws a
+ * beam up behind the headline; on desktop a soft glow follows the pointer.
+ */
+export function Hero({ nextEvent }: { nextEvent: PublicEvent | null }) {
+  const { t, isAr, formatDate } = useLocale();
   const sectionLink = useSectionLink();
+  const ref = useRef<HTMLElement>(null);
+
+  const onMove = (e: PointerEvent<HTMLElement>) => {
+    const el = ref.current;
+    if (!el || e.pointerType !== "mouse" || prefersReducedMotion()) return;
+    const r = el.getBoundingClientRect();
+    el.style.setProperty("--mx", `${((e.clientX - r.left) / r.width) * 100}%`);
+    el.style.setProperty("--my", `${((e.clientY - r.top) / r.height) * 100}%`);
+  };
 
   return (
-    <section aria-labelledby="hero-title" className="border-b border-line bg-surface">
-      <div className="mx-auto grid max-w-6xl items-center gap-10 px-4 py-12 sm:px-6 sm:py-16 lg:grid-cols-[minmax(0,1.1fr)_minmax(0,1fr)] lg:gap-14 lg:py-20">
-        <div>
-          <p className={`text-xs font-semibold text-copper-ink sm:text-sm ${isAr ? "" : "uppercase tracking-[0.2em]"}`}>{t.heroEyebrow}</p>
-          <span className="mt-3 block h-1 w-12 rounded-full bg-copper" aria-hidden="true" />
-          <h1 id="hero-title" className="mt-5 text-[2rem] font-bold leading-[1.1] tracking-tight min-[400px]:text-4xl sm:text-5xl lg:text-[3.4rem]">
-            {t.heroTitle}
-          </h1>
-          <p className="mt-5 max-w-xl text-lg leading-relaxed text-muted">{t.heroSub}</p>
-          <div className="mt-8 flex flex-col gap-3 sm:flex-row">
-            <a
-              href="/#events"
-              onClick={sectionLink("events")}
-              className="inline-flex h-12 items-center justify-center gap-2 rounded-md bg-accent px-6 text-base font-semibold text-on-accent transition-colors hover:bg-accent-hover"
-            >
-              {t.browseEvents}
-              <ArrowDown className="size-4" aria-hidden="true" />
-            </a>
-            <a
-              href="/#how"
-              onClick={sectionLink("how")}
-              className="inline-flex h-12 items-center justify-center rounded-md border border-line-strong bg-surface px-6 text-base font-semibold text-ink transition-colors hover:border-ink"
-            >
-              {t.heroHow}
-            </a>
-          </div>
+    <section
+      ref={ref}
+      onPointerMove={onMove}
+      aria-labelledby="hero-title"
+      className="relative isolate overflow-hidden bg-[#001f3b] text-white"
+    >
+      {/* Faint blueprint grid, like the posters. */}
+      <div
+        aria-hidden="true"
+        className="absolute inset-0 -z-10 opacity-[0.07]"
+        style={{
+          backgroundImage:
+            "linear-gradient(to right, #fff 1px, transparent 1px), linear-gradient(to bottom, #fff 1px, transparent 1px)",
+          backgroundSize: "56px 56px",
+          maskImage: "radial-gradient(ellipse at 50% 40%, #000 30%, transparent 75%)",
+        }}
+      />
+      {/* Pointer glow. */}
+      <div
+        aria-hidden="true"
+        className="pointer-events-none absolute inset-0 -z-10 hidden md:block"
+        style={{ background: "radial-gradient(420px circle at var(--mx, 50%) var(--my, 30%), rgba(233,140,56,0.10), transparent 70%)" }}
+      />
+      {/* The beam. */}
+      <div
+        aria-hidden="true"
+        className="beam-on pointer-events-none absolute inset-x-0 bottom-[150px] -z-10 mx-auto h-[85%] w-[min(1100px,140%)] sm:bottom-[190px]"
+      >
+        <div
+          className="beam-breathe h-full w-full"
+          style={{
+            background:
+              "radial-gradient(ellipse 18% 100% at 50% 100%, rgba(255,236,200,0.55), rgba(255,214,150,0.18) 45%, transparent 75%), conic-gradient(from 180deg at 50% 100%, transparent 162deg, rgba(255,225,170,0.14) 172deg, rgba(255,235,195,0.26) 180deg, rgba(255,225,170,0.14) 188deg, transparent 198deg)",
+          }}
+        />
+      </div>
+
+      <div className="mx-auto flex min-h-[min(100svh,920px)] max-w-5xl flex-col items-center px-4 pb-[230px] pt-14 text-center sm:px-6 sm:pb-[290px] sm:pt-20">
+        <p className="rise inline-flex items-center gap-2 rounded-full border border-white/15 bg-white/5 px-3.5 py-1.5 text-xs font-semibold text-white/85 sm:text-sm">
+          <span className="size-1.5 rounded-full bg-[#e98c38]" aria-hidden="true" />
+          {t.heroKicker}
+          {nextEvent?.event_date && (
+            <>
+              <span className="text-white/35" aria-hidden="true">·</span>
+              <span className="text-[#f3a25a]">{formatDate(nextEvent.event_date, "short")}</span>
+            </>
+          )}
+        </p>
+
+        <h1
+          id="hero-title"
+          className={`mt-6 font-[family-name:var(--font-display)] font-extrabold tracking-tight ${
+            isAr ? "text-[3.4rem] leading-[1.25] min-[400px]:text-6xl sm:text-7xl lg:text-8xl" : "text-[2.9rem] leading-[1.02] min-[400px]:text-6xl sm:text-7xl lg:text-[6.2rem]"
+          }`}
+        >
+          <span className="rise block text-[#fef9ef]" style={{ ["--d" as string]: 120 }}>{t.heroLine1}</span>
+          <span
+            className="rise block bg-gradient-to-b from-[#f3a25a] to-[#d5762c] bg-clip-text text-transparent"
+            style={{ ["--d" as string]: 260 }}
+          >
+            {t.heroLine2}
+          </span>
+        </h1>
+
+        <p className="rise mt-6 max-w-2xl text-base leading-relaxed text-white/75 sm:text-lg" style={{ ["--d" as string]: 420 }}>
+          {t.heroLead}
+        </p>
+
+        <div className="rise mt-8 flex w-full flex-col justify-center gap-3 sm:w-auto sm:flex-row" style={{ ["--d" as string]: 560 }}>
+          <a
+            href="/#events"
+            onClick={sectionLink("events")}
+            className="group inline-flex h-13 items-center justify-center gap-2 rounded-full bg-[#e07b2e] px-7 text-base font-bold text-[#001f3b] shadow-[0_10px_40px_-10px_rgba(233,140,56,0.8)] transition-all hover:-translate-y-0.5 hover:bg-[#ee8f45]"
+          >
+            <Ticket className="size-5 transition-transform group-hover:-rotate-12" aria-hidden="true" />
+            {t.grabSeat}
+          </a>
+          <a
+            href="/#how"
+            onClick={sectionLink("how")}
+            className="inline-flex h-13 items-center justify-center gap-2 rounded-full border border-white/25 px-7 text-base font-semibold text-white transition-colors hover:border-white/60 hover:bg-white/5"
+          >
+            {t.heroHow}
+            <ArrowDown className="size-4" aria-hidden="true" />
+          </a>
         </div>
 
-        <BrandVisual />
+        <div className="mt-10">{nextEvent?.event_date && <Countdown event={nextEvent} />}</div>
       </div>
+
+      {/* Flashlight + motif from the campaign, blended into the navy. */}
+      <img
+        src="/brand/flashlight.webp"
+        alt=""
+        width={1122}
+        height={690}
+        fetchPriority="high"
+        className="pointer-events-none absolute bottom-0 left-1/2 -z-10 h-[300px] w-auto max-w-none -translate-x-1/2 sm:h-[380px]"
+        style={{ maskImage: "linear-gradient(to top, #000 70%, transparent), linear-gradient(to right, transparent, #000 18%, #000 82%, transparent)", maskComposite: "intersect" }}
+      />
+      <div
+        aria-hidden="true"
+        className="absolute inset-x-0 bottom-0 -z-10 h-[46px] bg-repeat-x sm:h-[58px]"
+        style={{ backgroundImage: "url(/brand/motif.png)", backgroundSize: "auto 100%", backgroundPosition: "center bottom" }}
+      />
     </section>
   );
 }

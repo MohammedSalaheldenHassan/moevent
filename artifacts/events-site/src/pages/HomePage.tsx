@@ -2,17 +2,23 @@ import { useEffect, useMemo } from "react";
 import { isPast, useEvents } from "@/lib/events";
 import { scrollToSection } from "@/lib/sections";
 import { Hero } from "@/components/landing/Hero";
+import { Marquee } from "@/components/landing/Marquee";
 import { StatsBar } from "@/components/landing/StatsBar";
 import { AvailableNow, pickAvailableNow } from "@/components/landing/AvailableNow";
 import { EventsSection } from "@/components/landing/EventsSection";
+import { MapSection } from "@/components/landing/MapSection";
+import { TableSection } from "@/components/landing/TableSection";
+import { StandOut } from "@/components/landing/StandOut";
 import { HowItWorks } from "@/components/landing/HowItWorks";
-import { About } from "@/components/landing/About";
+import { CampaignWall } from "@/components/landing/CampaignWall";
 import { Faq } from "@/components/landing/Faq";
 import { CtaBand } from "@/components/landing/CtaBand";
 
 export default function HomePage() {
   const { data, loading, error, reload } = useEvents();
   const upcoming = useMemo(() => data.filter((e) => !isPast(e)), [data]);
+  // The soonest dated event drives the hero's date and countdown.
+  const nextEvent = useMemo(() => upcoming.find((e) => e.event_date) ?? null, [upcoming]);
   // "Available now" only earns its place when it is a subset; if it would
   // list every upcoming event, the full list below already shows them.
   const availableNow = useMemo(() => {
@@ -30,12 +36,18 @@ export default function HomePage() {
 
   return (
     <>
-      <Hero />
+      <Hero nextEvent={nextEvent} />
+      <Marquee />
       <StatsBar />
       {!loading && !error && <AvailableNow events={availableNow} />}
       <EventsSection upcoming={upcoming} loading={loading} error={error} onRetry={reload} />
+      <div className="mt-20 sm:mt-24">
+        <MapSection />
+        <TableSection />
+        <StandOut />
+      </div>
       <HowItWorks />
-      <About />
+      <CampaignWall />
       <Faq />
       <CtaBand />
     </>

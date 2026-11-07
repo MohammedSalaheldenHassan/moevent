@@ -1,41 +1,44 @@
 @import "tailwindcss";
 
-/* Nexus Youth brand: Nile Blue #0E2A4A, Teal #1F7A7A, Sand #E6D6C2,
-   Copper #C47A3F, Ivory #F8F6F2. Montserrat (Latin) + Cairo (Arabic). */
+/* Nexus Youth brand (campaign files): Navy #001F3B, Orange #E07B2E,
+   Copper #CE8848, Sand #ECD4BD, Teal #1E5C61, Cream #FEF9EF.
+   Montserrat (Latin), Cairo (Arabic body), Ruwudu (Arabic display). */
 @theme {
-  --color-bg: #f8f6f2;
+  --color-bg: #fef9ef;
   --color-surface: #ffffff;
-  --color-ink: #0e2a4a;
-  --color-ink-soft: #33475e;
-  --color-muted: #5c6b7b;
-  --color-line: #e8e1d6;
-  --color-line-strong: #cfc4b2;
-  /* Primary action colour and the text on it. */
-  --color-accent: #0e2a4a;
-  --color-accent-hover: #1a4068;
-  --color-accent-soft: #e8eef5;
-  --color-on-accent: #ffffff;
-  /* Brand highlight. copper-ink is the copper that stays readable as text. */
-  --color-copper: #c47a3f;
-  --color-copper-ink: #9a5a26;
-  --color-copper-soft: #f7ebdf;
-  --color-on-copper: #0e2a4a;
-  --color-sand: #e6d6c2;
-  --color-teal: #1f7a7a;
-  --color-ok: #1f7a7a;
-  --color-ok-soft: #e2f1f0;
+  --color-ink: #001f3b;
+  --color-ink-soft: #283f58;
+  --color-muted: #586a7d;
+  --color-line: #eadfcd;
+  --color-line-strong: #d3c1a7;
+  /* Primary action: orange with navy text (navy on orange passes AA). */
+  --color-accent: #e07b2e;
+  --color-accent-hover: #ee8f45;
+  --color-accent-soft: #fbe8d6;
+  --color-on-accent: #001f3b;
+  /* Orange that stays readable as text on cream/white. */
+  --color-copper: #e07b2e;
+  --color-copper-ink: #a8521a;
+  --color-copper-soft: #fbe8d6;
+  --color-on-copper: #001f3b;
+  --color-sand: #ecd4bd;
+  --color-teal: #1e5c61;
+  --color-navy: #001f3b;
+  --color-cream: #fef9ef;
+  --color-ok: #1e6b5f;
+  --color-ok-soft: #e1f0ec;
   --color-danger: #b42318;
-  --color-warn-soft: #f8ecdd;
+  --color-warn-soft: #f9ead8;
   --color-warn: #85491a;
   --color-danger-soft: #fef3f2;
-  --color-placeholder: #efe9df;
-  /* Solid buttons (dark in light mode, light in dark mode) and their text. */
-  --color-btn: #0e2a4a;
+  --color-placeholder: #f1e8da;
+  --color-btn: #001f3b;
   --color-on-btn: #ffffff;
-  /* Always-dark feature panels (CTA band); text on them stays white. */
-  --color-panel: #0e2a4a;
+  /* Always-dark brand panels; text on them stays light. */
+  --color-panel: #001f3b;
 
   --font-sans: "Montserrat Variable", "Cairo Variable", system-ui, sans-serif;
+  --font-display: "Montserrat Variable", "Ruwudu", "Cairo Variable", system-ui, sans-serif;
   --font-mono: ui-monospace, "SFMono-Regular", Menlo, Consolas, monospace;
 }
 
@@ -46,33 +49,36 @@
 /* Dark theme. data-theme is set before first paint by theme-init.js. */
 :root[data-theme="dark"] {
   color-scheme: dark;
-  --color-bg: #081a2e;
-  --color-surface: #0f2640;
-  --color-ink: #f8f6f2;
-  --color-ink-soft: #d8d4cb;
-  --color-muted: #a3b2c2;
-  --color-line: #213a56;
-  --color-line-strong: #38557a;
-  --color-accent: #d9954f;
-  --color-accent-hover: #e6ac6f;
-  --color-accent-soft: #33261a;
-  --color-on-accent: #0e2a4a;
-  --color-copper: #d9954f;
-  --color-copper-ink: #e6ac6f;
-  --color-copper-soft: #33261a;
-  --color-sand: #e6d6c2;
-  --color-teal: #4fbdb3;
-  --color-ok: #4fbdb3;
-  --color-ok-soft: #103331;
+  --color-bg: #00172c;
+  --color-surface: #03233f;
+  --color-ink: #fef9ef;
+  --color-ink-soft: #dcd6cb;
+  --color-muted: #a3b3c4;
+  --color-line: #12345a;
+  --color-line-strong: #24507c;
+  --color-accent: #e98c38;
+  --color-accent-hover: #f3a25a;
+  --color-accent-soft: #3a2614;
+  --color-on-accent: #001f3b;
+  --color-copper: #e98c38;
+  --color-copper-ink: #f3a25a;
+  --color-copper-soft: #3a2614;
+  --color-ok: #5cc2b0;
+  --color-ok-soft: #0e322d;
   --color-danger: #ff8a7e;
   --color-danger-soft: #3a1714;
   --color-warn-soft: #36280f;
   --color-warn: #f0b56f;
-  --color-placeholder: #18304a;
-  --color-btn: #f8f6f2;
-  --color-on-btn: #0e2a4a;
-  --color-panel: #133356;
+  --color-placeholder: #0b2d4d;
+  --color-btn: #fef9ef;
+  --color-on-btn: #001f3b;
+  --color-panel: #001f3b;
 }
+
+/* The logo comes in two colourways; show the one that suits the theme. */
+.logo-on-dark { display: none; }
+:root[data-theme="dark"] .logo-auto .logo-on-light { display: none; }
+:root[data-theme="dark"] .logo-auto .logo-on-dark { display: block; }
 
 body {
   transition: background-color 0.2s ease, color 0.2s ease;
@@ -110,6 +116,7 @@ body {
 
 html[lang="ar"] body {
   --font-sans: "Cairo Variable", "Montserrat Variable", system-ui, sans-serif;
+  --font-display: "Ruwudu", "Cairo Variable", system-ui, sans-serif;
 }
 /* Letter-spacing breaks joined Arabic script. */
 html[lang="ar"] [class*="tracking-"] {
@@ -134,8 +141,63 @@ input[type="search"]::-webkit-search-cancel-button {
   animation: fade-in 0.25s ease-out both;
 }
 
+/* ── Landing page motion ─────────────────────────────────────────── */
+
+/* The flashlight beam switching on. */
+@keyframes beam-on {
+  0% { opacity: 0; transform: scaleY(0.6); }
+  12% { opacity: 0.9; }
+  18% { opacity: 0.35; }
+  30% { opacity: 1; transform: scaleY(1); }
+  100% { opacity: 1; transform: scaleY(1); }
+}
+.beam-on {
+  transform-origin: 50% 100%;
+  animation: beam-on 1.6s ease-out 0.3s both;
+}
+@keyframes beam-breathe {
+  0%, 100% { opacity: 0.85; }
+  50% { opacity: 1; }
+}
+.beam-breathe { animation: beam-breathe 5s ease-in-out 2s infinite; }
+
+/* Text rising into place, staggered with --d. */
+@keyframes rise {
+  from { opacity: 0; transform: translateY(18px); }
+  to { opacity: 1; transform: none; }
+}
+.rise { animation: rise 0.8s cubic-bezier(.2,.7,.2,1) calc(var(--d, 0) * 1ms) both; }
+
+/* Sections that reveal when scrolled into view (see useReveal). */
+.reveal { opacity: 0; transform: translateY(24px); transition: opacity .7s ease, transform .7s cubic-bezier(.2,.7,.2,1); transition-delay: calc(var(--d, 0) * 1ms); }
+.reveal.is-in, .is-in .reveal { opacity: 1; transform: none; }
+
+/* Endless horizontal strips. The track holds the content twice. */
+@keyframes marquee { to { transform: translateX(-50%); } }
+@keyframes marquee-rtl { to { transform: translateX(50%); } }
+.marquee-track { animation: marquee var(--speed, 40s) linear infinite; }
+[dir="rtl"] .marquee-track { animation-name: marquee-rtl; }
+.marquee:hover .marquee-track { animation-play-state: paused; }
+
+/* "Your seat" pulse. */
+@keyframes seat-ping {
+  0% { transform: scale(.7); opacity: .9; }
+  100% { transform: scale(1.9); opacity: 0; }
+}
+.seat-ping { animation: seat-ping 1.8s cubic-bezier(0,0,.2,1) infinite; }
+
+/* The map route drawing itself. */
+.route-draw { stroke-dasharray: 1; stroke-dashoffset: 1; transition: stroke-dashoffset 2.2s ease-in-out .2s; }
+.is-in .route-draw { stroke-dashoffset: 0; }
+.waypoint { opacity: 0; transform: scale(.6); transform-box: fill-box; transform-origin: center; transition: opacity .4s ease, transform .5s cubic-bezier(.3,1.6,.5,1); transition-delay: calc(var(--d, 0) * 1ms); }
+.is-in .waypoint { opacity: 1; transform: none; }
+
 @media (prefers-reduced-motion: reduce) {
   html { scroll-behavior: auto; }
-  .fade-in { animation: none; }
+  .fade-in, .beam-on, .beam-breathe, .rise, .seat-ping { animation: none; }
+  .marquee-track { animation: none; }
+  .reveal { opacity: 1; transform: none; }
+  .route-draw { stroke-dashoffset: 0; }
+  .waypoint { opacity: 1; transform: none; }
   * { transition: none !important; }
 }

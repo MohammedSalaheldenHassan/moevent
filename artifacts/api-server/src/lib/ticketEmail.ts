@@ -78,7 +78,7 @@ export function buildEmailHtml({
   const row = (label: string, value: string, extra = "") => `
               <tr>
                 <td style="padding:12px 0;border-bottom:1px solid #EFE9DF;font:600 11px/1.4 ${font};letter-spacing:.08em;text-transform:uppercase;color:#5C6B7B;width:38%;vertical-align:top;">${label}</td>
-                <td style="padding:12px 0;border-bottom:1px solid #EFE9DF;font:500 15px/1.45 ${font};color:#0E2A4A;vertical-align:top;">${value}${extra}</td>
+                <td style="padding:12px 0;border-bottom:1px solid #EFE9DF;font:500 15px/1.45 ${font};color:#001F3B;vertical-align:top;">${value}${extra}</td>
               </tr>`;
 
   const ticketRows = tickets
@@ -86,7 +86,7 @@ export function buildEmailHtml({
       const tt = ticketTheme(t.attendeeType);
       return `
               <tr>
-                <td style="padding:10px 14px;border-top:${i ? "1px solid #EFE9DF" : "0"};font:600 16px/1.3 'SFMono-Regular',Menlo,Consolas,monospace;letter-spacing:.06em;color:#0E2A4A;">#${shortTicketId(t.id)}</td>
+                <td style="padding:10px 14px;border-top:${i ? "1px solid #EFE9DF" : "0"};font:600 16px/1.3 'SFMono-Regular',Menlo,Consolas,monospace;letter-spacing:.06em;color:#001F3B;">#${shortTicketId(t.id)}</td>
                 <td align="right" style="padding:10px 14px;border-top:${i ? "1px solid #EFE9DF" : "0"};">
                   <span style="display:inline-block;padding:4px 10px;border-radius:999px;background:${tt.accent};color:${tt.onAccent};font:700 11px/1.2 ${font};letter-spacing:.12em;">${tt.premium ? "&#9733; " : ""}${tt.label}</span>
                 </td>
@@ -104,7 +104,7 @@ export function buildEmailHtml({
 
   const button = (href: string, label: string, primary: boolean) =>
     `<a href="${escapeHtml(href)}" target="_blank" style="display:inline-block;margin:4px 6px 4px 0;padding:12px 20px;border-radius:10px;font:600 14px/1 ${font};text-decoration:none;${
-      primary ? `background:#0E2A4A;color:#FFFFFF;` : `background:#FFFFFF;color:#0E2A4A;border:1px solid #CFC4B2;`
+      primary ? `background:#001F3B;color:#FFFFFF;` : `background:#FFFFFF;color:#001F3B;border:1px solid #CFC4B2;`
     }">${label}</a>`;
 
   return `<!DOCTYPE html>
@@ -115,9 +115,9 @@ export function buildEmailHtml({
   <meta name="color-scheme" content="light only">
   <title>${many ? "Your tickets" : "Your ticket"} – ${title}</title>
 </head>
-<body style="margin:0;padding:0;background:#F8F6F2;-webkit-text-size-adjust:100%;">
+<body style="margin:0;padding:0;background:#FEF9EF;-webkit-text-size-adjust:100%;">
   <div style="display:none;max-height:0;overflow:hidden;opacity:0;color:transparent;">${escapeHtml(preheader)}</div>
-  <table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0" style="background:#F8F6F2;">
+  <table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0" style="background:#FEF9EF;">
     <tr>
       <td align="center" style="padding:28px 12px 40px;">
         <table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0" style="max-width:560px;">
@@ -126,8 +126,8 @@ export function buildEmailHtml({
           <tr>
             <td style="padding:0 6px 16px;">
               ${logo
-                ? `<img src="${escapeHtml(logo)}" width="146" height="36" alt="${brand}" style="display:block;border:0;">`
-                : `<span style="font:800 18px/1 ${font};color:#0E2A4A;">${brand}</span>`}
+                ? `<img src="${escapeHtml(logo)}" width="142" height="40" alt="${brand}" style="display:block;border:0;">`
+                : `<span style="font:800 18px/1 ${font};color:#001F3B;">${brand}</span>`}
             </td>
           </tr>
 
@@ -173,7 +173,7 @@ export function buildEmailHtml({
                 <!-- How to enter -->
                 <tr>
                   <td style="padding:22px 28px 6px;">
-                    <p style="margin:0 0 6px;font:700 16px/1.4 ${font};color:#0E2A4A;">At the entrance</p>
+                    <p style="margin:0 0 6px;font:700 16px/1.4 ${font};color:#001F3B;">At the entrance</p>
                     <table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0">
                       ${step(1, `Open the attached PDF ${many ? "tickets" : "ticket"} &mdash; on your phone or printed.`)}
                       ${step(2, `Show the QR code to the staff at the door. ${many ? "Each guest needs their own ticket." : ""}`)}

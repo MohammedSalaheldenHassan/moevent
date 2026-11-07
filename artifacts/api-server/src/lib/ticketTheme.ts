@@ -29,19 +29,19 @@ export interface TicketTheme {
 export const TICKET_THEMES: Record<TicketKind, TicketTheme> = {
   student: {
     kind: "student", label: "STUDENT", tagline: "Student admission",
-    dark: "#0B3B3B", dark2: "#1F7A7A", accent: "#4FBDB3", onAccent: "#0B3B3B", soft: "#E2F1F0", text: "#1F7A7A", premium: false,
+    dark: "#0C3437", dark2: "#1E5C61", accent: "#6FC1B8", onAccent: "#0C3437", soft: "#E1F0EE", text: "#1E5C61", premium: false,
   },
   regular: {
     kind: "regular", label: "REGULAR", tagline: "General admission",
-    dark: "#0E2A4A", dark2: "#1C4C80", accent: "#8DB4DB", onAccent: "#0E2A4A", soft: "#E8EEF5", text: "#1C4C80", premium: false,
+    dark: "#001F3B", dark2: "#0B3A66", accent: "#E07B2E", onAccent: "#001F3B", soft: "#E7EDF4", text: "#0B3A66", premium: false,
   },
   organization: {
     kind: "organization", label: "ORGANIZATION", tagline: "Organization admission",
-    dark: "#2A3A4A", dark2: "#4C6073", accent: "#E6D6C2", onAccent: "#2A3A4A", soft: "#F3ECE2", text: "#4C6073", premium: false,
+    dark: "#2A3A4A", dark2: "#4C6073", accent: "#ECD4BD", onAccent: "#2A3A4A", soft: "#F3ECE2", text: "#4C6073", premium: false,
   },
   vip: {
     kind: "vip", label: "VIP", tagline: "VIP access",
-    dark: "#5A3113", dark2: "#C47A3F", accent: "#F2D7B8", onAccent: "#5A3113", soft: "#F7EBDF", text: "#9A5A26", premium: true,
+    dark: "#5A2E0E", dark2: "#E07B2E", accent: "#FBE1C6", onAccent: "#5A2E0E", soft: "#FBE8D6", text: "#A8521A", premium: true,
   },
   vvip: {
     kind: "vvip", label: "VVIP", tagline: "Very VIP · All access",

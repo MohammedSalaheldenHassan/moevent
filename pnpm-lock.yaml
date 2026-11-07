@@ -181,6 +181,9 @@ importers:
       '@fontsource-variable/montserrat':
         specifier: ^5.3.0
         version: 5.3.0
+      '@fontsource/ruwudu':
+        specifier: 5.2.5
+        version: 5.2.5
       '@supabase/supabase-js':
         specifier: ^2.100.1
         version: 2.100.1
@@ -1249,6 +1252,9 @@ packages:
 
   '@fontsource-variable/montserrat@5.3.0':
     resolution: {integrity: sha512-7PaZoxaxrWLAyrhO46v65An9LhUhfkTExWLhfbywYZCnZEgg/W1rEHnlNmZKjNZ3nJTVYyicqxlJt10z/26yTA==}
+
+  '@fontsource/ruwudu@5.2.5':
+    resolution: {integrity: sha512-vgbKrKz04rlMF32Zvrca+ZlCw0bDjSJBe1oMTCKFXVG8ijTmdQG31lzRwRaV/sywb2U7ziM1VcFy2NPyOFaknA==}
 
   '@gerrit0/mini-shiki@3.23.0':
     resolution: {integrity: sha512-bEMORlG0cqdjVyCEuU0cDQbORWX+kYCeo0kV1lbxF5bt4r7SID2l9bqsxJEM0zndaxpOUT7riCyIVEuqq/Ynxg==}
@@ -4767,6 +4773,8 @@ snapshots:
   '@fontsource-variable/cairo@5.3.0': {}
 
   '@fontsource-variable/montserrat@5.3.0': {}
+
+  '@fontsource/ruwudu@5.2.5': {}
 
   '@gerrit0/mini-shiki@3.23.0':
     dependencies:
