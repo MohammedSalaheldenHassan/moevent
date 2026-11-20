@@ -2,6 +2,7 @@ import { Router, type IRouter } from "express";
 import { createClient } from "@supabase/supabase-js";
 import { getSupabaseProjectUrl } from "../lib/supabaseProjectUrl";
 import { requireAdmin } from "../middlewares/requireAdmin";
+import { generateTemporaryPassword, setStaffPassword } from "../lib/staffPassword";
 
 const router: IRouter = Router();
 
@@ -43,6 +44,9 @@ router.post("/staff/create", requireAdmin, async (req, res) => {
       password,
       email_confirm: true, // auto-confirm so they can log in immediately
       user_metadata: { full_name: full_name?.trim() || null },
+      // Staff get a password from an admin; the gate app makes them set their
+      // own (verified by an email code) at the first sign-in.
+      ...(assignedRole === "staff" ? { app_metadata: { must_change_password: true } } : {}),
     });
 
     if (createError) {
@@ -81,6 +85,65 @@ router.post("/staff/create", requireAdmin, async (req, res) => {
   } catch (err: unknown) {
     const msg = err instanceof Error ? err.message : "Internal server error";
     console.error("[staff/create] unexpected error:", msg);
+    res.status(500).json({ error: "Internal server error" });
+  }
+});
+
+// POST /api/staff/:id/reset-password
+// Gives a staff member a new random temporary password, returned once. They
+// must set their own password at their next gate-app sign-in.
+// Supabase's admin password change deletes all of their sessions, so their
+// phone is sent to login at its next token refresh. Until then (up to the
+// access token's lifetime, about an hour) the current access token still
+// works against the database, which only checks its signature.
+router.post("/staff/:id/reset-password", requireAdmin, async (req, res) => {
+  res.set("Cache-Control", "no-store");
+  try {
+    const id = String(req.params["id"]);
+    if (id === res.locals["userId"]) {
+      res.status(400).json({ error: "You cannot reset your own password here." });
+      return;
+    }
+
+    const adminClient = getAdminClient();
+    const { data: profile, error: profileError } = await adminClient
+      .from("profiles").select("role").eq("id", id).maybeSingle();
+    if (profileError) {
+      res.status(500).json({ error: profileError.message });
+      return;
+    }
+    if (!profile) {
+      res.status(404).json({ error: "Staff member not found." });
+      return;
+    }
+    if (profile.role !== "staff") {
+      res.status(400).json({ error: "Only staff accounts can be reset here." });
+      return;
+    }
+
+    const password = generateTemporaryPassword();
+    const { error, passwordChanged } = await setStaffPassword(adminClient, id, password, {
+      mustChangeAfter: true,
+    });
+    if (error && !passwordChanged) {
+      console.error("[staff/reset-password] failed:", error.message);
+      res.status(500).json({ error: `Password not changed: ${error.message}` });
+      return;
+    }
+    if (error) {
+      // The password did change, so the admin still needs to see it.
+      console.error("[staff/reset-password] flag not set:", error.message);
+      res.status(207).json({
+        password,
+        warning: "Password changed, but they won't be asked to set their own. Reset again to retry.",
+      });
+      return;
+    }
+
+    res.json({ password });
+  } catch (err: unknown) {
+    const msg = err instanceof Error ? err.message : "Internal server error";
+    console.error("[staff/reset-password] unexpected error:", msg);
     res.status(500).json({ error: "Internal server error" });
   }
 });
