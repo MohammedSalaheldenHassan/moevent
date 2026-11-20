@@ -66,6 +66,9 @@ const limiter = (limit: number) =>
   });
 app.use("/api", limiter(300));
 app.use(["/api/auth", "/api/staff", "/api/issue-ticket", "/api/cleanup/run", "/api/org", "/api/tickets/send-email"], limiter(60));
+// Password changes from the gate app. Per IP, and staff at one venue may
+// share an IP, so it is generous; wrong codes are also capped per user.
+app.use("/api/account", limiter(40));
 // Public bookings: a person books a few times at most; scripts get cut off.
 app.use("/api/public/bookings", limiter(10));
 

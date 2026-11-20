@@ -16,6 +16,8 @@ import {
   Plus,
   Eye,
   EyeOff,
+  KeyRound,
+  Copy,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -64,6 +66,15 @@ export default function StaffPage() {
   const [deleteTarget, setDeleteTarget] = useState<Profile | null>(null);
   const [deleting, setDeleting] = useState(false);
   const [deleteError, setDeleteError] = useState<string | null>(null);
+
+  // ── Reset Password ─────────────────────────────────────────
+  const [resetTarget, setResetTarget] = useState<Profile | null>(null);
+  const [resetting, setResetting] = useState(false);
+  const [resetError, setResetError] = useState<string | null>(null);
+  const [resetWarning, setResetWarning] = useState<string | null>(null);
+  // Shown once, then dropped from state when the dialog closes.
+  const [tempPassword, setTempPassword] = useState<string | null>(null);
+  const [copied, setCopied] = useState(false);
 
   // ──────────────────────────────────────────────────────────
 
@@ -226,6 +237,54 @@ export default function StaffPage() {
       setDeleteError(err instanceof Error ? err.message : "Failed to delete profile");
     } finally {
       setDeleting(false);
+    }
+  };
+
+  // ── Reset Password ─────────────────────────────────────────
+  const openReset = (profile: Profile) => {
+    setResetTarget(profile);
+    setResetError(null);
+    setResetWarning(null);
+    setTempPassword(null);
+    setCopied(false);
+  };
+
+  const closeReset = () => {
+    setResetTarget(null);
+    setTempPassword(null);
+    setResetError(null);
+    setResetWarning(null);
+    setCopied(false);
+  };
+
+  const handleReset = async () => {
+    if (!resetTarget) return;
+    setResetting(true);
+    setResetError(null);
+    try {
+      const res = await fetch(`${getApiBase()}/staff/${resetTarget.id}/reset-password`, {
+        method: "POST",
+        headers: await getApiAuthHeaders(),
+      });
+      const json = await res.json() as { password?: string; warning?: string; error?: string };
+      if (!res.ok || !json.password) throw new Error(json.error || `Server error ${res.status}`);
+      setTempPassword(json.password);
+      if (json.warning) setResetWarning(json.warning);
+      logActivity("settings_changed", `Reset password: ${resetTarget.email}`, currentProfile?.email ?? undefined);
+    } catch (err: unknown) {
+      setResetError(err instanceof Error ? err.message : "Failed to reset password");
+    } finally {
+      setResetting(false);
+    }
+  };
+
+  const copyTempPassword = async () => {
+    if (!tempPassword) return;
+    try {
+      await navigator.clipboard.writeText(tempPassword);
+      setCopied(true);
+    } catch {
+      setCopied(false);
     }
   };
 
@@ -394,6 +453,15 @@ export default function StaffPage() {
                     >
                       <Pencil className="w-3.5 h-3.5" />
                     </button>
+                    {!isAdmin && !isSelf && (
+                      <button
+                        onClick={() => openReset(profile)}
+                        className="p-1.5 rounded-lg text-muted-foreground hover:text-foreground hover:bg-muted transition-all"
+                        title={isAr ? "إعادة تعيين كلمة المرور" : "Reset password"}
+                      >
+                        <KeyRound className="w-3.5 h-3.5" />
+                      </button>
+                    )}
                     <button
                       onClick={() => { setDeleteTarget(profile); setDeleteError(null); }}
                       disabled={isSelf}
@@ -566,6 +634,90 @@ export default function StaffPage() {
                 : <><Check className="w-4 h-4" />{isAr ? "حفظ التغييرات" : "Save Changes"}</>
               }
             </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* ── Reset Password Modal ──────────────────────────────── */}
+      <Dialog open={!!resetTarget} onOpenChange={(o) => { if (!o && !resetting) closeReset(); }}>
+        <DialogContent className="sm:max-w-sm rounded-lg">
+          <DialogHeader>
+            <DialogTitle className="text-lg font-semibold">
+              {isAr ? "إعادة تعيين كلمة المرور" : "Reset password"}
+            </DialogTitle>
+            {resetTarget && (
+              <DialogDescription className="text-sm text-muted-foreground">
+                {resetTarget.full_name || t.unnamedUser} · {resetTarget.email || resetTarget.id}
+              </DialogDescription>
+            )}
+          </DialogHeader>
+
+          {tempPassword ? (
+            <div className="space-y-3 py-2">
+              <p className="text-sm text-foreground">
+                {isAr
+                  ? "كلمة المرور المؤقتة. انسخها وأرسلها للموظف، فلن تظهر مرة أخرى."
+                  : "Temporary password. Copy it and give it to them: it won't be shown again."}
+              </p>
+              <div className="flex items-center gap-2">
+                <code
+                  dir="ltr"
+                  className="flex-1 px-3 py-2.5 rounded-md bg-muted border border-border font-mono text-base tracking-wide select-all"
+                >
+                  {tempPassword}
+                </code>
+                <Button variant="outline" size="sm" onClick={copyTempPassword} className="rounded-md shrink-0">
+                  {copied ? <Check className="w-4 h-4" /> : <Copy className="w-4 h-4" />}
+                  {copied ? (isAr ? "تم النسخ" : "Copied") : (isAr ? "نسخ" : "Copy")}
+                </Button>
+              </div>
+              <p className="text-xs text-muted-foreground">
+                {isAr
+                  ? "سيُطلب منهم تعيين كلمة مرور خاصة بهم عند تسجيل الدخول التالي في تطبيق البوابة."
+                  : "They'll set their own password at their next sign-in to the gate app."}
+              </p>
+              {resetWarning && (
+                <div className="flex items-start gap-2 p-3 bg-amber-50 dark:bg-amber-900/10 border border-amber-200 dark:border-amber-800/30 rounded-md text-amber-800 dark:text-amber-400">
+                  <AlertCircle className="w-4 h-4 shrink-0 mt-0.5" />
+                  <p className="text-xs">{resetWarning}</p>
+                </div>
+              )}
+            </div>
+          ) : (
+            <div className="space-y-3 py-2">
+              <p className="text-sm text-muted-foreground">
+                {isAr
+                  ? "ستتوقف كلمة المرور الحالية عن العمل، وستحصل على كلمة مرور مؤقتة جديدة لإعطائها للموظف."
+                  : "Their current password stops working. You'll get a new temporary password to give them."}
+              </p>
+              {resetError && (
+                <div className="flex items-start gap-2 p-3 bg-destructive/10 border border-destructive/20 rounded-md text-sm text-destructive">
+                  <AlertCircle className="w-4 h-4 shrink-0 mt-0.5" />
+                  <p className="text-xs">{resetError}</p>
+                </div>
+              )}
+            </div>
+          )}
+
+          <DialogFooter className="gap-2">
+            {tempPassword ? (
+              <Button onClick={closeReset} className="rounded-md bg-primary border-0 shadow-md">
+                <Check className="w-4 h-4" />
+                {isAr ? "تم" : "Done"}
+              </Button>
+            ) : (
+              <>
+                <Button variant="outline" onClick={closeReset} className="rounded-md" disabled={resetting}>
+                  {t.cancel}
+                </Button>
+                <Button onClick={handleReset} disabled={resetting} className="rounded-md bg-primary border-0 shadow-md">
+                  {resetting
+                    ? <><Loader2 className="w-4 h-4 animate-spin" />{isAr ? "جارٍ إعادة التعيين..." : "Resetting..."}</>
+                    : <><KeyRound className="w-4 h-4" />{isAr ? "إعادة التعيين" : "Reset password"}</>
+                  }
+                </Button>
+              </>
+            )}
           </DialogFooter>
         </DialogContent>
       </Dialog>
